@@ -45,8 +45,49 @@ final class PermissionCoordinator {
         !pendingSince.isEmpty || microphone == .requesting
     }
 
+    /// Re-checks while a permission is still missing.
+    ///
+    /// macOS never tells an app that its authorisation changed, and granting
+    /// one happens in System Settings — another app entirely. Without this the
+    /// state was read once at launch and never again, so the only way to make
+    /// the app notice a permission it already had was to quit and relaunch it.
+    @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var pollTimer: Timer?
+
     init() {
         refresh()
+        // Coming back from System Settings is the moment the answer changed.
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                PermissionCoordinator.shared.refresh()
+                PermissionCoordinator.shared.startPolling()
+            }
+        }
+        startPolling()
+    }
+
+    /// Accessibility and input monitoring can be granted without the app ever
+    /// losing focus, so the activation notification alone would miss them. The
+    /// poll stops as soon as nothing is outstanding, and this object lives for
+    /// the process lifetime, so there is nothing to tear down.
+    private func startPolling() {
+        guard pollTimer == nil, !requiredPermissionsGranted else { return }
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+            Task { @MainActor in
+                PermissionCoordinator.shared.pollOnce()
+            }
+        }
+    }
+
+    private func pollOnce() {
+        refresh()
+        guard requiredPermissionsGranted else { return }
+        pollTimer?.invalidate()
+        pollTimer = nil
     }
 
     func status(for permission: VoxoLPermission) -> VoxoLPermissionStatus {
