@@ -33,7 +33,11 @@ for manifest in "$ROOT"/benchmarks/*/manifest-frozen.json; do
   [ -f "$manifest" ] || continue
   directory="$(dirname "$manifest")"
   name="$(basename "$directory")"
-  language="${name##*-}"
+  # Derived cells append a condition suffix (commonvoice-fr-babble10db), so a
+  # naive suffix strip hands the competitor "babble10db" as its language hint
+  # and quietly corrupts the comparison it is meant to make fair.
+  base="${name%-babble*db}"
+  language="${base##*-}"
   report="$directory/wispr-report.json"
 
   if [ -f "$report" ]; then
