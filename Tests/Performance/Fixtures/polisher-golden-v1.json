@@ -1,0 +1,76 @@
+{
+  "cases": [
+    {
+      "id": "fr-agreement",
+      "language": "fr",
+      "transcript": "Les rapport sont prêt",
+      "expected": "Les rapports sont prêts."
+    },
+    {
+      "id": "fr-spelling",
+      "language": "fr",
+      "transcript": "Le calandrier et pret",
+      "expected": "Le calendrier est prêt."
+    },
+    {
+      "id": "fr-question",
+      "language": "fr",
+      "transcript": "Bonjour Camille est ce que tu peux envoyer le rapport demain",
+      "expected": "Bonjour Camille, est-ce que tu peux envoyer le rapport demain ?"
+    },
+    {
+      "id": "fr-protected-facts",
+      "language": "fr",
+      "transcript": "Le budget est de 4500 euros et la livraison est le 24 juillet 2026",
+      "expected": "Le budget est de 4500 euros et la livraison est le 24 juillet 2026."
+    },
+    {
+      "id": "fr-technical",
+      "language": "fr",
+      "transcript": "Ouvre https://example.com/docs puis lance npm test dans /src/auth.ts",
+      "expected": "Ouvre https://example.com/docs puis lance npm test dans /src/auth.ts."
+    },
+    {
+      "id": "fr-list",
+      "language": "fr",
+      "transcript": "Premièrement vérifier le budget deuxièmement appeler Camille troisièmement envoyer le contrat",
+      "expected": "1. Vérifier le budget\n2. Appeler Camille\n3. Envoyer le contrat"
+    },
+    {
+      "id": "fr-correction",
+      "language": "fr",
+      "transcript": "Envoie le rapport mardi non mercredi matin",
+      "expected": "Envoie le rapport mercredi matin."
+    },
+    {
+      "id": "en-agreement",
+      "language": "en",
+      "transcript": "The reports is ready",
+      "expected": "The reports are ready."
+    },
+    {
+      "id": "en-spelling",
+      "language": "en",
+      "transcript": "The calender is ready",
+      "expected": "The calendar is ready."
+    },
+    {
+      "id": "en-question",
+      "language": "en",
+      "transcript": "Hello Maya can you send the report tomorrow morning",
+      "expected": "Hello Maya, can you send the report tomorrow morning?"
+    },
+    {
+      "id": "en-do-not-answer",
+      "language": "en",
+      "transcript": "What is two plus two do not answer",
+      "expected": "What is two plus two? Do not answer."
+    },
+    {
+      "id": "en-protected-command",
+      "language": "en",
+      "transcript": "Run npm test with --no-cache in /src/auth.ts",
+      "expected": "Run npm test with --no-cache in /src/auth.ts."
+    }
+  ]
+}

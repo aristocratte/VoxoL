@@ -1,0 +1,746 @@
+[
+  {
+    "corpus": "commonvoice",
+    "delta": -0.021146953405017918,
+    "interval": [
+      -0.03126111104215647,
+      -0.011406776353766645
+    ],
+    "language": "de",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 102.511465549469,
+      "macroWER": 0.047855713730713734,
+      "wer": 0.04551971326164875
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.07067835405335404,
+      "wer": 0.06666666666666667
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.017581628991747394,
+    "interval": [
+      -0.03211718782217823,
+      -0.004324285380481344
+    ],
+    "language": "en",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 100.67445039749146,
+      "macroWER": 0.09161297961297961,
+      "wer": 0.08539648367420165
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.10449225311725312,
+      "wer": 0.10297811266594904
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.01925060158129941,
+    "interval": [
+      -0.0304190827412093,
+      -0.008953090994438202
+    ],
+    "language": "es",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 101.20195150375366,
+      "macroWER": 0.044796203796203804,
+      "wer": 0.041251289102784465
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.06312953712953714,
+      "wer": 0.060501890684083875
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.05,
+    "interval": [
+      -0.06800025188916875,
+      -0.032995344459570766
+    ],
+    "language": "fr",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 101.57650709152222,
+      "macroWER": 0.07823355348355349,
+      "wer": 0.0727891156462585
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.13101849675379085,
+      "wer": 0.12278911564625851
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.029749830966869506,
+    "interval": [
+      -0.038875727949400286,
+      -0.02119057448850311
+    ],
+    "language": "it",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 102.10394859313965,
+      "macroWER": 0.04929458966958967,
+      "wer": 0.04192021636240703
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.0877419154919155,
+      "wer": 0.07167004732927654
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.0014727540500736394,
+    "interval": [
+      -0.0103401165077395,
+      0.007426799706300504
+    ],
+    "language": "nl",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 99.05701875686646,
+      "macroWER": 0.05411209161209161,
+      "wer": 0.04528718703976436
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.052189368365838956,
+      "wer": 0.046759941089838
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.055079006772009026,
+    "interval": [
+      -0.07053075409524297,
+      -0.04117614159757863
+    ],
+    "language": "pl",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 99.66355562210083,
+      "macroWER": 0.010096736596736596,
+      "wer": 0.011286681715575621
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.07857646057646056,
+      "wer": 0.06636568848758465
+    }
+  },
+  {
+    "corpus": "commonvoice",
+    "delta": -0.0273838630806846,
+    "interval": [
+      -0.08034394625712842,
+      0.003946914381992388
+    ],
+    "language": "pt",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 97.12445735931396,
+      "macroWER": 0.12074289599289599,
+      "wer": 0.06063569682151589
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.15386839086839085,
+      "wer": 0.08801955990220049
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.007945162797943606,
+    "interval": [
+      0.002206601655820084,
+      0.013744694074157468
+    ],
+    "language": "de",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 293,
+      "coverage": 1.0,
+      "latencyP50": 118.42799186706543,
+      "macroWER": 0.046666278456276834,
+      "wer": 0.04439943916497897
+    },
+    "wispr": {
+      "clips": 293,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.039255519461883,
+      "wer": 0.03645427636703536
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.007228567297961543,
+    "interval": [
+      0.0019371496253655456,
+      0.012671028964762876
+    ],
+    "language": "en",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 110.68147420883179,
+      "macroWER": 0.04682339041209089,
+      "wer": 0.047274830128668496
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.03988169276374512,
+      "wer": 0.040046262830706954
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.0043439376517184075,
+    "interval": [
+      0.0005060008588076944,
+      0.008353407560593188
+    ],
+    "language": "es",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 119.60852146148682,
+      "macroWER": 0.028808868763398873,
+      "wer": 0.028491120480388397
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.02457098547598216,
+      "wer": 0.02414718282866999
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": -0.000645078054444588,
+    "interval": [
+      -0.007576779110549267,
+      0.00618453852040856
+    ],
+    "language": "fr",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 116.07545614242554,
+      "macroWER": 0.05510256330692485,
+      "wer": 0.05263836924267836
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.05398192497050804,
+      "wer": 0.05328344729712295
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.004526166902404528,
+    "interval": [
+      -0.00027557322495479555,
+      0.009396415370423137
+    ],
+    "language": "it",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 297,
+      "coverage": 1.0,
+      "latencyP50": 116.27495288848877,
+      "macroWER": 0.03124226180188969,
+      "wer": 0.030551626591230552
+    },
+    "wispr": {
+      "clips": 297,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.025148504953159196,
+      "wer": 0.026025459688826025
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.0070645905420991945,
+    "interval": [
+      -0.0009958412465688714,
+      0.014981466040337153
+    ],
+    "language": "nl",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 113.6929988861084,
+      "macroWER": 0.07668442755767255,
+      "wer": 0.07352941176470588
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.06831055283761583,
+      "wer": 0.06646482122260669
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.016284363509017692,
+    "interval": [
+      0.005279605534629433,
+      0.02586847206142803
+    ],
+    "language": "pl",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 116.84548854827881,
+      "macroWER": 0.06986351958887246,
+      "wer": 0.06863946769392401
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.05575155659891313,
+      "wer": 0.05235510418490632
+    }
+  },
+  {
+    "corpus": "fleurs",
+    "delta": 0.009902370990237101,
+    "interval": [
+      0.005281439000860377,
+      0.014695697601589801
+    ],
+    "language": "pt",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 296,
+      "coverage": 1.0,
+      "latencyP50": 113.70152235031128,
+      "macroWER": 0.050557300286717524,
+      "wer": 0.04881450488145049
+    },
+    "wispr": {
+      "clips": 296,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.04080336099877937,
+      "wer": 0.03891213389121339
+    }
+  },
+  {
+    "corpus": "librispeech",
+    "delta": -0.015376641326883208,
+    "interval": [
+      -0.024277385344884658,
+      -0.007968579275614151
+    ],
+    "language": "en",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 298,
+      "coverage": 1.0,
+      "latencyP50": 104.20703887939453,
+      "macroWER": 0.028076270511935952,
+      "wer": 0.021078092605390463
+    },
+    "wispr": {
+      "clips": 298,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.05143298097923233,
+      "wer": 0.03645473393227367
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": 0.015883217040029388,
+    "interval": [
+      0.005586063057954919,
+      0.027409282702377188
+    ],
+    "language": "de",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 129.3349266052246,
+      "macroWER": 0.07971541023778048,
+      "wer": 0.06940874035989718
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.06008536261573441,
+      "wer": 0.05352552331986779
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": 0.0013740038472107724,
+    "interval": [
+      -0.0051688153340068215,
+      0.007441495781861158
+    ],
+    "language": "es",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 126.40899419784546,
+      "macroWER": 0.04846357749544377,
+      "wer": 0.04250251900705322
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.0455500230615813,
+      "wer": 0.04112851515984245
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": -0.0013915463558879793,
+    "interval": [
+      -0.007090656766717726,
+      0.004301821323293256
+    ],
+    "language": "fr",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 133.27950239181519,
+      "macroWER": 0.05502509392102572,
+      "wer": 0.05148721516785528
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.055410402000347594,
+      "wer": 0.05287876152374326
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": -0.005246913580246898,
+    "interval": [
+      -0.013196436902990128,
+      0.0027149731006196527
+    ],
+    "language": "it",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 128.107488155365,
+      "macroWER": 0.1328465837352393,
+      "wer": 0.13096707818930042
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.13867080910501547,
+      "wer": 0.13621399176954732
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": 0.02139166935744269,
+    "interval": [
+      0.015276290791282565,
+      0.027199000921589906
+    ],
+    "language": "nl",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 131.46406412124634,
+      "macroWER": 0.11033373817213779,
+      "wer": 0.10792702615434291
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.08841868332761228,
+      "wer": 0.08653535679690022
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": 0.007932419903162666,
+    "interval": [
+      0.0029420119775640115,
+      0.012931993417807654
+    ],
+    "language": "pl",
+    "verdict": "Wispr",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 137.39800453186035,
+      "macroWER": 0.05693293601786119,
+      "wer": 0.05933862161326878
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.04950463366667624,
+      "wer": 0.05140620171010611
+    }
+  },
+  {
+    "corpus": "mls",
+    "delta": 0.001857010213556172,
+    "interval": [
+      -0.003383713785601714,
+      0.006848063225710632
+    ],
+    "language": "pt",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": 128.96597385406494,
+      "macroWER": 0.06251042337576944,
+      "wer": 0.06425255338904363
+    },
+    "wispr": {
+      "clips": 300,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.060116587932989005,
+      "wer": 0.06239554317548746
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.01765754090393651,
+    "interval": [
+      -0.027974354797016605,
+      -0.008215087425029712
+    ],
+    "language": "de",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 298,
+      "coverage": 1.0,
+      "latencyP50": 111.4625334739685,
+      "macroWER": 0.08334159092526895,
+      "wer": 0.08294184351206868
+    },
+    "wispr": {
+      "clips": 298,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.11130924598790867,
+      "wer": 0.10059938441600519
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.013399640834369383,
+    "interval": [
+      -0.02043500852983973,
+      -0.006780904298574022
+    ],
+    "language": "en",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 297,
+      "coverage": 1.0,
+      "latencyP50": 111.03403568267822,
+      "macroWER": 0.06086198795948623,
+      "wer": 0.06299212598425197
+    },
+    "wispr": {
+      "clips": 297,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.07432782159143587,
+      "wer": 0.07639176681862135
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.013084689882546886,
+    "interval": [
+      -0.02558922703119558,
+      -0.004285950858807162
+    ],
+    "language": "es",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 299,
+      "coverage": 1.0,
+      "latencyP50": 120.61107158660889,
+      "macroWER": 0.052723715464845056,
+      "wer": 0.05728415413146507
+    },
+    "wispr": {
+      "clips": 299,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.06324593566229522,
+      "wer": 0.07036884401401196
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.01400175021877735,
+    "interval": [
+      -0.019291951924539783,
+      -0.008828575170339368
+    ],
+    "language": "fr",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 298,
+      "coverage": 0.9932885906040269,
+      "latencyP50": 115.07803201675415,
+      "macroWER": 0.08958104341118954,
+      "wer": 0.10101262657832229
+    },
+    "wispr": {
+      "clips": 298,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.10533835904921103,
+      "wer": 0.11501437679709964
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.024366041896361657,
+    "interval": [
+      -0.0351875070852578,
+      -0.014468174972341031
+    ],
+    "language": "it",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 291,
+      "coverage": 0.9828178694158075,
+      "latencyP50": 122.56503105163574,
+      "macroWER": 0.1735692439896084,
+      "wer": 0.13517089305402424
+    },
+    "wispr": {
+      "clips": 291,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.19671203478776692,
+      "wer": 0.1595369349503859
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.005213764337851937,
+    "interval": [
+      -0.013165994137956,
+      0.0024747498481737487
+    ],
+    "language": "nl",
+    "verdict": "tie",
+    "voxol": {
+      "clips": 296,
+      "coverage": 0.9966216216216216,
+      "latencyP50": 110.15152931213379,
+      "macroWER": 0.11675629684999222,
+      "wer": 0.10427528675703858
+    },
+    "wispr": {
+      "clips": 296,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.1292564657261706,
+      "wer": 0.10948905109489052
+    }
+  },
+  {
+    "corpus": "voxpopuli",
+    "delta": -0.008547008547008544,
+    "interval": [
+      -0.016430193380563157,
+      -0.0017476177902190082
+    ],
+    "language": "pl",
+    "verdict": "VoxoL",
+    "voxol": {
+      "clips": 295,
+      "coverage": 1.0,
+      "latencyP50": 115.61298370361328,
+      "macroWER": 0.060613978487366535,
+      "wer": 0.06384092098377812
+    },
+    "wispr": {
+      "clips": 295,
+      "coverage": 1.0,
+      "latencyP50": null,
+      "macroWER": 0.07642236770574416,
+      "wer": 0.07238792953078667
+    }
+  }
+]

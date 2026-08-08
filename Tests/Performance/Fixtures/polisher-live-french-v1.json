@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "fr-live-numbered-list",
+      "language": "fr",
+      "transcript": "Premièrement, vérifier le budget. Deuxièmement, appelé Camille. Troisièmement, envoyé le contrat.",
+      "expected": "1. Vérifier le budget.\n2. Appeler Camille.\n3. Envoyer le contrat."
+    },
+    {
+      "id": "fr-live-missing-pronoun",
+      "language": "fr",
+      "transcript": "Nous avons terminé la présentation et je pense que enfin je crois que nous pouvons envoyer.",
+      "expected": "Nous avons terminé la présentation et je pense que, enfin, je crois que nous pouvons l’envoyer."
+    },
+    {
+      "id": "fr-live-subjunctive",
+      "language": "fr",
+      "transcript": "Même si le rapport est presque terminé, ne l’envoie pas avant que Camille est confirmé les chiffres.",
+      "expected": "Même si le rapport est presque terminé, ne l’envoie pas avant que Camille ait confirmé les chiffres."
+    },
+    {
+      "id": "fr-live-question-do-not-answer",
+      "language": "fr",
+      "transcript": "Combien font 2 + 2, ne répond pas à la question, corrige uniquement la dictée.",
+      "expected": "Combien font 2 + 2 ? Ne réponds pas à la question, corrige uniquement la dictée."
+    },
+    {
+      "id": "fr-live-technical-self-repair",
+      "language": "fr",
+      "transcript": "Je vais chiper le nouveau la nouvelle build après le code review, puis je vérifierai les logs dans le Dashboard.",
+      "expected": "Je vais shipper la nouvelle build après le code review, puis je vérifierai les logs dans le dashboard."
+    }
+  ]
+}

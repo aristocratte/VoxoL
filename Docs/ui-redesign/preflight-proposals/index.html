@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Preflight · pistes</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body {
+        overflow: auto;
+      }
+
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 72px 40px 90px;
+      }
+
+      h1 {
+        font-size: clamp(34px, 4.4vw, 56px);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1;
+      }
+
+      .lede {
+        margin-top: 16px;
+        max-width: 60ch;
+        font-size: 16px;
+        color: var(--muted);
+      }
+
+      ol {
+        margin-top: 48px;
+        list-style: none;
+      }
+
+      li {
+        border-top: 1px solid var(--line);
+      }
+
+      a.card {
+        display: grid;
+        grid-template-columns: 44px 1fr auto;
+        gap: 24px;
+        align-items: baseline;
+        padding: 26px 0;
+        text-decoration: none;
+        color: inherit;
+      }
+
+      a.card:hover h2 {
+        color: var(--cobalt);
+      }
+
+      .key {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      h2 {
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        transition: color 0.2s;
+      }
+
+      p {
+        margin-top: 6px;
+        font-size: 14px;
+        color: var(--muted);
+        max-width: 62ch;
+      }
+
+      .go {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--cobalt);
+      }
+
+      .note {
+        margin-top: 54px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--muted);
+        max-width: 66ch;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Preflight · quatre pistes</h1>
+      <p class="lede">
+        Quatre structures réellement différentes, pas quatre mises en page du même écran. Chacune
+        est jouable : espace ou clic pour avancer. Rien ici ne reprend ce qui a été fait en Swift.
+      </p>
+
+      <ol>
+        <li>
+          <a class="card" href="a-depart.html">
+            <span class="key">A</span>
+            <span>
+              <h2>Départ</h2>
+              <p>
+                Un tableau d'affichage d'aéroport. Fond encre, typo ivoire, et chaque caractère
+                claque en place comme un volet mécanique. Les états système sont des lignes de
+                départ qui basculent. Le mot « preflight » pris au pied de la lettre.
+              </p>
+            </span>
+            <span class="go">ouvrir →</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="b-tunnel.html">
+            <span class="key">B</span>
+            <span>
+              <h2>Tunnel</h2>
+              <p>
+                Les actes sont des plans à des profondeurs différentes et on avance dedans. Le
+                dither devient volumétrique : des cellules qui défilent vers toi. Cinématique, on
+                traverse le signal au lieu de le regarder.
+              </p>
+            </span>
+            <span class="go">ouvrir →</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="c-mosaique.html">
+            <span class="key">C</span>
+            <span>
+              <h2>Mosaïque</h2>
+              <p>
+                Toute la fenêtre est une grille de tuiles, et chaque acte est la même grille dans
+                une configuration différente. Changer de page fait basculer les tuiles en onde
+                depuis un point. Systématique, très dessiné.
+              </p>
+            </span>
+            <span class="go">ouvrir →</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="d-lettre.html">
+            <span class="key">D</span>
+            <span>
+              <h2>Lettre</h2>
+              <p>
+                Pas de pages du tout : l'app t'écrit une lettre, et les autorisations sont des mots
+                dans la phrase sur lesquels tu cliques. Le signal ne vit que sur les bords. Le plus
+                calme et le plus court des quatre.
+              </p>
+            </span>
+            <span class="go">ouvrir →</span>
+          </a>
+        </li>
+      </ol>
+
+      <p class="note">
+        Ce sont des maquettes de sensation, pas des écrans finis : les contenus sont figés et rien
+        n'est branché sur de vrais états système. L'idée est de trancher sur la structure et le
+        mouvement avant de retoucher une ligne de Swift.
+      </p>
+    </main>
+  </body>
+</html>

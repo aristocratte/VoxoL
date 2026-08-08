@@ -1,0 +1,6 @@
+coremltools==9.0
+librosa==0.11.0
+numpy==2.2.6
+soundfile==0.13.1
+torch==2.7.0
+git+https://github.com/huggingface/transformers.git@38a8b55f22d593c103e8bcc616413e70a5ef03ca

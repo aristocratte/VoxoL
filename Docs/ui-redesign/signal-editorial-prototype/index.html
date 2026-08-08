@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Prototype de la direction Signal éditorial pour la refonte de VoxoL."
+    />
+    <title>VoxoL · Signal éditorial</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Aller au contenu</a>
+
+    <div class="prototype-toolbar" aria-label="Choisir un écran du prototype">
+      <span class="prototype-toolbar__label">Signal éditorial</span>
+      <button type="button" data-target="today">Aujourd’hui</button>
+      <button type="button" data-target="dictation">Dictée</button>
+      <button type="button" data-target="insights">Insights</button>
+      <button type="button" data-target="meetings">Réunions</button>
+      <button type="button" data-target="preflight">Preflight</button>
+      <button type="button" data-target="brand">Marque</button>
+    </div>
+
+    <div class="app-window" data-current="today">
+      <header class="window-bar" aria-label="Fenêtre VoxoL">
+        <div class="traffic-lights" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <span class="window-title">VoxoL</span>
+        <div class="window-state">
+          <span class="window-state__dot"></span>
+          <span>Prêt sur ce Mac</span>
+        </div>
+      </header>
+
+      <div class="app-layout">
+        <aside class="sidebar" aria-label="Navigation principale">
+          <div class="brand-lockup">
+            <img src="assets/mark-threshold.svg" alt="" class="brand-lockup__mark" />
+            <span class="brand-lockup__word">voxol</span>
+          </div>
+
+          <nav class="sidebar-nav">
+            <button class="nav-item is-current" type="button" data-target="today">
+              <img src="assets/icons/house.svg" alt="" />
+              <span>Aujourd’hui</span>
+            </button>
+            <button class="nav-item" type="button" data-target="dictation">
+              <img src="assets/icons/waveform.svg" alt="" />
+              <span>Dictée</span>
+            </button>
+            <button class="nav-item" type="button" data-target="insights">
+              <img src="assets/icons/chart-line-up.svg" alt="" />
+              <span>Insights</span>
+            </button>
+            <button class="nav-item" type="button" data-target="meetings">
+              <img src="assets/icons/users-three.svg" alt="" />
+              <span>Réunions</span>
+              <span class="nav-badge">Bientôt</span>
+            </button>
+            <button class="nav-item" type="button" data-target="library">
+              <img src="assets/icons/books.svg" alt="" />
+              <span>Bibliothèque</span>
+            </button>
+            <button class="nav-item" type="button" data-target="settings">
+              <img src="assets/icons/gear-six.svg" alt="" />
+              <span>Réglages</span>
+            </button>
+          </nav>
+
+          <div class="sidebar-spacer"></div>
+
+          <button class="local-status" type="button" data-target="settings">
+            <span class="local-status__icon">
+              <img src="assets/icons/shield-check.svg" alt="" />
+            </span>
+            <span>
+              <strong>Tout fonctionne</strong>
+              <small>2 moteurs · 3 accès</small>
+            </span>
+            <img src="assets/icons/caret-right.svg" alt="" class="local-status__chevron" />
+          </button>
+        </aside>
+
+        <main class="main-panel" id="main-content">
+          <section class="screen is-active" data-screen="today" aria-labelledby="today-title">
+            <div class="screen-scroll">
+              <header class="page-heading page-heading--with-action stagger-item">
+                <div>
+                  <p class="eyebrow">Dimanche 2 août</p>
+                  <h1 id="today-title">Prêt quand tu l’es.</h1>
+                  <p class="page-summary">
+                    Parle naturellement, VoxoL prépare le texte et l’insère dans l’app active.
+                  </p>
+                </div>
+                <button class="icon-button" type="button" aria-label="Ouvrir les réglages" data-target="settings">
+                  <img src="assets/icons/sliders-horizontal.svg" alt="" />
+                </button>
+              </header>
+
+              <section class="voice-hero stagger-item" aria-label="Démarrer une dictée">
+                <div class="voice-hero__copy">
+                  <span class="status-chip status-chip--ready">
+                    <span></span> Prêt à écouter
+                  </span>
+                  <h2>Parle. Ton texte est prêt.</h2>
+                  <p>Maintiens le raccourci, parle naturellement, puis relâche.</p>
+                  <button class="primary-button voice-trigger" type="button" aria-pressed="false">
+                    <img src="assets/icons/microphone.svg" alt="" />
+                    <span class="voice-trigger__label">Maintenir pour dicter</span>
+                    <kbd>⌥ Espace</kbd>
+                  </button>
+                </div>
+                <div class="voice-hero__art" aria-hidden="true">
+                  <canvas class="dither-canvas" data-mode="idle"></canvas>
+                  <div class="resolved-mark">
+                    <img src="assets/mark-threshold.svg" alt="" />
+                  </div>
+                </div>
+              </section>
+
+              <div class="dashboard-grid stagger-item">
+                <article class="surface-card recent-card">
+                  <header class="card-heading">
+                    <div>
+                      <p class="eyebrow">Dernier résultat</p>
+                      <h3>Il y a 8 minutes dans Notes</h3>
+                    </div>
+                    <button class="icon-button icon-button--small copy-button" type="button" aria-label="Copier la transcription">
+                      <img src="assets/icons/copy.svg" alt="" />
+                    </button>
+                  </header>
+                  <p class="transcript-copy">
+                    Le budget est de 4 500 euros et la livraison est prévue mercredi matin.
+                  </p>
+                  <div class="result-meta">
+                    <span>Français</span>
+                    <span>6,4 s</span>
+                    <span>Préparé localement</span>
+                  </div>
+                </article>
+
+                <article class="surface-card usage-card">
+                  <header class="card-heading">
+                    <div>
+                      <p class="eyebrow">Aujourd’hui</p>
+                      <h3>La voix t’a déjà fait gagner du temps.</h3>
+                    </div>
+                  </header>
+                  <div class="usage-metrics">
+                    <div><strong>3 min</strong><span>récupérées</span></div>
+                    <div><strong>182</strong><span>mots</span></div>
+                    <div><strong>12</strong><span>dictées</span></div>
+                  </div>
+                  <button class="text-button" type="button" data-target="insights">Voir les insights <img src="assets/icons/arrow-right.svg" alt="" /></button>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen" data-screen="dictation" aria-labelledby="dictation-title">
+            <div class="screen-scroll">
+              <header class="page-heading page-heading--with-action stagger-item">
+                <div>
+                  <p class="eyebrow">Dictée</p>
+                  <h1 id="dictation-title">Ta voix, prête partout.</h1>
+                  <p class="page-summary">Choisis une langue, puis utilise ⌥ Espace.</p>
+                </div>
+                <div class="segmented-control" aria-label="Langue de dictée">
+                  <button type="button">Auto</button>
+                  <button type="button" class="is-selected">Français</button>
+                  <button type="button">English</button>
+                </div>
+              </header>
+
+              <section class="dictation-stage stagger-item">
+                <div class="dictation-stage__art" aria-hidden="true">
+                  <canvas class="dither-canvas" data-mode="voice"></canvas>
+                </div>
+                <div class="live-capsule">
+                  <span class="wave-mini"><i></i><i></i><i></i><i></i><i></i></span>
+                  <strong>À l’écoute</strong>
+                  <kbd>esc</kbd>
+                </div>
+                <div class="comparison-panels">
+                  <article>
+                    <span>Entendu</span>
+                    <p>Euh, envoie le mardi, non pardon, le mercredi matin.</p>
+                  </article>
+                  <div class="comparison-arrow" aria-hidden="true">
+                    <img src="assets/icons/arrow-right.svg" alt="" />
+                  </div>
+                  <article class="is-ready">
+                    <span>Prêt à insérer</span>
+                    <p>Envoie le mercredi matin.</p>
+                  </article>
+                </div>
+              </section>
+
+              <section class="settings-strip stagger-item" aria-label="Réglages de dictée">
+                <button type="button" class="setting-tile">
+                  <span class="setting-tile__icon"><img src="assets/icons/waveform.svg" alt="" /></span>
+                  <span><small>Activation</small><strong>Maintenir pour parler</strong></span>
+                  <img src="assets/icons/caret-right.svg" alt="" />
+                </button>
+                <button type="button" class="setting-tile">
+                  <span class="setting-tile__icon"><img src="assets/icons/text-aa.svg" alt="" /></span>
+                  <span><small>Préparation</small><strong>Fidèle</strong></span>
+                  <img src="assets/icons/caret-right.svg" alt="" />
+                </button>
+                <button type="button" class="setting-tile">
+                  <span class="setting-tile__icon"><img src="assets/icons/command.svg" alt="" /></span>
+                  <span><small>Raccourci</small><strong>⌥ Espace</strong></span>
+                  <img src="assets/icons/caret-right.svg" alt="" />
+                </button>
+              </section>
+            </div>
+          </section>
+
+          <section class="screen" data-screen="insights" aria-labelledby="insights-title">
+            <div class="screen-scroll screen-scroll--insights">
+              <header class="page-heading page-heading--with-action stagger-item">
+                <div>
+                  <p class="eyebrow">Insights</p>
+                  <h1 id="insights-title">Ta voix en un coup d’œil.</h1>
+                  <p class="page-summary">Sept jours de dictée, mesurés uniquement sur ce Mac.</p>
+                </div>
+                <div class="segmented-control insights-period" aria-label="Période des insights">
+                  <button type="button" class="is-selected">7 jours</button>
+                  <button type="button">30 jours</button>
+                  <button type="button">Tout</button>
+                </div>
+              </header>
+
+              <section class="insights-hero stagger-item">
+                <div class="insights-hero__copy">
+                  <p class="eyebrow">Cette semaine</p>
+                  <h2>8 minutes récupérées.</h2>
+                  <p>883 mots préparés dans 55 dictées, sans quitter tes apps.</p>
+                </div>
+                <div class="insights-hero__metrics" aria-label="Chiffres clés de la semaine">
+                  <div><strong>149</strong><span>mots / min</span></div>
+                  <div><strong>11,4</strong><span>mots / dictée</span></div>
+                  <div><strong>4</strong><span>apps utilisées</span></div>
+                </div>
+                <div class="insights-hero__art" aria-hidden="true">
+                  <canvas class="dither-canvas" data-mode="insights"></canvas>
+                </div>
+              </section>
+
+              <div class="insights-grid stagger-item">
+                <article class="surface-card rhythm-card">
+                  <header class="card-heading">
+                    <div><p class="eyebrow">Rythme</p><h3>Une semaine régulière.</h3></div>
+                    <span class="metric-note">+18 %</span>
+                  </header>
+                  <div class="weekly-chart" aria-label="Mots dictés par jour">
+                    <div><span style="--bar: 42%"></span><small>L</small></div>
+                    <div><span style="--bar: 74%"></span><small>M</small></div>
+                    <div><span style="--bar: 58%"></span><small>M</small></div>
+                    <div><span style="--bar: 84%"></span><small>J</small></div>
+                    <div><span style="--bar: 68%"></span><small>V</small></div>
+                    <div><span style="--bar: 92%"></span><small>S</small></div>
+                    <div><span class="is-today" style="--bar: 76%"></span><small>D</small></div>
+                  </div>
+                </article>
+
+                <article class="surface-card app-usage-card">
+                  <header class="card-heading">
+                    <div><p class="eyebrow">Où tu dictes</p><h3>Notes reste ton premier réflexe.</h3></div>
+                  </header>
+                  <div class="app-usage-list">
+                    <div><span>Notes</span><i><b style="--share: 41%"></b></i><strong>41 %</strong></div>
+                    <div><span>Mail</span><i><b style="--share: 28%"></b></i><strong>28 %</strong></div>
+                    <div><span>Cursor</span><i><b style="--share: 19%"></b></i><strong>19 %</strong></div>
+                    <div><span>Autres</span><i><b style="--share: 12%"></b></i><strong>12 %</strong></div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen" data-screen="meetings" aria-labelledby="meetings-title">
+            <div class="screen-scroll">
+              <header class="page-heading page-heading--with-action stagger-item">
+                <div>
+                  <div class="eyebrow-line">
+                    <p class="eyebrow">Réunions</p>
+                    <span class="status-chip status-chip--soon">Bientôt</span>
+                  </div>
+                  <h1 id="meetings-title">Tes réunions, résumées sur ce Mac.</h1>
+                  <p class="page-summary">Le futur espace est visible dès maintenant, sans simuler une capture indisponible.</p>
+                </div>
+                <span class="privacy-badge"><img src="assets/icons/lock-key.svg" alt="" /> Capture locale</span>
+              </header>
+
+              <section class="meeting-preview stagger-item">
+                <div class="meeting-preview__header">
+                  <div>
+                    <p class="eyebrow">Aperçu du résultat</p>
+                    <h2>Point produit</h2>
+                    <p>Google Meet · 42 min · Exemple non enregistré</p>
+                  </div>
+                  <div class="meeting-time"><span></span> 42:18</div>
+                </div>
+                <div class="meeting-art" aria-hidden="true">
+                  <canvas class="dither-canvas" data-mode="meeting"></canvas>
+                  <div class="timeline-line"><i></i><i></i><i></i><i></i></div>
+                </div>
+                <div class="meeting-tabs" role="tablist" aria-label="Sections du compte rendu">
+                  <button type="button" role="tab" aria-selected="true" data-meeting-tab="summary">Résumé</button>
+                  <button type="button" role="tab" aria-selected="false" data-meeting-tab="decisions">Décisions <span>2</span></button>
+                  <button type="button" role="tab" aria-selected="false" data-meeting-tab="actions">Actions <span>3</span></button>
+                  <button type="button" role="tab" aria-selected="false" data-meeting-tab="transcript">Transcription</button>
+                </div>
+                <div class="meeting-output" data-meeting-panel="summary">
+                  <article>
+                    <span class="meeting-output__index">01</span>
+                    <div><h3>La dictée reste la priorité.</h3><p>L’équipe valide la qualité et la latence avant d’ouvrir la capture longue.</p></div>
+                  </article>
+                  <article>
+                    <span class="meeting-output__index">02</span>
+                    <div><h3>Le traitement reste entièrement local.</h3><p>Le résumé, les décisions et les actions suivent la même promesse de confidentialité.</p></div>
+                  </article>
+                </div>
+                <div class="meeting-output" data-meeting-panel="decisions" hidden>
+                  <article><span class="meeting-output__index">01</span><div><h3>Valider le pipeline de dictée avant la capture longue.</h3><p>La réunion ne sera activée qu’après les gates qualité et performance.</p></div></article>
+                  <article><span class="meeting-output__index">02</span><div><h3>Ne pas promettre l’attribution des intervenants.</h3><p>La première version reste fidèle aux capacités réellement disponibles.</p></div></article>
+                </div>
+                <div class="meeting-output" data-meeting-panel="actions" hidden>
+                  <article><span class="meeting-output__index">01</span><div><h3>Tester la sélection de source macOS.</h3><p>Propriétaire : produit · Après validation de la dictée.</p></div></article>
+                  <article><span class="meeting-output__index">02</span><div><h3>Mesurer les résumés sur des sessions longues.</h3><p>Propriétaire : modèle · Gate de latence à définir.</p></div></article>
+                </div>
+                <div class="meeting-output meeting-output--transcript" data-meeting-panel="transcript" hidden>
+                  <p><time>10:04</time> La priorité reste de rendre la dictée irréprochable avant d’élargir la capture.</p>
+                  <p><time>10:05</time> Le premier mode Réunions doit rester local et transparent sur ses limites.</p>
+                </div>
+              </section>
+
+              <div class="future-flow stagger-item" aria-label="Flux prévu">
+                <span><strong>1</strong> Choisir une source</span>
+                <i></i>
+                <span><strong>2</strong> Capturer localement</span>
+                <i></i>
+                <span><strong>3</strong> Relire le compte rendu</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen screen--simple" data-screen="library" aria-labelledby="library-title">
+            <div class="screen-scroll">
+              <header class="page-heading stagger-item">
+                <p class="eyebrow">Bibliothèque</p>
+                <h1 id="library-title">Tes mots, toujours à portée.</h1>
+                <p class="page-summary">Historique, vocabulaire et raccourcis restent organisés au même endroit.</p>
+              </header>
+              <div class="library-tabs stagger-item" role="tablist">
+                <button type="button" class="is-selected">Historique</button>
+                <button type="button">Dictionnaire</button>
+                <button type="button">Snippets</button>
+                <button type="button">Profils</button>
+              </div>
+              <article class="surface-card library-list stagger-item">
+                <div><time>15:42</time><p>Le budget est de 4 500 euros et la livraison est prévue mercredi matin.</p><span>Notes</span></div>
+                <div><time>14:18</time><p>Peux tu préparer un résumé avec les décisions et les prochaines actions.</p><span>Mail</span></div>
+                <div><time>11:06</time><p>On garde la version locale et on mesure la latence sur le Mac de référence.</p><span>Cursor</span></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="screen screen--simple" data-screen="settings" aria-labelledby="settings-title">
+            <div class="screen-scroll">
+              <header class="page-heading stagger-item">
+                <p class="eyebrow">Réglages</p>
+                <h1 id="settings-title">Simple au quotidien, précis quand il le faut.</h1>
+                <p class="page-summary">Les préférences système, les moteurs et la confidentialité vivent ici.</p>
+              </header>
+              <div class="settings-layout stagger-item">
+                <nav class="settings-nav" aria-label="Sections des réglages">
+                  <button type="button" class="is-selected">Général</button>
+                  <button type="button">Audio et raccourci</button>
+                  <button type="button">Moteurs locaux</button>
+                  <button type="button">Confidentialité</button>
+                </nav>
+                <article class="surface-card settings-card">
+                  <div class="settings-row"><span><strong>Langue de l’interface</strong><small>Français</small></span><button type="button">Modifier</button></div>
+                  <div class="settings-row"><span><strong>Raccourci de dictée</strong><small>Maintenir ⌥ Espace</small></span><button type="button">Modifier</button></div>
+                  <div class="settings-row"><span><strong>Apparence</strong><small>Clair</small></span><button type="button">Modifier</button></div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen screen--preflight" data-screen="preflight" aria-labelledby="preflight-title">
+            <div class="preflight-shell">
+              <header class="preflight-topbar">
+                <div class="brand-lockup">
+                  <img src="assets/mark-threshold.svg" alt="" class="brand-lockup__mark" />
+                  <span class="brand-lockup__word">voxol</span>
+                </div>
+                <div class="preflight-topbar__actions">
+                  <span class="preflight-local-pill"><i></i> Sur ce Mac</span>
+                  <button class="language-button" type="button">Français <span>⌄</span></button>
+                </div>
+              </header>
+
+              <div class="preflight-main" data-step="0" data-direction="forward">
+                <div class="preflight-copy stagger-item">
+                  <p class="eyebrow preflight-eyebrow">01 · Ce qu’on a construit</p>
+                  <h1 id="preflight-title" class="preflight-title">Ta voix devient du texte, ici.</h1>
+                  <p class="preflight-summary">VoxoL entend, protège le sens et insère un texte prêt à envoyer.</p>
+                  <div class="preflight-assurance"><img src="assets/icons/lock-key.svg" alt="" /><span>Aucun compte. Aucun détour par le cloud.</span></div>
+                </div>
+
+                <div class="preflight-visual stagger-item" data-scene="intro">
+                  <canvas class="dither-canvas" data-mode="preflight-intro"></canvas>
+                  <div class="preflight-card" aria-live="polite" aria-atomic="true"></div>
+                </div>
+              </div>
+
+              <footer class="preflight-footer">
+                <button class="secondary-button preflight-back" type="button">Retour</button>
+                <div class="preflight-journey">
+                  <span class="preflight-step-label">La transformation</span>
+                  <div class="preflight-progress" aria-label="Progression du preflight"></div>
+                </div>
+                <button class="primary-button preflight-next" type="button">Continuer <img src="assets/icons/arrow-right.svg" alt="" /></button>
+              </footer>
+            </div>
+          </section>
+
+          <section class="screen screen--brand" data-screen="brand" aria-labelledby="brand-title">
+            <div class="brand-board">
+              <header class="brand-board__header">
+                <div>
+                  <p class="eyebrow">Direction validée</p>
+                  <h1 id="brand-title">Signal éditorial</h1>
+                  <p>Une interface locale et silencieuse, traversée par un signal graphique vivant.</p>
+                </div>
+                <div class="brand-board__lockup">
+                  <img src="assets/mark-threshold.svg" alt="" />
+                  <span>voxol</span>
+                </div>
+              </header>
+
+              <div class="brand-board__grid">
+                <section class="brand-module brand-module--palette">
+                  <p class="eyebrow">Palette</p>
+                  <div class="swatches">
+                    <div style="--swatch:#F4F1E8"><span>Ivoire</span><code>#F4F1E8</code></div>
+                    <div style="--swatch:#FFFDF8"><span>Porcelaine</span><code>#FFFDF8</code></div>
+                    <div style="--swatch:#171713"><span>Encre</span><code>#171713</code></div>
+                    <div style="--swatch:#2449F8"><span>Cobalt</span><code>#2449F8</code></div>
+                    <div style="--swatch:#FF7048"><span>Corail</span><code>#FF7048</code></div>
+                  </div>
+                </section>
+
+                <section class="brand-module brand-module--type">
+                  <p class="eyebrow">Typographie</p>
+                  <div class="type-sample"><strong>Aa</strong><span>Outfit</span></div>
+                  <p>Regular pour lire. Medium pour agir. Semibold pour orienter.</p>
+                  <div class="type-weights"><span>Voice 400</span><span>Voice 500</span><span>Voice 600</span></div>
+                </section>
+
+                <section class="brand-module brand-module--logos">
+                  <div class="module-heading"><div><p class="eyebrow">Marque</p><h2>Trois territoires</h2></div><span class="status-chip status-chip--ready">A recommandé</span></div>
+                  <div class="logo-options">
+                    <article class="is-selected"><img src="assets/mark-threshold.svg" alt="Concept Seuil" /><div><strong>A · Seuil</strong><span>Le bruit devient une forme nette.</span></div></article>
+                    <article><img src="assets/mark-portal.svg" alt="Concept Portail" /><div><strong>B · Portail</strong><span>La voix traverse une ouverture.</span></div></article>
+                    <article><img src="assets/mark-grain.svg" alt="Concept Grain" /><div><strong>C · Grain</strong><span>Une cadence réduite à l’essentiel.</span></div></article>
+                  </div>
+                </section>
+
+                <section class="brand-module brand-module--motion">
+                  <div><p class="eyebrow">Mouvement</p><h2>Du champ à la forme</h2></div>
+                  <div class="motion-states">
+                    <article><div class="motion-preview"><canvas class="dither-canvas" data-mode="idle"></canvas></div><span>Prêt</span></article>
+                    <article><div class="motion-preview"><canvas class="dither-canvas" data-mode="voice"></canvas></div><span>Écoute</span></article>
+                    <article><div class="motion-preview"><canvas class="dither-canvas" data-mode="process"></canvas></div><span>Prépare</span></article>
+                    <article><div class="motion-preview motion-preview--resolved"><img src="assets/mark-threshold.svg" alt="" /></div><span>Insère</span></article>
+                  </div>
+                </section>
+
+                <section class="brand-module brand-module--icon">
+                  <p class="eyebrow">Icône macOS</p>
+                  <img src="assets/app-icon-concept.svg" alt="Concept d’icône VoxoL" />
+                  <p>La couleur vit dans l’icône. La barre des menus conserve une marque monochrome.</p>
+                </section>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div class="toast" role="status" aria-live="polite">Copié dans le presse papiers</div>
+    <script src="app.js"></script>
+  </body>
+</html>

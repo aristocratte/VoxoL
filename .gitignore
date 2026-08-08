@@ -1,0 +1,31 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+
+# Local model sources and converted runtime artifacts are never committed.
+*.bin
+*.ckpt
+*.gguf
+*.mlmodel
+*.mlmodelc/
+*.mlpackage/
+*.nemo
+*.onnx
+*.pt
+*.pth
+*.safetensors
+Models/artifacts/
+
+# Generated benchmark runs stay local unless deliberately promoted as a baseline.
+Artifacts/
+
+# SSH keys for the training pod live beside the repo for convenience and must
+# never be committed.
+runpod
+runpod.pub
+
+# Transient local outputs.
+outputs/

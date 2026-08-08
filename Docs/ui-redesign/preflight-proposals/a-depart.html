@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>A · Départ</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body {
+        background: var(--ink);
+        color: var(--canvas);
+      }
+
+      #grain {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        opacity: 0.5;
+      }
+
+      .board {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 40px 56px 34px;
+      }
+
+      .masthead {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        color: rgba(244, 241, 232, 0.55);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .headline {
+        margin-top: 40px;
+        font-size: clamp(38px, 5.4vw, 76px);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 0.98;
+        display: flex;
+        flex-wrap: wrap;
+      }
+
+      .rows {
+        margin-top: auto;
+        border-top: 1px solid rgba(244, 241, 232, 0.16);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 190px 1fr auto;
+        gap: 28px;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(244, 241, 232, 0.1);
+      }
+
+      .row .label {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(244, 241, 232, 0.5);
+      }
+
+      .row .value {
+        display: flex;
+        gap: 3px;
+      }
+
+      .status {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .status[data-state="ok"] {
+        color: #8fd4b0;
+      }
+      .status[data-state="wait"] {
+        color: var(--coral);
+      }
+
+      /* One flap. It clatters through a few glyphs before it lands. */
+      .flap {
+        display: inline-block;
+        min-width: 0.62em;
+        font-variant-numeric: tabular-nums;
+        color: var(--canvas);
+      }
+
+      .flap.spin {
+        color: rgba(244, 241, 232, 0.45);
+        transform: translateY(-1px) scaleY(0.86);
+      }
+
+      .foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 22px;
+        color: rgba(244, 241, 232, 0.5);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .go {
+        color: var(--ink);
+        background: var(--canvas);
+        border-radius: 999px;
+        padding: 13px 22px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .ticks {
+        display: flex;
+        gap: 6px;
+      }
+      .ticks i {
+        width: 7px;
+        height: 7px;
+        background: rgba(244, 241, 232, 0.24);
+      }
+      .ticks i.on {
+        background: var(--canvas);
+        width: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="grain"></canvas>
+
+    <div class="board">
+      <div class="masthead">
+        <span>voxol · preflight</span>
+        <span id="clock">sur ce mac</span>
+      </div>
+
+      <h1 class="headline" id="headline"></h1>
+
+      <div class="rows" id="rows"></div>
+
+      <div class="foot">
+        <span class="ticks" id="ticks"></span>
+        <button class="go" id="go">Continuer</button>
+      </div>
+    </div>
+
+    <div class="tag"><a href="index.html">← pistes</a><span>A · Départ</span></div>
+    <div class="hint">espace / clic</div>
+
+    <script>
+      const ACTS = [
+        {
+          title: "TA VOIX DEVIENT DU TEXTE",
+          rows: [
+            ["Entendu", "euh, envoie-le mardi — non, mercredi", "brut"],
+            ["Prêt à insérer", "Envoie-le mercredi matin.", "ok"],
+            ["Destination", "dans l'app active", "ok"],
+          ],
+        },
+        {
+          title: "TROIS ACCÈS. RIEN DE PLUS.",
+          rows: [
+            ["Microphone", "entendre ta voix", "wait"],
+            ["Accessibilité", "insérer le résultat", "wait"],
+            ["Entrée clavier", "détecter ⌥ espace", "wait"],
+          ],
+        },
+        {
+          title: "DEUX MOTEURS LOCAUX",
+          rows: [
+            ["Parakeet", "voix → mots", "wait"],
+            ["Qwen", "mots → texte prêt", "ok"],
+            ["Vérification", "somme de contrôle", "ok"],
+          ],
+        },
+        {
+          title: "MAINTIENS. PARLE. RELÂCHE.",
+          rows: [
+            ["Raccourci", "⌥ espace", "ok"],
+            ["Démonstration", "aucun audio enregistré", "ok"],
+            ["Résultat", "correction comprise", "ok"],
+          ],
+        },
+        {
+          title: "PRÊT SUR CE MAC",
+          rows: [
+            ["Accès", "3 sur 3 autorisés", "ok"],
+            ["Moteurs", "2 sur 2 installés", "ok"],
+            ["Historique", "désactivé par défaut", "ok"],
+          ],
+        },
+      ];
+
+      const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZÀÉÈÊ0123456789·—→ ";
+      let act = 0;
+
+      /* Fills a container with flaps that clatter to the target string. */
+      function flapInto(container, text, delay = 0) {
+        container.innerHTML = "";
+        [...text].forEach((char, index) => {
+          const span = document.createElement("span");
+          span.className = "flap";
+          span.textContent = char === " " ? " " : char;
+          container.appendChild(span);
+
+          if (char === " ") return;
+          const spins = 5 + Math.floor(Math.random() * 8);
+          let step = 0;
+          span.classList.add("spin");
+          const start = delay + index * 22;
+          setTimeout(() => {
+            const timer = setInterval(() => {
+              span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+              if (++step >= spins) {
+                clearInterval(timer);
+                span.textContent = char;
+                span.classList.remove("spin");
+              }
+            }, 34);
+          }, start);
+        });
+      }
+
+      function render() {
+        const data = ACTS[act];
+        flapInto(document.getElementById("headline"), data.title);
+
+        const rows = document.getElementById("rows");
+        rows.innerHTML = "";
+        data.rows.forEach(([label, value, state], index) => {
+          const row = document.createElement("div");
+          row.className = "row";
+
+          const l = document.createElement("div");
+          l.className = "label";
+          l.textContent = label;
+
+          const v = document.createElement("div");
+          v.className = "value";
+
+          const s = document.createElement("div");
+          s.className = "status";
+          s.dataset.state = state === "ok" ? "ok" : "wait";
+          s.textContent = state === "ok" ? "prêt" : state === "brut" ? "brut" : "à autoriser";
+
+          row.append(l, v, s);
+          rows.appendChild(row);
+          flapInto(v, value.toUpperCase(), 220 + index * 90);
+        });
+
+        const ticks = document.getElementById("ticks");
+        ticks.innerHTML = "";
+        ACTS.forEach((_, index) => {
+          const tick = document.createElement("i");
+          if (index === act) tick.className = "on";
+          ticks.appendChild(tick);
+        });
+
+        document.getElementById("go").textContent =
+          act === ACTS.length - 1 ? "Ouvrir VoxoL" : "Continuer";
+      }
+
+      function next() {
+        act = (act + 1) % ACTS.length;
+        render();
+      }
+
+      document.getElementById("go").addEventListener("click", next);
+      document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" || event.code === "Enter") {
+          event.preventDefault();
+          next();
+        }
+      });
+
+      /* A very quiet dither so the board is not flat black. */
+      const canvas = document.getElementById("grain");
+      const ctx = canvas.getContext("2d");
+      function resize() {
+        canvas.width = innerWidth * devicePixelRatio;
+        canvas.height = innerHeight * devicePixelRatio;
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      function grain(time) {
+        const w = canvas.width;
+        const h = canvas.height;
+        const cell = 7 * devicePixelRatio;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "rgba(244,241,232,0.30)";
+        for (let y = 0; y < h; y += cell) {
+          for (let x = 0; x < w; x += cell) {
+            const nx = x / w;
+            const ny = y / h;
+            const wave = 0.5 + Math.sin(nx * 7 + time * 0.0004) * 0.16;
+            const band = Math.exp(-((ny - wave) ** 2) / 0.012);
+            if (Math.random() < band * 0.35) ctx.fillRect(x, y, 2, 2);
+          }
+        }
+        requestAnimationFrame(grain);
+      }
+      requestAnimationFrame(grain);
+
+      render();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voxol.local/schemas/review-output.schema.v2.json",
+  "title": "VoxoL text refining review v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "input_sha256",
+    "decision",
+    "refined_edited",
+    "confidence",
+    "recoverable_from_raw",
+    "usable_for_polisher",
+    "raw_content_preserved",
+    "runtime_support",
+    "boundary_status",
+    "edit_types",
+    "transformations",
+    "formatting",
+    "review_flags",
+    "evidence_urls",
+    "review_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "voxol-text-refining-review-v2"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "accept_wispr_edited",
+        "replace_wispr_edited",
+        "exclude_unrecoverable"
+      ]
+    },
+    "refined_edited": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "recoverable_from_raw": {
+      "type": "boolean"
+    },
+    "usable_for_polisher": {
+      "type": "boolean"
+    },
+    "raw_content_preserved": {
+      "type": "boolean"
+    },
+    "runtime_support": {
+      "enum": [
+        "raw_only",
+        "raw_plus_product_context",
+        "not_recoverable_at_runtime"
+      ]
+    },
+    "boundary_status": {
+      "enum": [
+        "complete",
+        "continues_from_previous",
+        "continues_into_next",
+        "continues_both",
+        "uncertain"
+      ]
+    },
+    "edit_types": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "spelling",
+          "grammar",
+          "punctuation",
+          "capitalization",
+          "disfluency",
+          "repetition",
+          "self_correction",
+          "anglicism",
+          "proper_noun",
+          "technical_term",
+          "number_or_date",
+          "url_or_email",
+          "path_command_or_code",
+          "language_preservation",
+          "missing_content_restored_from_raw",
+          "hallucinated_content_removed",
+          "boundary_repair",
+          "formatting",
+          "other"
+        ]
+      }
+    },
+    "transformations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "raw_surface",
+          "refined_surface",
+          "type",
+          "basis",
+          "confidence",
+          "runtime_support"
+        ],
+        "properties": {
+          "raw_surface": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "refined_surface": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "type": {
+            "enum": [
+              "anglicism",
+              "proper_noun",
+              "technical_term",
+              "number_or_date",
+              "url_or_email",
+              "path_command_or_code",
+              "other"
+            ]
+          },
+          "basis": {
+            "enum": [
+              "raw_only",
+              "raw_neighbor",
+              "source_metadata",
+              "product_lexicon",
+              "public_spelling_reference"
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "runtime_support": {
+            "enum": [
+              "raw_only",
+              "raw_plus_product_context",
+              "not_recoverable_at_runtime"
+            ]
+          }
+        }
+      }
+    },
+    "formatting": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "sentence_split",
+          "paragraphs",
+          "bullets",
+          "numbered_list",
+          "quotation_marks",
+          "dashes",
+          "parentheses",
+          "plain_code",
+          "url_formatting"
+        ]
+      }
+    },
+    "review_flags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "raw_empty",
+          "edited_empty",
+          "edited_request_failed",
+          "boundary_incomplete",
+          "possible_missing_content",
+          "possible_added_content",
+          "number_or_entity_risk",
+          "code_or_url_risk",
+          "language_risk",
+          "runtime_context_dependency",
+          "prompt_injection_text",
+          "requires_second_review"
+        ]
+      }
+    },
+    "evidence_urls": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://"
+      }
+    },
+    "review_note": {
+      "type": "string",
+      "maxLength": 280
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "accept_wispr_edited"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "refined_edited": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recoverable_from_raw": {
+            "const": true
+          },
+          "usable_for_polisher": {
+            "const": true
+          },
+          "raw_content_preserved": {
+            "const": true
+          },
+          "runtime_support": {
+            "const": "raw_only"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "replace_wispr_edited"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "refined_edited": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recoverable_from_raw": {
+            "const": true
+          },
+          "raw_content_preserved": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "exclude_unrecoverable"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "refined_edited": {
+            "type": "null"
+          },
+          "recoverable_from_raw": {
+            "const": false
+          },
+          "usable_for_polisher": {
+            "const": false
+          },
+          "raw_content_preserved": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "confidence": {
+            "const": "low"
+          }
+        },
+        "required": [
+          "confidence"
+        ]
+      },
+      "then": {
+        "properties": {
+          "usable_for_polisher": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "usable_for_polisher": {
+            "const": true
+          }
+        },
+        "required": [
+          "usable_for_polisher"
+        ]
+      },
+      "then": {
+        "properties": {
+          "recoverable_from_raw": {
+            "const": true
+          },
+          "raw_content_preserved": {
+            "const": true
+          },
+          "runtime_support": {
+            "const": "raw_only"
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "edit_types": {
+            "contains": {
+              "const": "none"
+            }
+          }
+        },
+        "required": [
+          "edit_types"
+        ]
+      },
+      "then": {
+        "properties": {
+          "edit_types": {
+            "maxItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "formatting": {
+            "contains": {
+              "const": "none"
+            }
+          }
+        },
+        "required": [
+          "formatting"
+        ]
+      },
+      "then": {
+        "properties": {
+          "formatting": {
+            "maxItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "transformations": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "basis": {
+                  "const": "public_spelling_reference"
+                }
+              },
+              "required": [
+                "basis"
+              ]
+            }
+          }
+        },
+        "required": [
+          "transformations"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_urls": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

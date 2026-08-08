@@ -1,0 +1,162 @@
+name: release
+
+# CI proves the code compiles and the tests pass. Nothing turned that into
+# something a user can install: no signed build, no notarised artifact, no
+# download. This workflow closes that gap — it is the difference between a
+# repository and a product.
+#
+# Triggered by a `v*` tag, or manually for a dry run that skips signing.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: "Sign and notarise (requires secrets)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Report toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Enforce repository policy
+        run: ./Scripts/check-repository-policy.sh
+
+      - name: Run package tests
+        run: swift test
+
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      # Signing identities live in the keychain, so an unsigned dry run has to
+      # opt out of code signing entirely rather than fail on a missing identity.
+      - name: Decide signing mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.sign }}" = "true" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import signing certificate
+        if: steps.mode.outputs.signed == 'true'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/voxol-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$keychain"
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+      - name: Build the app
+        env:
+          SIGNED: ${{ steps.mode.outputs.signed }}
+          DEVELOPMENT_TEAM: ${{ secrets.MACOS_DEVELOPMENT_TEAM }}
+        run: |
+          set -euo pipefail
+          arguments=(
+            -project VoxoL.xcodeproj
+            -scheme VoxoL
+            -configuration Release
+            -destination 'platform=macOS,arch=arm64'
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+            -skipPackagePluginValidation
+          )
+          if [ "$SIGNED" = "true" ]; then
+            arguments+=(
+              CODE_SIGNING_ALLOWED=YES
+              "DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM"
+              CODE_SIGN_STYLE=Manual
+              "CODE_SIGN_IDENTITY=Developer ID Application"
+              OTHER_CODE_SIGN_FLAGS=--timestamp
+              ENABLE_HARDENED_RUNTIME=YES
+            )
+          else
+            arguments+=(CODE_SIGNING_ALLOWED=NO)
+          fi
+          xcodebuild "${arguments[@]}" build
+
+      - name: Notarise and staple
+        if: steps.mode.outputs.signed == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          DEVELOPMENT_TEAM: ${{ secrets.MACOS_DEVELOPMENT_TEAM }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials voxol-notary \
+            --apple-id "$APPLE_ID" \
+            --team-id "$DEVELOPMENT_TEAM" \
+            --password "$APPLE_APP_PASSWORD"
+          VOXOL_NOTARY_PROFILE=voxol-notary ./Scripts/notarize-release.sh \
+            "$RUNNER_TEMP/DerivedData/Build/Products/Release/VoxoL.app"
+
+      # Zip rather than DMG: `ditto -c -k --keepParent` is what notarytool
+      # accepts, and it is also what Sparkle expects to download.
+      - name: Package
+        id: package
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Release/VoxoL.app"
+          version="${GITHUB_REF_NAME#v}"
+          [ "$version" = "$GITHUB_REF_NAME" ] && version="$(date +%Y.%m.%d)"
+          archive="$RUNNER_TEMP/VoxoL-$version.zip"
+          ditto -c -k --keepParent "$app" "$archive"
+          shasum -a 256 "$archive" | tee "$archive.sha256"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the packaged app
+        if: steps.mode.outputs.signed == 'true'
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Release/VoxoL.app"
+          # Gatekeeper's own verdict, not codesign's: this is what a user's
+          # machine will run when they open the download.
+          spctl --assess --type execute --verbose=4 "$app"
+          xcrun stapler validate "$app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: VoxoL-${{ steps.package.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.archive }}.sha256
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "${{ steps.package.outputs.archive }}" \
+            "${{ steps.package.outputs.archive }}.sha256" \
+            --title "VoxoL $GITHUB_REF_NAME" \
+            --generate-notes

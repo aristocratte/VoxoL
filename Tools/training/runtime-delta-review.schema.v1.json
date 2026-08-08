@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voxol.local/schemas/runtime-delta-review.schema.v1.json",
+  "title": "VoxoL runtime-aware delta review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "input_sha256",
+    "decision",
+    "final_target",
+    "confidence",
+    "review_flags",
+    "review_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "voxol-runtime-delta-review-v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "input_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "keep_deterministic_baseline",
+        "accept_gpt_target",
+        "replace_with_better_target",
+        "exclude_unrecoverable"
+      ]
+    },
+    "final_target": {
+      "type": ["string", "null"]
+    },
+    "confidence": {
+      "enum": ["high", "medium", "low"]
+    },
+    "review_flags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "candidate_reintroduces_disfluency",
+          "candidate_typography_regression",
+          "candidate_missing_content",
+          "candidate_added_content",
+          "candidate_partial_cleanup",
+          "candidate_is_strict_improvement",
+          "baseline_is_already_best",
+          "requires_human_review"
+        ]
+      }
+    },
+    "review_note": {
+      "type": "string",
+      "maxLength": 320
+    }
+  }
+}

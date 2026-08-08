@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>B · Tunnel</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        perspective: 1200px;
+        perspective-origin: 42% 46%;
+      }
+
+      .rail {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+        transition: transform 1s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .plane {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 clamp(40px, 8vw, 130px);
+        transform-style: preserve-3d;
+        transition:
+          opacity 0.7s ease,
+          filter 0.7s ease;
+      }
+
+      .plane .eyebrow {
+        color: var(--muted);
+      }
+
+      .plane h1 {
+        margin-top: 12px;
+        font-size: clamp(34px, 4.8vw, 70px);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 1;
+        max-width: 12ch;
+      }
+
+      .plane p {
+        margin-top: 18px;
+        max-width: 42ch;
+        font-size: 16px;
+        color: var(--muted);
+      }
+
+      .facts {
+        margin-top: 34px;
+        display: flex;
+        gap: 40px;
+      }
+
+      .fact {
+        border-top: 1px solid var(--ink);
+        padding-top: 10px;
+        min-width: 150px;
+      }
+
+      .fact b {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .fact span {
+        display: block;
+        margin-top: 3px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .fact a {
+        display: inline-block;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cobalt);
+        border-bottom: 1px solid rgba(36, 73, 248, 0.4);
+        cursor: pointer;
+      }
+
+      .chrome {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        padding: 34px 44px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .chrome > div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chrome .brand {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .depth {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .go {
+        pointer-events: auto;
+        background: var(--ink);
+        color: var(--surface);
+        border-radius: 999px;
+        padding: 14px 22px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field"></canvas>
+
+    <div class="stage">
+      <div class="rail" id="rail"></div>
+    </div>
+
+    <div class="chrome">
+      <div>
+        <span class="brand">voxol</span>
+        <span class="depth" id="depth">01 / 05</span>
+      </div>
+      <div>
+        <span></span>
+        <button class="go" id="go">Continuer →</button>
+      </div>
+    </div>
+
+    <div class="tag"><a href="index.html">← pistes</a><span>B · Tunnel</span></div>
+    <div class="hint">espace / clic</div>
+
+    <script>
+      const ACTS = [
+        {
+          eyebrow: "01 · ce qu'on a construit",
+          title: "Ta voix devient du texte, ici.",
+          body: "VoxoL entend, protège le sens et insère un texte prêt à envoyer.",
+          facts: [
+            ["Sur ce Mac", "audio et texte restent ici"],
+            ["Sens préservé", "correction comprise"],
+            ["Dans l'app active", "là où est ton curseur"],
+          ],
+        },
+        {
+          eyebrow: "02 · partout sur macOS",
+          title: "Trois accès. Rien de plus.",
+          body: "Chaque accès correspond à une action visible que tu déclenches toi-même.",
+          facts: [
+            ["Microphone", "entendre ta voix", "Autoriser"],
+            ["Accessibilité", "insérer le résultat", "Autoriser"],
+            ["Entrée", "détecter ⌥ espace", "Autoriser"],
+          ],
+        },
+        {
+          eyebrow: "03 · sous le capot",
+          title: "Deux moteurs. Un seul geste.",
+          body: "Parakeet reconnaît ta voix. Qwen prépare le texte. Tout reste sur ce Mac.",
+          facts: [
+            ["Parakeet", "voix → mots", "Télécharger"],
+            ["Qwen", "mots → texte prêt", "645,3 Mo"],
+            ["Vérifié", "fichier par fichier"],
+          ],
+        },
+        {
+          eyebrow: "04 · à toi d'essayer",
+          title: "Maintiens. Parle. Relâche.",
+          body: "Sens le geste avant ta première vraie dictée.",
+          facts: [
+            ["Raccourci", "⌥ espace"],
+            ["Démonstration", "aucun audio enregistré"],
+            ["Résultat", "correction comprise"],
+          ],
+        },
+        {
+          eyebrow: "05 · prêt sur ce mac",
+          title: "Tout est là. À toi de parler.",
+          body: "Le raccourci, les moteurs et les accès ont été vérifiés.",
+          facts: [
+            ["Accès", "3 sur 3"],
+            ["Moteurs", "2 sur 2"],
+            ["Historique", "désactivé"],
+          ],
+        },
+      ];
+
+      const GAP = 900;
+      let act = 0;
+
+      const rail = document.getElementById("rail");
+      ACTS.forEach((data, index) => {
+        const plane = document.createElement("section");
+        plane.className = "plane";
+        plane.style.transform = `translateZ(${-index * GAP}px)`;
+        plane.innerHTML = `
+          <span class="eyebrow">${data.eyebrow}</span>
+          <h1>${data.title}</h1>
+          <p>${data.body}</p>
+          <div class="facts">
+            ${data.facts
+              .map(
+                ([label, detail, action]) => `
+              <div class="fact">
+                <b>${label}</b><span>${detail}</span>
+                ${action ? `<a>${action}</a>` : ""}
+              </div>`
+              )
+              .join("")}
+          </div>`;
+        rail.appendChild(plane);
+      });
+
+      function render() {
+        rail.style.transform = `translateZ(${act * GAP}px)`;
+        [...rail.children].forEach((plane, index) => {
+          const distance = index - act;
+          // Behind you it is gone; ahead of you it is still deep in the field.
+          const opacity = distance < 0 ? 0 : Math.max(0, 1 - distance * 0.55);
+          plane.style.opacity = opacity;
+          plane.style.filter = `blur(${Math.min(8, Math.abs(distance) * 3)}px)`;
+        });
+        document.getElementById("depth").textContent =
+          `0${act + 1} / 0${ACTS.length}`;
+        document.getElementById("go").textContent =
+          act === ACTS.length - 1 ? "Ouvrir VoxoL →" : "Continuer →";
+      }
+
+      function next() {
+        act = (act + 1) % ACTS.length;
+        render();
+      }
+
+      document.getElementById("go").addEventListener("click", next);
+      document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" || event.code === "Enter") {
+          event.preventDefault();
+          next();
+        }
+      });
+
+      /* A volumetric field: dither cells with a depth, rushing past the camera. */
+      const canvas = document.getElementById("field");
+      const ctx = canvas.getContext("2d");
+      let cells = [];
+
+      function resize() {
+        canvas.width = innerWidth * devicePixelRatio;
+        canvas.height = innerHeight * devicePixelRatio;
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+        cells = Array.from({ length: 520 }, () => ({
+          x: (Math.random() - 0.5) * 2.4,
+          y: (Math.random() - 0.5) * 2.0,
+          z: Math.random(),
+          hue: Math.random(),
+        }));
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      let travel = 0;
+      let target = 0;
+      function draw() {
+        target = act * 0.22;
+        travel += (target - travel) * 0.04;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        for (const cell of cells) {
+          let z = cell.z - travel;
+          z = ((z % 1) + 1) % 1;
+          const depth = 0.08 + z * 1.6;
+          const px = w / 2 + (cell.x / depth) * w * 0.5;
+          const py = h / 2 + (cell.y / depth) * h * 0.5;
+          if (px < -20 || px > w + 20 || py < -20 || py > h + 20) continue;
+
+          const size = Math.max(1.5, (1 - z) * 7 * devicePixelRatio);
+          const alpha = Math.min(0.5, (1 - z) * 0.55);
+          ctx.fillStyle =
+            cell.hue > 0.72
+              ? `rgba(255,112,72,${alpha})`
+              : cell.hue > 0.4
+                ? `rgba(36,73,248,${alpha})`
+                : `rgba(23,23,19,${alpha * 0.6})`;
+          ctx.fillRect(px, py, size, size);
+        }
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+
+      render();
+    </script>
+  </body>
+</html>

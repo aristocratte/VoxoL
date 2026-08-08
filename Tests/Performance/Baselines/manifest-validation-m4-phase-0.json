@@ -1,0 +1,31 @@
+{
+  "benchmark" : "runtime-manifest-validation",
+  "environment" : {
+    "architecture" : "arm64",
+    "hardware_model" : "Mac16,1",
+    "operating_system" : "Version 26.5.2 (Build 25F84)",
+    "physical_memory_bytes" : 17179869184,
+    "processor_count" : 10
+  },
+  "measurements" : [
+    {
+      "name" : "decode-and-validate",
+      "statistics" : {
+        "maximum" : 1.727042,
+        "minimum" : 0.008458,
+        "p50" : 0.008959,
+        "p95" : 0.019583,
+        "p99" : 0.02698032999999994,
+        "sample_count" : 1000
+      },
+      "unit" : "milliseconds"
+    }
+  ],
+  "parameters" : {
+    "iterations" : "1000",
+    "manifest" : "Models/manifests/runtime-models.json"
+  },
+  "recorded_at" : "2026-07-20T13:52:41Z",
+  "schema_version" : 1,
+  "source_revision" : "uncommitted-phase-0"
+}

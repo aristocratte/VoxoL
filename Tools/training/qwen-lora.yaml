@@ -1,0 +1,31 @@
+model: mlx-community/Qwen3.5-0.8B-4bit
+train: true
+data: ./dataset
+fine_tune_type: lora
+optimizer: adamw
+mask_prompt: true
+adapter_path: ./artifacts/qwen-cleanup-lora
+num_layers: 16
+batch_size: 1
+grad_accumulation_steps: 8
+learning_rate: 5.0e-5
+iters: 1200
+steps_per_report: 10
+steps_per_eval: 100
+save_every: 200
+val_batches: 24
+max_seq_length: 768
+seed: 1729
+test: false
+lora_parameters:
+  keys:
+    - self_attn.q_proj
+    - self_attn.k_proj
+    - self_attn.v_proj
+    - self_attn.o_proj
+    - linear_attn.in_proj_qkv
+    - linear_attn.in_proj_z
+    - linear_attn.out_proj
+  rank: 8
+  scale: 16.0
+  dropout: 0.05

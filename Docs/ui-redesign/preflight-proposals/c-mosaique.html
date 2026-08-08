@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>C · Mosaïque</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      .mosaic {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        display: grid;
+        gap: 0;
+      }
+
+      .tile {
+        position: relative;
+        transform-style: preserve-3d;
+        transition:
+          transform 0.62s cubic-bezier(0.22, 0.8, 0.16, 1),
+          background-color 0.62s ease;
+        background: transparent;
+      }
+
+      .tile::after {
+        /* every tile carries a single dither cell, so the whole page is one grid of signal */
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 3px;
+        height: 3px;
+        transform: translate(-50%, -50%);
+        background: rgba(23, 23, 19, 0.18);
+        transition: all 0.62s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .tile.lit::after {
+        width: 7px;
+        height: 7px;
+        background: var(--cobalt);
+      }
+
+      .tile.warm::after {
+        width: 6px;
+        height: 6px;
+        background: var(--coral);
+      }
+
+      .tile.solid {
+        background: var(--ink);
+      }
+      .tile.solid::after {
+        opacity: 0;
+      }
+
+      .tile.flipping {
+        transform: rotateX(180deg);
+      }
+
+      .content {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        padding: 44px 56px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .content > * {
+        pointer-events: auto;
+      }
+
+      .brand {
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .middle {
+        margin-top: auto;
+        margin-bottom: auto;
+        max-width: 46ch;
+        transition:
+          opacity 0.34s ease,
+          transform 0.34s ease;
+      }
+
+      .middle.out {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      .middle .eyebrow {
+        color: var(--muted);
+      }
+
+      .middle h1 {
+        margin-top: 12px;
+        font-size: clamp(36px, 5vw, 68px);
+        font-weight: 600;
+        letter-spacing: -0.035em;
+        line-height: 0.98;
+      }
+
+      .middle p {
+        margin-top: 18px;
+        font-size: 16px;
+        color: var(--muted);
+      }
+
+      .cards {
+        display: flex;
+        gap: 10px;
+        margin-top: 30px;
+      }
+
+      .card {
+        background: var(--surface);
+        box-shadow: 0 0 0 1px rgba(23, 23, 19, 0.07);
+        padding: 14px 16px;
+        min-width: 150px;
+      }
+
+      .card b {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .card span {
+        display: block;
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .ticks {
+        display: flex;
+        gap: 6px;
+      }
+      .ticks i {
+        width: 7px;
+        height: 7px;
+        background: rgba(23, 23, 19, 0.16);
+      }
+      .ticks i.on {
+        width: 22px;
+        background: var(--ink);
+      }
+
+      .go {
+        background: var(--ink);
+        color: var(--surface);
+        border-radius: 999px;
+        padding: 14px 22px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mosaic" id="mosaic"></div>
+
+    <div class="content">
+      <div class="brand">voxol</div>
+
+      <div class="middle" id="middle">
+        <span class="eyebrow" id="eyebrow"></span>
+        <h1 id="title"></h1>
+        <p id="body"></p>
+        <div class="cards" id="cards"></div>
+      </div>
+
+      <div class="foot">
+        <span class="ticks" id="ticks"></span>
+        <button class="go" id="go">Continuer →</button>
+      </div>
+    </div>
+
+    <div class="tag"><a href="index.html">← pistes</a><span>C · Mosaïque</span></div>
+    <div class="hint">espace / clic</div>
+
+    <script>
+      const ACTS = [
+        {
+          eyebrow: "01 · ce qu'on a construit",
+          title: "Ta voix devient du texte, ici.",
+          body: "VoxoL entend, protège le sens et insère un texte prêt à envoyer.",
+          cards: [
+            ["Sur ce Mac", "audio et texte restent ici"],
+            ["Sens préservé", "correction comprise"],
+          ],
+          shape: "wave",
+        },
+        {
+          eyebrow: "02 · partout sur macOS",
+          title: "Trois accès. Rien de plus.",
+          body: "Chaque accès correspond à une action visible que tu déclenches toi-même.",
+          cards: [
+            ["Microphone", "à autoriser"],
+            ["Accessibilité", "à autoriser"],
+            ["Entrée", "à autoriser"],
+          ],
+          shape: "orbit",
+        },
+        {
+          eyebrow: "03 · sous le capot",
+          title: "Deux moteurs. Un seul geste.",
+          body: "Parakeet reconnaît ta voix, Qwen prépare le texte.",
+          cards: [
+            ["Parakeet", "à télécharger"],
+            ["Qwen", "645,3 Mo"],
+          ],
+          shape: "bridge",
+        },
+        {
+          eyebrow: "04 · à toi d'essayer",
+          title: "Maintiens. Parle. Relâche.",
+          body: "Sens le geste avant ta première vraie dictée.",
+          cards: [["Raccourci", "⌥ espace"]],
+          shape: "pulse",
+        },
+        {
+          eyebrow: "05 · prêt sur ce mac",
+          title: "Tout est là. À toi de parler.",
+          body: "Le raccourci, les moteurs et les accès ont été vérifiés.",
+          cards: [
+            ["Accès", "3 sur 3"],
+            ["Moteurs", "2 sur 2"],
+          ],
+          shape: "ring",
+        },
+      ];
+
+      const COLS = 34;
+      const ROWS = 20;
+      let act = 0;
+
+      const mosaic = document.getElementById("mosaic");
+      mosaic.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+      mosaic.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
+
+      const tiles = [];
+      for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+          const tile = document.createElement("div");
+          tile.className = "tile";
+          mosaic.appendChild(tile);
+          tiles.push({ node: tile, col, row });
+        }
+      }
+
+      /* Each act is the same grid holding a different shape. */
+      function belongs(shape, col, row) {
+        const x = col / (COLS - 1);
+        const y = row / (ROWS - 1);
+        switch (shape) {
+          case "wave": {
+            const line = 0.5 + Math.sin(x * 7) * 0.16;
+            return Math.abs(y - line) < 0.07 ? "lit" : "";
+          }
+          case "orbit": {
+            const dx = x - 0.72;
+            const dy = (y - 0.5) * 0.62;
+            const radius = Math.hypot(dx, dy);
+            return Math.abs(radius - 0.16) < 0.035 ? "lit" : "";
+          }
+          case "bridge": {
+            if (Math.abs(y - 0.5) < 0.045 && x > 0.5 && x < 0.94) return "lit";
+            if (Math.abs(y - 0.5) < 0.1 && (Math.abs(x - 0.52) < 0.03 || Math.abs(x - 0.92) < 0.03))
+              return "warm";
+            return "";
+          }
+          case "pulse": {
+            const dx = x - 0.76;
+            const dy = (y - 0.5) * 0.62;
+            const radius = Math.hypot(dx, dy);
+            return radius < 0.1 ? "warm" : Math.abs(radius - 0.19) < 0.025 ? "lit" : "";
+          }
+          case "ring": {
+            const dx = x - 0.74;
+            const dy = (y - 0.5) * 0.62;
+            const radius = Math.hypot(dx, dy);
+            return Math.abs(radius - 0.13) < 0.05 ? "solid" : "";
+          }
+          default:
+            return "";
+        }
+      }
+
+      function render(instant = false) {
+        const data = ACTS[act];
+        const middle = document.getElementById("middle");
+
+        if (!instant) middle.classList.add("out");
+
+        // The tiles recompose outward from a point, so the page reorganises rather than swaps.
+        const epicentreX = Math.random() * COLS;
+        const epicentreY = Math.random() * ROWS;
+
+        tiles.forEach(({ node, col, row }) => {
+          const distance = Math.hypot(col - epicentreX, row - epicentreY);
+          const delay = instant ? 0 : distance * 11;
+          setTimeout(() => {
+            node.className = "tile flipping";
+            setTimeout(() => {
+              const state = belongs(data.shape, col, row);
+              node.className = `tile ${state}`;
+            }, 160);
+          }, delay);
+        });
+
+        setTimeout(
+          () => {
+            document.getElementById("eyebrow").textContent = data.eyebrow;
+            document.getElementById("title").textContent = data.title;
+            document.getElementById("body").textContent = data.body;
+            document.getElementById("cards").innerHTML = data.cards
+              .map(([label, detail]) => `<div class="card"><b>${label}</b><span>${detail}</span></div>`)
+              .join("");
+            middle.classList.remove("out");
+          },
+          instant ? 0 : 340
+        );
+
+        const ticks = document.getElementById("ticks");
+        ticks.innerHTML = "";
+        ACTS.forEach((_, index) => {
+          const tick = document.createElement("i");
+          if (index === act) tick.className = "on";
+          ticks.appendChild(tick);
+        });
+
+        document.getElementById("go").textContent =
+          act === ACTS.length - 1 ? "Ouvrir VoxoL →" : "Continuer →";
+      }
+
+      function next() {
+        act = (act + 1) % ACTS.length;
+        render();
+      }
+
+      document.getElementById("go").addEventListener("click", next);
+      document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" || event.code === "Enter") {
+          event.preventDefault();
+          next();
+        }
+      });
+
+      render(true);
+    </script>
+  </body>
+</html>

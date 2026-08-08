@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>E · Le fil</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body {
+        background: #fbf9f3;
+      }
+
+      /* --- ambience: soft moving light, then a fine grain over it --- */
+      .glow {
+        position: fixed;
+        inset: -30%;
+        z-index: 0;
+        filter: blur(90px);
+        opacity: 0.75;
+        transition: transform 1.4s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .glow span {
+        position: absolute;
+        border-radius: 50%;
+        transition:
+          background 1.2s ease,
+          transform 1.4s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .glow .a {
+        width: 46vw;
+        height: 46vw;
+        left: 4%;
+        top: 18%;
+        background: radial-gradient(circle, rgba(36, 73, 248, 0.4), transparent 68%);
+      }
+
+      .glow .b {
+        width: 40vw;
+        height: 40vw;
+        right: 6%;
+        top: 4%;
+        background: radial-gradient(circle, rgba(255, 112, 72, 0.36), transparent 68%);
+      }
+
+      .glow .c {
+        width: 34vw;
+        height: 34vw;
+        left: 42%;
+        bottom: -6%;
+        background: radial-gradient(circle, rgba(46, 107, 81, 0.24), transparent 68%);
+      }
+
+      #grain {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      /* --- the thread --- */
+      #thread {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      #thread .track {
+        fill: none;
+        stroke: rgba(23, 23, 19, 0.1);
+        stroke-width: 1.5;
+      }
+
+      #thread .drawn {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1.15s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .node {
+        position: fixed;
+        z-index: 3;
+        width: 10px;
+        height: 10px;
+        margin: -5px 0 0 -5px;
+        border-radius: 50%;
+        background: #fbf9f3;
+        box-shadow: 0 0 0 1.5px rgba(23, 23, 19, 0.18);
+        transition: all 0.7s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .node.done {
+        background: var(--ink);
+        box-shadow: 0 0 0 1.5px var(--ink);
+      }
+
+      .node.now {
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        background: var(--ink);
+        box-shadow:
+          0 0 0 1.5px var(--ink),
+          0 0 0 7px rgba(23, 23, 19, 0.08);
+      }
+
+      .node b {
+        position: absolute;
+        left: 50%;
+        top: 24px;
+        transform: translateX(-50%);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        color: var(--muted);
+        opacity: 0;
+        transition: opacity 0.5s ease;
+      }
+
+      .node.now b {
+        opacity: 1;
+        color: var(--ink);
+      }
+
+      /* a word riding the thread, forever */
+      .drift {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 2;
+        offset-rotate: 0deg;
+        font-size: 13px;
+        font-weight: 500;
+        color: rgba(23, 23, 19, 0.26);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      /* --- content --- */
+      .page {
+        position: fixed;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        flex-direction: column;
+        padding: 40px 56px 34px;
+        pointer-events: none;
+      }
+
+      .page > * {
+        pointer-events: auto;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .brand {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(14px);
+        box-shadow: inset 0 0 0 1px rgba(23, 23, 19, 0.06);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .pill i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--sage);
+      }
+
+      .middle {
+        margin-top: 6vh;
+        max-width: 46ch;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+      }
+
+      h1 {
+        margin-top: 14px;
+        font-size: clamp(40px, 6.2vw, 92px);
+        font-weight: 600;
+        letter-spacing: -0.045em;
+        line-height: 0.94;
+        max-width: 11ch;
+      }
+
+      h1 span {
+        display: inline-block;
+      }
+
+      h1.flying {
+        opacity: 0;
+      }
+
+      .lede {
+        margin-top: 22px;
+        max-width: 44ch;
+        font-size: 17px;
+        line-height: 1.45;
+        color: var(--muted);
+        transition:
+          opacity 0.45s ease,
+          transform 0.45s ease;
+      }
+
+      .lede.out {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      /* the glass panel — the one modern-SaaS surface on the page */
+      .panel {
+        position: fixed;
+        right: 56px;
+        bottom: 116px;
+        z-index: 5;
+        width: min(400px, 38vw);
+        padding: 22px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.62);
+        backdrop-filter: blur(26px) saturate(1.4);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+          0 1px 2px rgba(23, 23, 19, 0.05),
+          0 22px 60px -20px rgba(23, 23, 19, 0.28);
+        transition:
+          opacity 0.5s ease,
+          transform 0.6s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .panel.out {
+        opacity: 0;
+        transform: translateY(16px) scale(0.98);
+      }
+
+      .panel h3 {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .rows {
+        margin-top: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .prow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 0;
+        border-top: 1px solid rgba(23, 23, 19, 0.07);
+      }
+
+      .prow:first-child {
+        border-top: 0;
+      }
+
+      .prow b {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .prow span {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+
+      .prow em {
+        font-style: normal;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cobalt);
+        white-space: nowrap;
+      }
+
+      .prow em.ok {
+        color: var(--sage);
+      }
+
+      .bottom {
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .back {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .go {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px 24px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #fbf9f3;
+        font-size: 15px;
+        font-weight: 600;
+        box-shadow: 0 12px 30px -12px rgba(23, 23, 19, 0.7);
+        transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      .go:active {
+        transform: scale(0.97);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow" id="glow">
+      <span class="a"></span><span class="b"></span><span class="c"></span>
+    </div>
+    <canvas id="grain"></canvas>
+
+    <svg id="thread">
+      <path class="track" id="track"></path>
+      <path class="drawn" id="drawn"></path>
+    </svg>
+
+    <div class="page">
+      <div class="top">
+        <span class="brand">voxol</span>
+        <span class="pill"><i></i> Tout se passe sur ce Mac</span>
+      </div>
+
+      <div class="middle">
+        <span class="eyebrow" id="eyebrow"></span>
+        <h1 id="headline"></h1>
+        <p class="lede" id="lede"></p>
+      </div>
+
+      <div class="bottom">
+        <button class="back" id="back">← Retour</button>
+        <button class="go" id="go">Continuer <span>→</span></button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel">
+      <h3 id="panelTitle"></h3>
+      <div class="rows" id="panelRows"></div>
+    </div>
+
+    <div class="tag"><a href="index.html">← pistes</a><span>E · Le fil</span></div>
+    <div class="hint">espace / clic</div>
+
+    <script>
+      const ACTS = [
+        {
+          node: "La transformation",
+          eyebrow: "01 · ce qu'on a construit",
+          title: "Ta voix devient du texte",
+          lede: "VoxoL entend, protège le sens, et insère un texte prêt à envoyer. Sans compte, sans détour par le cloud.",
+          panel: "Ce que tu obtiens",
+          rows: [
+            ["Entendu", "euh, envoie-le mardi — non, mercredi", ""],
+            ["Prêt à insérer", "Envoie-le mercredi matin.", "ok"],
+          ],
+        },
+        {
+          node: "Les accès",
+          eyebrow: "02 · partout sur macOS",
+          title: "Trois accès. Rien de plus.",
+          lede: "Chaque accès correspond à une action visible que tu déclenches toi-même, et macOS reste seul juge.",
+          panel: "À autoriser",
+          rows: [
+            ["Microphone", "entendre ta voix", "Autoriser"],
+            ["Accessibilité", "insérer le résultat", "Autoriser"],
+            ["Entrée", "détecter ⌥ espace", "Autoriser"],
+          ],
+        },
+        {
+          node: "Les moteurs",
+          eyebrow: "03 · sous le capot",
+          title: "Deux moteurs, un seul geste",
+          lede: "Parakeet reconnaît ta voix. Qwen prépare le texte. Les deux tournent ici, une fois téléchargés.",
+          panel: "Sur ce Mac",
+          rows: [
+            ["Parakeet", "voix → mots", "Télécharger"],
+            ["Qwen", "mots → texte prêt", "ok"],
+          ],
+        },
+        {
+          node: "Le premier geste",
+          eyebrow: "04 · à toi d'essayer",
+          title: "Maintiens. Parle. Relâche.",
+          lede: "Sens le geste avant ta première vraie dictée. Cette démonstration n'enregistre aucun audio.",
+          panel: "Le geste",
+          rows: [
+            ["⌥ espace", "maintenir pour parler", ""],
+            ["Relâcher", "le texte s'insère", "ok"],
+          ],
+        },
+        {
+          node: "Prêt",
+          eyebrow: "05 · prêt sur ce mac",
+          title: "Tout est là. À toi de parler.",
+          lede: "Le raccourci, les moteurs et les accès ont été vérifiés. L'historique reste désactivé.",
+          panel: "Vérifié",
+          rows: [
+            ["Accès", "3 sur 3", "ok"],
+            ["Moteurs", "2 sur 2", "ok"],
+            ["Historique", "désactivé", "ok"],
+          ],
+        },
+      ];
+
+      const DRIFT_WORDS = [
+        "ta voix", "devient", "du texte", "ici", "sur ce Mac", "mercredi matin",
+        "prêt à insérer", "sans cloud", "⌥ espace", "le sens", "protégé", "entendu",
+      ];
+
+      let act = 0;
+      let path = "";
+      let pathLength = 0;
+      const svg = document.getElementById("thread");
+      const track = document.getElementById("track");
+      const drawn = document.getElementById("drawn");
+
+      /* The thread is rebuilt from the viewport so it always runs corner to corner. */
+      function buildThread() {
+        const w = innerWidth;
+        const h = innerHeight;
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        svg.setAttribute("width", w);
+        svg.setAttribute("height", h);
+        path =
+          `M -60 ${h * 0.95} ` +
+          `C ${w * 0.24} ${h * 1.04}, ${w * 0.26} ${h * 0.72}, ${w * 0.52} ${h * 0.74} ` +
+          `S ${w * 0.78} ${h * 0.78}, ${w * 0.82} ${h * 0.42} ` +
+          `S ${w * 0.96} ${h * 0.13}, ${w + 60} ${h * 0.15}`;
+        track.setAttribute("d", path);
+        drawn.setAttribute("d", path);
+        pathLength = drawn.getTotalLength();
+        drawn.style.strokeDasharray = pathLength;
+        placeNodes();
+        updateDraw();
+      }
+
+      /* Nodes sit at even stations along the thread. */
+      let nodes = [];
+      function placeNodes() {
+        nodes.forEach((node) => node.remove());
+        nodes = ACTS.map((data, index) => {
+          const at = drawn.getPointAtLength(((index + 0.55) / ACTS.length) * pathLength);
+          const node = document.createElement("div");
+          node.className = "node";
+          node.style.left = at.x + "px";
+          node.style.top = at.y + "px";
+          node.innerHTML = `<b>${data.node}</b>`;
+          document.body.appendChild(node);
+          return node;
+        });
+        paintNodes();
+      }
+
+      function paintNodes() {
+        nodes.forEach((node, index) => {
+          node.className =
+            "node" + (index === act ? " now" : index < act ? " done" : "");
+        });
+      }
+
+      function updateDraw() {
+        const reach = ((act + 0.55) / ACTS.length) * pathLength;
+        drawn.style.strokeDashoffset = pathLength - reach;
+      }
+
+      /* Words that ride the thread for ever — the thread is a sentence in motion. */
+      function seedDrift() {
+        DRIFT_WORDS.forEach((word, index) => {
+          const span = document.createElement("span");
+          span.className = "drift";
+          span.textContent = word;
+          span.style.offsetPath = `path("${path}")`;
+          document.body.appendChild(span);
+          span.animate(
+            [
+              { offsetDistance: "0%", opacity: 0 },
+              { offsetDistance: "12%", opacity: 1, offset: 0.14 },
+              { offsetDistance: "88%", opacity: 1, offset: 0.86 },
+              { offsetDistance: "100%", opacity: 0 },
+            ],
+            {
+              duration: 20000 + Math.random() * 9000,
+              delay: -index * 1700,
+              iterations: Infinity,
+              easing: "linear",
+            }
+          );
+        });
+      }
+
+      /* --- the headline flies along an arc between acts --- */
+      const headline = document.getElementById("headline");
+
+      function setHeadline(text) {
+        headline.innerHTML = text
+          .split(" ")
+          .map((word) => `<span>${word}</span>`)
+          .join(" ");
+      }
+
+      function wordRects() {
+        return [...headline.querySelectorAll("span")].map((span) => {
+          const rect = span.getBoundingClientRect();
+          return { text: span.textContent, x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+        });
+      }
+
+      function fly(from, to) {
+        const clones = [];
+        const count = Math.max(from.length, to.length);
+        const style = getComputedStyle(headline);
+
+        for (let index = 0; index < count; index += 1) {
+          const start = from[index];
+          const end = to[index];
+          if (!start && !end) continue;
+
+          const clone = document.createElement("span");
+          clone.textContent = (end || start).text;
+          clone.style.cssText = `
+            position:fixed;left:0;top:0;z-index:6;white-space:nowrap;
+            font-size:${style.fontSize};font-weight:${style.fontWeight};
+            letter-spacing:${style.letterSpacing};line-height:${style.lineHeight};
+            color:${style.color};offset-rotate:0deg;pointer-events:none;`;
+
+          const a = start || { x: end.x + innerWidth * 0.18, y: end.y + 120 };
+          const b = end || { x: start.x - innerWidth * 0.18, y: start.y - 120 };
+
+          // The control point bulges along the thread's direction, so every word travels on it.
+          const cx = (a.x + b.x) / 2 + (b.y - a.y) * 0.32;
+          const cy = (a.y + b.y) / 2 - Math.abs(b.x - a.x) * 0.22 - 40;
+
+          clone.style.offsetPath = `path("M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}")`;
+          document.body.appendChild(clone);
+          clones.push(clone);
+
+          clone.animate(
+            [
+              { offsetDistance: "0%", opacity: start ? 1 : 0, filter: "blur(0px)" },
+              { offsetDistance: "50%", opacity: 1, filter: "blur(1.5px)", offset: 0.5 },
+              { offsetDistance: "100%", opacity: end ? 1 : 0, filter: "blur(0px)" },
+            ],
+            {
+              duration: 900,
+              delay: index * 55,
+              easing: "cubic-bezier(0.32, 0, 0.16, 1)",
+              fill: "both",
+            }
+          );
+        }
+
+        setTimeout(
+          () => {
+            clones.forEach((clone) => clone.remove());
+            headline.classList.remove("flying");
+          },
+          900 + count * 55
+        );
+      }
+
+      function render(instant) {
+        const data = ACTS[act];
+        const lede = document.getElementById("lede");
+        const panel = document.getElementById("panel");
+
+        if (instant) {
+          setHeadline(data.title);
+        } else {
+          const from = wordRects();
+          headline.classList.add("flying");
+          setHeadline(data.title);
+          const to = wordRects();
+          fly(from, to);
+        }
+
+        lede.classList.toggle("out", !instant);
+        panel.classList.toggle("out", !instant);
+
+        setTimeout(
+          () => {
+            document.getElementById("eyebrow").textContent = data.eyebrow;
+            lede.textContent = data.lede;
+            document.getElementById("panelTitle").textContent = data.panel;
+            document.getElementById("panelRows").innerHTML = data.rows
+              .map(
+                ([label, detail, action]) => `
+                  <div class="prow">
+                    <div><b>${label}</b><span>${detail}</span></div>
+                    ${action ? `<em class="${action === "ok" ? "ok" : ""}">${action === "ok" ? "✓ prêt" : action}</em>` : ""}
+                  </div>`
+              )
+              .join("");
+            lede.classList.remove("out");
+            panel.classList.remove("out");
+          },
+          instant ? 0 : 520
+        );
+
+        // the light drifts with the act
+        document.getElementById("glow").style.transform =
+          `translate(${-act * 5}%, ${act * 3}%) scale(${1 + act * 0.04})`;
+
+        document.getElementById("go").firstChild.textContent =
+          act === ACTS.length - 1 ? "Ouvrir VoxoL " : "Continuer ";
+        document.getElementById("back").style.opacity = act === 0 ? 0 : 1;
+
+        paintNodes();
+        updateDraw();
+      }
+
+      function step(delta) {
+        const next = Math.min(ACTS.length - 1, Math.max(0, act + delta));
+        if (next === act) return;
+        act = next;
+        render(false);
+      }
+
+      document.getElementById("go").addEventListener("click", () => step(1));
+      document.getElementById("back").addEventListener("click", () => step(-1));
+      document.addEventListener("keydown", (event) => {
+        if (event.code === "Space" || event.code === "Enter" || event.code === "ArrowRight") {
+          event.preventDefault();
+          step(1);
+        }
+        if (event.code === "ArrowLeft") step(-1);
+      });
+
+      /* A fine grain over the light, so it stays VoxoL and not a generic gradient. */
+      const canvas = document.getElementById("grain");
+      const ctx = canvas.getContext("2d");
+      function resizeGrain() {
+        canvas.width = innerWidth * devicePixelRatio;
+        canvas.height = innerHeight * devicePixelRatio;
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+      }
+
+      function paintGrain(time) {
+        const w = canvas.width;
+        const h = canvas.height;
+        const cell = 7 * devicePixelRatio;
+        ctx.clearRect(0, 0, w, h);
+        for (let y = 0; y < h; y += cell) {
+          for (let x = 0; x < w; x += cell) {
+            const nx = x / w;
+            const ny = y / h;
+            const wave = 0.5 + Math.sin(nx * 6 + time * 0.00035) * 0.22;
+            const band = Math.exp(-((ny - wave) ** 2) / 0.05);
+            if (Math.random() < band * 0.16) {
+              ctx.fillStyle = nx < 0.5 ? "rgba(36,73,248,0.45)" : "rgba(255,112,72,0.4)";
+              ctx.fillRect(x, y, 2, 2);
+            } else if (Math.random() < 0.02) {
+              ctx.fillStyle = "rgba(23,23,19,0.16)";
+              ctx.fillRect(x, y, 2, 2);
+            }
+          }
+        }
+        requestAnimationFrame(paintGrain);
+      }
+
+      function boot() {
+        resizeGrain();
+        buildThread();
+        setHeadline(ACTS[0].title);
+        render(true);
+        seedDrift();
+        requestAnimationFrame(paintGrain);
+      }
+
+      addEventListener("resize", () => {
+        resizeGrain();
+        buildThread();
+      });
+
+      boot();
+    </script>
+  </body>
+</html>

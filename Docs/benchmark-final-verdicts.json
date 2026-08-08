@@ -1,0 +1,382 @@
+{
+  "cells": [
+    {
+      "clusters": 296,
+      "delta": -0.021146953405017918,
+      "interval": [
+        -0.031786918142543065,
+        -0.011291460832745237
+      ],
+      "name": "commonvoice-de",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 299,
+      "delta": -0.017581628991747394,
+      "interval": [
+        -0.03185675455997683,
+        -0.004015917845644344
+      ],
+      "name": "commonvoice-en",
+      "p": 0.01,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 296,
+      "delta": -0.01925060158129941,
+      "interval": [
+        -0.030415680973301787,
+        -0.008925503286857607
+      ],
+      "name": "commonvoice-es",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 290,
+      "delta": -0.05,
+      "interval": [
+        -0.06850761255515186,
+        -0.032857105407699615
+      ],
+      "name": "commonvoice-fr",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 290,
+      "delta": -0.029749830966869506,
+      "interval": [
+        -0.03909274189959251,
+        -0.021031760326507023
+      ],
+      "name": "commonvoice-it",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 261,
+      "delta": -0.0014727540500736394,
+      "interval": [
+        -0.010368344404361303,
+        0.007524667032261626
+      ],
+      "name": "commonvoice-nl",
+      "p": 0.7792,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 284,
+      "delta": -0.055079006772009026,
+      "interval": [
+        -0.07010419222238355,
+        -0.04126544436165318
+      ],
+      "name": "commonvoice-pl",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 788,
+      "delta": 0.0074592784289846115,
+      "interval": [
+        -0.000613250112763487,
+        0.01594096393447074
+      ],
+      "name": "commonvoice-pt",
+      "p": 0.0714,
+      "source": "extended",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 215,
+      "delta": 0.007945162797943606,
+      "interval": [
+        0.0014408186756765687,
+        0.014545509650222489
+      ],
+      "name": "fleurs-de",
+      "p": 0.0188,
+      "source": "original",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 238,
+      "delta": 0.007228567297961543,
+      "interval": [
+        0.001666365383479624,
+        0.013034370846588728
+      ],
+      "name": "fleurs-en",
+      "p": 0.012,
+      "source": "original",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 219,
+      "delta": 0.0043439376517184075,
+      "interval": [
+        -0.0002739224079893063,
+        0.008953753090764845
+      ],
+      "name": "fleurs-es",
+      "p": 0.0716,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 220,
+      "delta": -0.000645078054444588,
+      "interval": [
+        -0.007955216075754373,
+        0.006421377718205011
+      ],
+      "name": "fleurs-fr",
+      "p": 0.8868,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 343,
+      "delta": -0.0027595722662987245,
+      "interval": [
+        -0.0060131470304736175,
+        0.0004611090326043264
+      ],
+      "name": "fleurs-it",
+      "p": 0.0912,
+      "source": "extended",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 251,
+      "delta": 0.010117843113915018,
+      "interval": [
+        0.002127692629993847,
+        0.01810327182086642
+      ],
+      "name": "fleurs-nl",
+      "p": 0.0142,
+      "source": "extended",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 217,
+      "delta": 0.016284363509017692,
+      "interval": [
+        0.005415087234912335,
+        0.02597889514029919
+      ],
+      "name": "fleurs-pl",
+      "p": 0.0064,
+      "source": "original",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 224,
+      "delta": 0.009902370990237101,
+      "interval": [
+        0.004610065528267573,
+        0.015240036686489896
+      ],
+      "name": "fleurs-pt",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 40,
+      "delta": -0.015376641326883208,
+      "interval": [
+        -0.026161988376114918,
+        -0.0071089399707073096
+      ],
+      "name": "librispeech-en",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 30,
+      "delta": 0.015883217040029388,
+      "interval": [
+        -0.0034391905579549986,
+        0.05138542124662539
+      ],
+      "name": "mls-de",
+      "p": 0.3298,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 20,
+      "delta": 0.0013740038472107724,
+      "interval": [
+        -0.006256611688795817,
+        0.010253573580073642
+      ],
+      "name": "mls-es",
+      "p": 0.7814,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 18,
+      "delta": -0.0013915463558879793,
+      "interval": [
+        -0.006982361011310746,
+        0.0038400428459228787
+      ],
+      "name": "mls-fr",
+      "p": 0.6054,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 10,
+      "delta": -0.004404876384278944,
+      "interval": [
+        -0.010116146919795937,
+        0.001549909123831461
+      ],
+      "name": "mls-it",
+      "p": 0.159,
+      "source": "extended",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 6,
+      "delta": 0.02139166935744269,
+      "interval": [
+        0.01569929806023096,
+        0.028789923526765626
+      ],
+      "name": "mls-nl",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "Wispr"
+    },
+    {
+      "clusters": 4,
+      "delta": 0.007932419903162666,
+      "interval": [
+        -0.0006688963210702281,
+        0.015319800842589042
+      ],
+      "name": "mls-pl",
+      "p": 0.0852,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 10,
+      "delta": 0.001857010213556172,
+      "interval": [
+        -0.0018779409739630149,
+        0.005849079825471031
+      ],
+      "name": "mls-pt",
+      "p": 0.3628,
+      "source": "original",
+      "verdict": "tie"
+    },
+    {
+      "clusters": 90,
+      "delta": -0.01765754090393651,
+      "interval": [
+        -0.028827591651712246,
+        -0.006990169187040146
+      ],
+      "name": "voxpopuli-de",
+      "p": 0.0008,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 158,
+      "delta": -0.013399640834369383,
+      "interval": [
+        -0.02055505966612474,
+        -0.006753305352996633
+      ],
+      "name": "voxpopuli-en",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 74,
+      "delta": -0.013084689882546886,
+      "interval": [
+        -0.02622671460609229,
+        -0.004602419996995351
+      ],
+      "name": "voxpopuli-es",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 105,
+      "delta": -0.01400175021877735,
+      "interval": [
+        -0.019100649897916967,
+        -0.009163392840633182
+      ],
+      "name": "voxpopuli-fr",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 73,
+      "delta": -0.024366041896361657,
+      "interval": [
+        -0.03509981234065148,
+        -0.014925281104650617
+      ],
+      "name": "voxpopuli-it",
+      "p": 0.0002,
+      "source": "original",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 71,
+      "delta": -0.007128677134091321,
+      "interval": [
+        -0.011706011017152558,
+        -0.0030351806880740497
+      ],
+      "name": "voxpopuli-nl",
+      "p": 0.0002,
+      "source": "extended",
+      "verdict": "VoxoL"
+    },
+    {
+      "clusters": 69,
+      "delta": -0.008547008547008544,
+      "interval": [
+        -0.01668349641597451,
+        -0.0018920493358904919
+      ],
+      "name": "voxpopuli-pl",
+      "p": 0.009,
+      "source": "original",
+      "verdict": "VoxoL"
+    }
+  ],
+  "method": "paired bootstrap resampling speakers (sentence for FLEURS), 10000 resamples, seed 20260807, Benjamini-Hochberg q=0.05",
+  "summary": {
+    "losses": 6,
+    "ties": 11,
+    "wins": 14
+  }
+}

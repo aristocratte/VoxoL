@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VoxoL Teacher Review</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --background: #f7f5f1;
+        --surface: #fffefb;
+        --surface-muted: #f1efea;
+        --text: #1c1b19;
+        --muted: #706d67;
+        --border: #d9d5ce;
+        --border-strong: #bbb6ad;
+        --success: #18813a;
+        --warning: #ad6c0d;
+        --danger: #a5362f;
+        --radius: 12px;
+        --shadow: 0 12px 34px rgb(45 40 32 / 7%);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        background: var(--background);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      button,
+      textarea,
+      input {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      .app {
+        display: grid;
+        grid-template:
+          "header header" 54px
+          "queue main" minmax(0, 1fr)
+          "footer footer" 38px /
+          310px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .topbar {
+        grid-area: header;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--border);
+        background: rgb(255 254 251 / 92%);
+        backdrop-filter: blur(16px);
+      }
+
+      .window-dots {
+        display: flex;
+        gap: 8px;
+      }
+
+      .window-dots span {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+
+      .window-dots span:nth-child(1) {
+        background: #ff5f57;
+      }
+
+      .window-dots span:nth-child(2) {
+        background: #febc2e;
+      }
+
+      .window-dots span:nth-child(3) {
+        background: #28c840;
+      }
+
+      .title {
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+
+      .progress-area {
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 290px;
+      }
+
+      .progress-copy {
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      progress {
+        width: 126px;
+        height: 6px;
+        border: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        appearance: none;
+      }
+
+      progress::-webkit-progress-bar {
+        background: #e4e1dc;
+      }
+
+      progress::-webkit-progress-value {
+        background: var(--text);
+        border-radius: 10px;
+        transition: width 180ms ease;
+      }
+
+      .queue {
+        grid-area: queue;
+        min-height: 0;
+        border-right: 1px solid var(--border);
+        background: #fbfaf7;
+        overflow: auto;
+      }
+
+      .queue-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 18px 12px;
+        background: #fbfaf7;
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .queue-summary {
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      .split-label {
+        padding: 14px 18px 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.035em;
+        text-transform: uppercase;
+      }
+
+      .queue-row {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: 34px 30px minmax(0, 1fr) 18px;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 0;
+        border-left: 3px solid transparent;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .queue-row:hover {
+        background: var(--surface-muted);
+      }
+
+      .queue-row[aria-current="true"] {
+        border-left-color: var(--text);
+        background: #eae7e1;
+      }
+
+      .row-number,
+      .language {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .row-number {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .language {
+        width: fit-content;
+        padding: 1px 4px;
+        border: 1px solid var(--border-strong);
+        border-radius: 4px;
+        background: var(--surface);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .row-name {
+        min-width: 0;
+        overflow: hidden;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-state {
+        color: var(--border-strong);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .row-state.accepted,
+      .row-state.corrected {
+        color: var(--success);
+      }
+
+      .row-state.skipped {
+        color: var(--warning);
+      }
+
+      main {
+        grid-area: main;
+        min-width: 0;
+        overflow: auto;
+        padding: 30px clamp(26px, 4vw, 64px) 40px;
+      }
+
+      .workspace {
+        width: min(1120px, 100%);
+        margin: 0 auto;
+      }
+
+      .metadata {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px 30px;
+        margin-bottom: 22px;
+      }
+
+      .metadata dt {
+        margin-bottom: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metadata dd {
+        margin: 0;
+        font-weight: 550;
+        overflow-wrap: anywhere;
+      }
+
+      .audio-panel {
+        margin-bottom: 22px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      audio {
+        display: block;
+        width: 100%;
+        height: 44px;
+      }
+
+      .field {
+        margin-top: 18px;
+      }
+
+      .field-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 7px;
+      }
+
+      label,
+      .field-title {
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .counter,
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      textarea {
+        width: 100%;
+        resize: vertical;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        outline: none;
+        background: var(--surface);
+        color: var(--text);
+        transition:
+          border-color 120ms ease,
+          box-shadow 120ms ease;
+      }
+
+      textarea:focus {
+        border-color: #89847b;
+        box-shadow: 0 0 0 3px rgb(28 27 25 / 8%);
+      }
+
+      #transcript {
+        min-height: 190px;
+        padding: 18px;
+        font-size: 17px;
+        line-height: 1.58;
+      }
+
+      #notes {
+        min-height: 72px;
+        padding: 12px 14px;
+      }
+
+      details {
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--surface);
+      }
+
+      summary {
+        padding: 13px 15px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .edited-reference {
+        padding: 0 15px 15px 34px;
+        color: var(--muted);
+        white-space: pre-wrap;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1.15fr 1fr minmax(120px, 0.7fr);
+        gap: 12px;
+        align-items: stretch;
+        margin-top: 24px;
+      }
+
+      .action {
+        min-height: 48px;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        background: var(--surface);
+        font-weight: 620;
+        cursor: pointer;
+        transition:
+          transform 100ms ease,
+          background 100ms ease;
+      }
+
+      .action:hover {
+        background: var(--surface-muted);
+      }
+
+      .action:active {
+        transform: scale(0.99);
+      }
+
+      .action.primary {
+        border-color: var(--text);
+        background: var(--text);
+        color: white;
+      }
+
+      .action.primary:hover {
+        background: #34322f;
+      }
+
+      .save-state {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .save-state.saved {
+        color: var(--success);
+      }
+
+      .save-state.error {
+        color: var(--danger);
+      }
+
+      .footer {
+        grid-area: footer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 18px;
+        border-top: 1px solid var(--border);
+        background: #fbfaf7;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      kbd {
+        min-width: 22px;
+        display: inline-block;
+        margin-left: 4px;
+        padding: 1px 5px;
+        border: 1px solid var(--border);
+        border-bottom-color: var(--border-strong);
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--text);
+        font: 11px -apple-system, BlinkMacSystemFont, sans-serif;
+        text-align: center;
+      }
+
+      @media (max-width: 900px) {
+        .app {
+          grid-template:
+            "header" 54px
+            "queue" 220px
+            "main" minmax(0, 1fr)
+            "footer" 38px /
+            1fr;
+        }
+
+        .queue {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .topbar {
+          grid-template-columns: auto 1fr;
+        }
+
+        .title {
+          margin-left: 14px;
+        }
+
+        .progress-area {
+          display: none;
+        }
+
+        main {
+          padding: 24px 18px 32px;
+        }
+
+        .metadata {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 620px) {
+        .metadata {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .actions {
+          grid-template-columns: 1fr;
+        }
+
+        .save-state {
+          min-height: 34px;
+        }
+
+        .footer .shortcuts {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="title">VoxoL Teacher Review</div>
+        <div class="progress-area">
+          <span class="progress-copy" id="progress-copy">Reviewed 0 / 400</span>
+          <progress id="progress" value="0" max="400"></progress>
+        </div>
+      </header>
+
+      <aside class="queue">
+        <div class="queue-header">
+          <span>Queue</span>
+          <span class="queue-summary" id="queue-summary">Loading…</span>
+        </div>
+        <div id="queue-list"></div>
+      </aside>
+
+      <main>
+        <div class="workspace">
+          <dl class="metadata">
+            <div><dt>ID</dt><dd id="meta-id">—</dd></div>
+            <div><dt>Language</dt><dd id="meta-language">—</dd></div>
+            <div><dt>Split</dt><dd id="meta-split">—</dd></div>
+            <div><dt>Duration</dt><dd id="meta-duration">—</dd></div>
+            <div><dt>Speaker</dt><dd id="meta-speaker">—</dd></div>
+            <div><dt>Recording</dt><dd id="meta-recording">—</dd></div>
+            <div><dt>Source</dt><dd id="meta-source">—</dd></div>
+            <div><dt>Audit category</dt><dd id="meta-category">—</dd></div>
+          </dl>
+
+          <div class="audio-panel">
+            <audio id="audio" controls preload="metadata"></audio>
+          </div>
+
+          <div class="field">
+            <div class="field-header">
+              <label for="transcript">Raw Wispr transcript (editable)</label>
+              <span class="counter" id="transcript-count">0 characters</span>
+            </div>
+            <textarea
+              id="transcript"
+              maxlength="12000"
+              spellcheck="true"
+            ></textarea>
+          </div>
+
+          <details id="edited-details">
+            <summary>Wispr edited version (reference)</summary>
+            <div class="edited-reference" id="edited-reference"></div>
+          </details>
+
+          <div class="field">
+            <div class="field-header">
+              <label for="notes">Notes (optional)</label>
+              <span class="hint">Noise, unclear word, name, or label issue</span>
+            </div>
+            <textarea
+              id="notes"
+              maxlength="2000"
+              placeholder="Add a short note only when it helps explain the decision."
+            ></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="action" id="accept" type="button">
+              Accept raw <kbd>⌘1</kbd>
+            </button>
+            <button class="action primary" id="correct" type="button">
+              Save correction <kbd>⌘2</kbd>
+            </button>
+            <button class="action" id="skip" type="button">
+              Skip <kbd>⌘3</kbd>
+            </button>
+            <div class="save-state" id="save-state" role="status">
+              Ready
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="footer">
+        <span>Progress is saved locally after every action.</span>
+        <span class="shortcuts">
+          Previous/next <kbd>⌘↑</kbd><kbd>⌘↓</kbd>
+        </span>
+      </footer>
+    </div>
+
+    <script>
+      const token = __VOXOL_REVIEW_TOKEN__;
+      const elements = {
+        accept: document.querySelector("#accept"),
+        audio: document.querySelector("#audio"),
+        correct: document.querySelector("#correct"),
+        editedDetails: document.querySelector("#edited-details"),
+        editedReference: document.querySelector("#edited-reference"),
+        notes: document.querySelector("#notes"),
+        progress: document.querySelector("#progress"),
+        progressCopy: document.querySelector("#progress-copy"),
+        queueList: document.querySelector("#queue-list"),
+        queueSummary: document.querySelector("#queue-summary"),
+        saveState: document.querySelector("#save-state"),
+        skip: document.querySelector("#skip"),
+        transcript: document.querySelector("#transcript"),
+        transcriptCount: document.querySelector("#transcript-count"),
+      };
+      const metadata = {
+        category: document.querySelector("#meta-category"),
+        duration: document.querySelector("#meta-duration"),
+        id: document.querySelector("#meta-id"),
+        language: document.querySelector("#meta-language"),
+        recording: document.querySelector("#meta-recording"),
+        source: document.querySelector("#meta-source"),
+        speaker: document.querySelector("#meta-speaker"),
+        split: document.querySelector("#meta-split"),
+      };
+      let queue = [];
+      let reviews = {};
+      let currentIndex = 0;
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            "X-VoxoL-Review-Token": token,
+            ...(options.headers || {}),
+          },
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "The review could not be saved.");
+        }
+        return payload;
+      }
+
+      function statusSymbol(status) {
+        if (status === "accepted") return "✓";
+        if (status === "corrected") return "✎";
+        if (status === "skipped") return "△";
+        return "○";
+      }
+
+      function renderQueue() {
+        elements.queueList.replaceChildren();
+        let previousSplit = "";
+        queue.forEach((item, index) => {
+          if (item.split !== previousSplit) {
+            const label = document.createElement("div");
+            label.className = "split-label";
+            label.textContent = item.split;
+            elements.queueList.append(label);
+            previousSplit = item.split;
+          }
+          const review = reviews[item.id];
+          const button = document.createElement("button");
+          button.className = "queue-row";
+          button.type = "button";
+          button.dataset.index = index;
+          button.setAttribute("aria-current", index === currentIndex);
+
+          const number = document.createElement("span");
+          number.className = "row-number";
+          number.textContent = String(item.reviewOrder).padStart(3, "0");
+
+          const language = document.createElement("span");
+          language.className = "language";
+          language.textContent = item.language;
+
+          const name = document.createElement("span");
+          name.className = "row-name";
+          name.textContent = item.sourceName;
+
+          const state = document.createElement("span");
+          state.className = `row-state ${review?.status || ""}`;
+          state.textContent = statusSymbol(review?.status);
+
+          button.append(number, language, name, state);
+          button.addEventListener("click", () => loadItem(index));
+          elements.queueList.append(button);
+        });
+        updateProgress();
+      }
+
+      function updateProgress() {
+        const values = Object.values(reviews);
+        const reviewed = values.filter((review) =>
+          ["accepted", "corrected"].includes(review.status),
+        ).length;
+        const skipped = values.filter(
+          (review) => review.status === "skipped",
+        ).length;
+        elements.progress.max = queue.length;
+        elements.progress.value = reviewed;
+        elements.progressCopy.textContent =
+          `Reviewed ${reviewed} / ${queue.length}`;
+        elements.queueSummary.textContent =
+          skipped > 0 ? `${reviewed} valid · ${skipped} skipped` : `${reviewed} valid`;
+      }
+
+      function loadItem(index) {
+        currentIndex = Math.max(0, Math.min(index, queue.length - 1));
+        const item = queue[currentIndex];
+        const review = reviews[item.id];
+        metadata.id.textContent = item.id;
+        metadata.language.textContent =
+          item.language === "fr" ? "FR · French" : "EN · English";
+        metadata.split.textContent = item.split;
+        metadata.duration.textContent = `${Number(item.durationSeconds).toFixed(1)} s`;
+        metadata.speaker.textContent = item.speakerID || "Unknown";
+        metadata.recording.textContent = item.recordingID;
+        metadata.source.textContent = item.sourceName;
+        metadata.category.textContent =
+          item.categories.length ? item.categories.join(", ") : "Representative";
+        elements.transcript.value =
+          review?.status === "corrected"
+            ? review.transcript
+            : item.rawTranscript;
+        elements.notes.value = review?.notes || "";
+        elements.editedReference.textContent =
+          item.editedTranscript || "No edited version is available for this sample.";
+        elements.editedDetails.open = false;
+        elements.audio.src =
+          `/audio/${encodeURIComponent(item.id)}?token=${encodeURIComponent(token)}`;
+        elements.audio.load();
+        elements.saveState.className = review
+          ? "save-state saved"
+          : "save-state";
+        elements.saveState.textContent = review
+          ? `Saved · ${review.status}`
+          : "Ready";
+        updateTranscriptCount();
+        renderQueue();
+        document
+          .querySelector('.queue-row[aria-current="true"]')
+          ?.scrollIntoView({ block: "nearest" });
+      }
+
+      function updateTranscriptCount() {
+        elements.transcriptCount.textContent =
+          `${elements.transcript.value.length} characters`;
+      }
+
+      function nextPendingIndex() {
+        for (let offset = 1; offset <= queue.length; offset += 1) {
+          const index = (currentIndex + offset) % queue.length;
+          if (!reviews[queue[index].id]) return index;
+        }
+        const skippedIndex = queue.findIndex(
+          (item) => reviews[item.id]?.status === "skipped",
+        );
+        return skippedIndex >= 0 ? skippedIndex : currentIndex;
+      }
+
+      async function save(status) {
+        const item = queue[currentIndex];
+        elements.saveState.className = "save-state";
+        elements.saveState.textContent = "Saving…";
+        try {
+          const result = await api(
+            `/api/reviews/${encodeURIComponent(item.id)}`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                notes: elements.notes.value,
+                status,
+                transcript: elements.transcript.value,
+              }),
+            },
+          );
+          reviews[item.id] = result.review;
+          elements.saveState.className = "save-state saved";
+          elements.saveState.textContent = "Saved";
+          renderQueue();
+          window.setTimeout(() => loadItem(nextPendingIndex()), 220);
+        } catch (error) {
+          elements.saveState.className = "save-state error";
+          elements.saveState.textContent = error.message;
+        }
+      }
+
+      elements.accept.addEventListener("click", () => save("accepted"));
+      elements.correct.addEventListener("click", () => save("corrected"));
+      elements.skip.addEventListener("click", () => save("skipped"));
+      elements.transcript.addEventListener("input", updateTranscriptCount);
+
+      document.addEventListener("keydown", (event) => {
+        if (!event.metaKey) return;
+        if (event.key === "1") {
+          event.preventDefault();
+          save("accepted");
+        } else if (event.key === "2") {
+          event.preventDefault();
+          save("corrected");
+        } else if (event.key === "3") {
+          event.preventDefault();
+          save("skipped");
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          loadItem(currentIndex - 1);
+        } else if (event.key === "ArrowDown") {
+          event.preventDefault();
+          loadItem(currentIndex + 1);
+        }
+      });
+
+      api("/api/session")
+        .then((session) => {
+          queue = session.queue.items;
+          reviews = session.state.reviews || {};
+          const firstPending = queue.findIndex((item) => !reviews[item.id]);
+          loadItem(firstPending >= 0 ? firstPending : 0);
+        })
+        .catch((error) => {
+          elements.saveState.className = "save-state error";
+          elements.saveState.textContent = error.message;
+        });
+    </script>
+  </body>
+</html>

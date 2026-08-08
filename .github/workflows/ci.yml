@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Report toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Enforce repository policy
+        run: ./Scripts/check-repository-policy.sh
+
+      - name: Lint Swift
+        run: >-
+          xcrun swift-format lint --strict --parallel --recursive
+          Package.swift App Packages Tools Tests
+
+      - name: Run package tests
+        run: swift test
+
+      - name: Smoke-test benchmark harness
+        run: swift run voxol-benchmark --iterations 5
+
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - name: Build native app
+        run: >-
+          xcodebuild
+          -project VoxoL.xcodeproj
+          -scheme VoxoL
+          -configuration Debug
+          -destination 'platform=macOS,arch=arm64'
+          -derivedDataPath .build/DerivedData
+          -skipPackagePluginValidation
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Check French localization coverage
+        run: ./Scripts/check-localization.sh .build/DerivedData

@@ -1,0 +1,459 @@
+{
+  "schemaVersion": 1,
+  "benchmarkID": "voxol-owner-pilot-v1",
+  "normalizationVersion": "voxol-asr-normalizer-v1",
+  "items": [
+    {
+      "id": "fr-short-001",
+      "audioPath": "owner-pilot/fr-short-001.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["short", "general"],
+      "reference": {
+        "verbatim": "Je reviens dans cinq minutes.",
+        "clean": "Je reviens dans cinq minutes.",
+        "criticalSpans": [{"kind": "number", "expected": "cinq", "acceptedAlternatives": ["5"]}],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-entity-002",
+      "audioPath": "owner-pilot/fr-entity-002.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["entity", "email"],
+      "reference": {
+        "verbatim": "Écris à Léa Dubois pour confirmer la démonstration de VoxoL.",
+        "clean": "Écris à Léa Dubois pour confirmer la démonstration de VoxoL.",
+        "criticalSpans": [
+          {"kind": "person", "expected": "Léa Dubois", "acceptedAlternatives": []},
+          {"kind": "product", "expected": "VoxoL", "acceptedAlternatives": ["Voxol"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-numbers-003",
+      "audioPath": "owner-pilot/fr-numbers-003.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["numbers", "currency", "percentage"],
+      "reference": {
+        "verbatim": "Le devis atteint douze mille quatre cent cinquante euros, avec une remise de sept virgule cinq pour cent.",
+        "clean": "Le devis atteint 12 450 €, avec une remise de 7,5 %.",
+        "criticalSpans": [
+          {"kind": "currency", "expected": "12 450 €", "acceptedAlternatives": ["douze mille quatre cent cinquante euros", "12450 euros"]},
+          {"kind": "number", "expected": "7,5 %", "acceptedAlternatives": ["sept virgule cinq pour cent", "7.5 percent"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-date-004",
+      "audioPath": "owner-pilot/fr-date-004.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["date", "time"],
+      "reference": {
+        "verbatim": "La maintenance commencera le mardi trois novembre deux mille vingt-six à dix-huit heures quarante-cinq.",
+        "clean": "La maintenance commencera le mardi 3 novembre 2026 à 18 h 45.",
+        "criticalSpans": [
+          {"kind": "date", "expected": "3 novembre 2026", "acceptedAlternatives": ["trois novembre deux mille vingt-six"]},
+          {"kind": "time", "expected": "18 h 45", "acceptedAlternatives": ["dix-huit heures quarante-cinq", "18:45"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-correction-005",
+      "audioPath": "owner-pilot/fr-correction-005.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["self-correction", "hesitation"],
+      "reference": {
+        "verbatim": "Envoie le dossier jeudi, enfin non, vendredi matin avant onze heures.",
+        "clean": "Envoie le dossier vendredi matin avant 11 heures.",
+        "criticalSpans": [
+          {"kind": "date", "expected": "vendredi matin", "acceptedAlternatives": []},
+          {"kind": "time", "expected": "11 heures", "acceptedAlternatives": ["onze heures"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-list-006",
+      "audioPath": "owner-pilot/fr-list-006.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["list", "formatting"],
+      "reference": {
+        "verbatim": "Pour le lancement, premièrement vérifier la signature, deuxièmement tester la mise à jour, troisièmement publier les notes de version.",
+        "clean": "Pour le lancement :\n1. Vérifier la signature.\n2. Tester la mise à jour.\n3. Publier les notes de version.",
+        "criticalSpans": [],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-negation-007",
+      "audioPath": "owner-pilot/fr-negation-007.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["negation", "critical"],
+      "reference": {
+        "verbatim": "Ne supprime surtout pas la sauvegarde tant que Nora n'a pas validé l'import.",
+        "clean": "Ne supprime surtout pas la sauvegarde tant que Nora n'a pas validé l'import.",
+        "criticalSpans": [
+          {"kind": "negation", "expected": "Ne supprime surtout pas", "acceptedAlternatives": []},
+          {"kind": "person", "expected": "Nora", "acceptedAlternatives": []}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-address-008",
+      "audioPath": "owner-pilot/fr-address-008.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["address", "entity"],
+      "reference": {
+        "verbatim": "Le colis doit arriver au vingt-sept avenue des Alpes à Lausanne.",
+        "clean": "Le colis doit arriver au 27 avenue des Alpes, à Lausanne.",
+        "criticalSpans": [
+          {"kind": "number", "expected": "27", "acceptedAlternatives": ["vingt-sept"]},
+          {"kind": "place", "expected": "Lausanne", "acceptedAlternatives": []}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-technical-009",
+      "audioPath": "owner-pilot/fr-technical-009.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["technical", "model"],
+      "reference": {
+        "verbatim": "Parakeet utilise un décodeur TDT glouton et l'encodeur s'exécute avec Core ML.",
+        "clean": "Parakeet utilise un décodeur TDT glouton et l'encodeur s'exécute avec Core ML.",
+        "criticalSpans": [
+          {"kind": "product", "expected": "Parakeet", "acceptedAlternatives": []},
+          {"kind": "code", "expected": "TDT", "acceptedAlternatives": []},
+          {"kind": "product", "expected": "Core ML", "acceptedAlternatives": ["CoreML"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-url-010",
+      "audioPath": "owner-pilot/fr-url-010.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["url", "developer"],
+      "reference": {
+        "verbatim": "Consulte docs point swift point org barre oblique concurrency avant de modifier le projet.",
+        "clean": "Consulte docs.swift.org/concurrency avant de modifier le projet.",
+        "criticalSpans": [{"kind": "url", "expected": "docs.swift.org/concurrency", "acceptedAlternatives": ["docs point swift point org barre oblique concurrency"]}],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-code-011",
+      "audioPath": "owner-pilot/fr-code-011.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["code", "command", "swift"],
+      "reference": {
+        "verbatim": "Dans Audio Capture Session point Swift, remplace frame length par sample count, puis lance Swift test tiret tiret filter Audio Ring Buffer Tests.",
+        "clean": "Dans AudioCaptureSession.swift, remplace `frameLength` par `sampleCount`, puis lance `swift test --filter AudioRingBufferTests`.",
+        "criticalSpans": [
+          {"kind": "path", "expected": "AudioCaptureSession.swift", "acceptedAlternatives": ["Audio Capture Session point Swift"]},
+          {"kind": "command", "expected": "swift test --filter AudioRingBufferTests", "acceptedAlternatives": ["Swift test tiret tiret filter Audio Ring Buffer Tests"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "fr-long-012",
+      "audioPath": "owner-pilot/fr-long-012.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "french",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["long", "boundary", "meeting"],
+      "reference": {
+        "verbatim": "Pendant la réunion, nous avons décidé de conserver le moteur actuel pour la prochaine version. L'équipe va d'abord vérifier la conversion du modèle, comparer les sorties avec la référence officielle et mesurer la latence depuis le relâchement du raccourci jusqu'à l'apparition du texte. Ensuite, nous testerons une nouvelle segmentation sur des enregistrements qui n'ont jamais servi à choisir les seuils.",
+        "clean": "Pendant la réunion, nous avons décidé de conserver le moteur actuel pour la prochaine version. L'équipe va d'abord vérifier la conversion du modèle, comparer les sorties avec la référence officielle et mesurer la latence depuis le relâchement du raccourci jusqu'à l'apparition du texte. Ensuite, nous testerons une nouvelle segmentation sur des enregistrements qui n'ont jamais servi à choisir les seuils.",
+        "criticalSpans": [],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-short-013",
+      "audioPath": "owner-pilot/en-short-013.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["short", "general"],
+      "reference": {
+        "verbatim": "I'll send the update after lunch.",
+        "clean": "I'll send the update after lunch.",
+        "criticalSpans": [],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-entity-014",
+      "audioPath": "owner-pilot/en-entity-014.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["entity", "product"],
+      "reference": {
+        "verbatim": "Ask Maya Thompson to review the VoxoL release candidate.",
+        "clean": "Ask Maya Thompson to review the VoxoL release candidate.",
+        "criticalSpans": [
+          {"kind": "person", "expected": "Maya Thompson", "acceptedAlternatives": []},
+          {"kind": "product", "expected": "VoxoL", "acceptedAlternatives": ["Voxol"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-numbers-015",
+      "audioPath": "owner-pilot/en-numbers-015.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["numbers", "currency", "unit"],
+      "reference": {
+        "verbatim": "The package weighs two point seven kilograms and costs one hundred eighty-nine dollars and ninety cents.",
+        "clean": "The package weighs 2.7 kilograms and costs $189.90.",
+        "criticalSpans": [
+          {"kind": "unit", "expected": "2.7 kilograms", "acceptedAlternatives": ["two point seven kilograms"]},
+          {"kind": "currency", "expected": "$189.90", "acceptedAlternatives": ["one hundred eighty-nine dollars and ninety cents"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-date-016",
+      "audioPath": "owner-pilot/en-date-016.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["date", "time"],
+      "reference": {
+        "verbatim": "Schedule the deployment for February seventeenth twenty twenty-seven at six thirty A M.",
+        "clean": "Schedule the deployment for February 17, 2027, at 6:30 AM.",
+        "criticalSpans": [
+          {"kind": "date", "expected": "February 17, 2027", "acceptedAlternatives": ["February seventeenth twenty twenty-seven"]},
+          {"kind": "time", "expected": "6:30 AM", "acceptedAlternatives": ["six thirty A M"]}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-correction-017",
+      "audioPath": "owner-pilot/en-correction-017.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["self-correction", "hesitation"],
+      "reference": {
+        "verbatim": "Ship the build on Monday, sorry, on Tuesday after the security review.",
+        "clean": "Ship the build on Tuesday after the security review.",
+        "criticalSpans": [{"kind": "date", "expected": "Tuesday", "acceptedAlternatives": []}],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-list-018",
+      "audioPath": "owner-pilot/en-list-018.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["list", "formatting"],
+      "reference": {
+        "verbatim": "For tomorrow, first update the changelog, second run the integration tests, and third archive the signed build.",
+        "clean": "For tomorrow:\n1. Update the changelog.\n2. Run the integration tests.\n3. Archive the signed build.",
+        "criticalSpans": [],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-negation-019",
+      "audioPath": "owner-pilot/en-negation-019.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["negation", "critical"],
+      "reference": {
+        "verbatim": "Do not merge the pull request until Elena confirms the migration.",
+        "clean": "Do not merge the pull request until Elena confirms the migration.",
+        "criticalSpans": [
+          {"kind": "negation", "expected": "Do not merge", "acceptedAlternatives": []},
+          {"kind": "person", "expected": "Elena", "acceptedAlternatives": []}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-code-020",
+      "audioPath": "owner-pilot/en-code-020.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["code", "command", "git"],
+      "reference": {
+        "verbatim": "Create a branch named feature slash confidence V two, then run git status and Swift test.",
+        "clean": "Create a branch named `feature/confidence-v2`, then run `git status` and `swift test`.",
+        "criticalSpans": [
+          {"kind": "path", "expected": "feature/confidence-v2", "acceptedAlternatives": ["feature slash confidence V two"]},
+          {"kind": "command", "expected": "git status", "acceptedAlternatives": []},
+          {"kind": "command", "expected": "swift test", "acceptedAlternatives": []}
+        ],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "en-long-021",
+      "audioPath": "owner-pilot/en-long-021.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "english",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["long", "boundary", "meeting"],
+      "reference": {
+        "verbatim": "During the design review, we agreed that the ordinary dictation path should stay fast and predictable. The speech engine must preserve names, numbers, commands, and negations before any formatting model is allowed to edit the text. We will compare every candidate on the same recordings, report warm and cold latency separately, and reject any change that improves average word error rate by deleting a critical phrase.",
+        "clean": "During the design review, we agreed that the ordinary dictation path should stay fast and predictable. The speech engine must preserve names, numbers, commands, and negations before any formatting model is allowed to edit the text. We will compare every candidate on the same recordings, report warm and cold latency separately, and reject any change that improves average word error rate by deleting a critical phrase.",
+        "criticalSpans": [],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "mixed-fr-en-022",
+      "audioPath": "owner-pilot/mixed-fr-en-022.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "mixed",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["code-switch", "fr-en"],
+      "reference": {
+        "verbatim": "Je prépare la release candidate, then I'll send the benchmark report to the team.",
+        "clean": "Je prépare la release candidate, then I'll send the benchmark report to the team.",
+        "criticalSpans": [{"kind": "product", "expected": "release candidate", "acceptedAlternatives": []}],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "mixed-en-fr-023",
+      "audioPath": "owner-pilot/mixed-en-fr-023.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "mixed",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["code-switch", "en-fr"],
+      "reference": {
+        "verbatim": "The encoder is ready, mais il faut encore vérifier les timestamps sur les longues dictées.",
+        "clean": "The encoder is ready, mais il faut encore vérifier les timestamps sur les longues dictées.",
+        "criticalSpans": [{"kind": "code", "expected": "timestamps", "acceptedAlternatives": []}],
+        "reviewed": true
+      }
+    },
+    {
+      "id": "mixed-technical-024",
+      "audioPath": "owner-pilot/mixed-technical-024.wav",
+      "speakerID": "owner-pilot",
+      "sessionID": "owner-built-in-quiet",
+      "split": "development",
+      "language": "mixed",
+      "microphone": "built-in",
+      "environment": "quiet",
+      "tags": ["code-switch", "technical", "command"],
+      "reference": {
+        "verbatim": "Lance le parity harness with CPU only, puis compare the token logits and the duration logits.",
+        "clean": "Lance le parity harness with CPU only, puis compare the token logits and the duration logits.",
+        "criticalSpans": [
+          {"kind": "code", "expected": "token logits", "acceptedAlternatives": []},
+          {"kind": "code", "expected": "duration logits", "acceptedAlternatives": []}
+        ],
+        "reviewed": true
+      }
+    }
+  ]
+}

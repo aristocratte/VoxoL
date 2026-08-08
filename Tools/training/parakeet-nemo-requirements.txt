@@ -1,0 +1,2 @@
+# The training runner also requires a CUDA-enabled PyTorch build supplied by the GPU host.
+nemo_toolkit[asr] @ git+https://github.com/NVIDIA-NeMo/NeMo.git@2381f42f6979449b5b99538f8f80135831009b51

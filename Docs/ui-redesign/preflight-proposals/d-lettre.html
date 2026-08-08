@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>D · Lettre</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #edge {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        opacity: 0.55;
+      }
+
+      .sheet {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .column {
+        width: min(760px, 76vw);
+        padding: 60px 0 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        transition: transform 0.7s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .brand {
+        position: fixed;
+        top: 34px;
+        left: 44px;
+        z-index: 2;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .line {
+        font-size: clamp(24px, 3.1vw, 40px);
+        font-weight: 500;
+        letter-spacing: -0.025em;
+        line-height: 1.28;
+        margin-bottom: 22px;
+        opacity: 0;
+        transform: translateY(14px);
+        transition:
+          opacity 0.5s ease,
+          transform 0.5s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .line.in {
+        opacity: 1;
+        transform: none;
+      }
+
+      .line.past {
+        opacity: 0.24;
+        font-size: clamp(18px, 2.1vw, 26px);
+        margin-bottom: 14px;
+      }
+
+      .caret {
+        display: inline-block;
+        width: 0.5em;
+        height: 1em;
+        margin-left: 2px;
+        vertical-align: -0.12em;
+        background: var(--ink);
+        animation: blink 1s steps(2) infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* A system answer, set inline in the sentence. */
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 12px 4px;
+        margin: 0 2px;
+        border-radius: 999px;
+        font-size: 0.72em;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        vertical-align: 0.1em;
+        cursor: pointer;
+        background: var(--coral-soft);
+        color: #a03415;
+        transition: all 0.4s cubic-bezier(0.22, 0.8, 0.16, 1);
+      }
+
+      .chip.done {
+        background: var(--sage-soft);
+        color: var(--sage);
+        cursor: default;
+      }
+
+      .chip i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .foot {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        padding: 22px 44px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(to top, var(--canvas) 55%, transparent);
+      }
+
+      .progress {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .go {
+        background: var(--ink);
+        color: var(--surface);
+        border-radius: 999px;
+        padding: 14px 22px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .go[disabled] {
+        opacity: 0.28;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="edge"></canvas>
+    <div class="brand">voxol</div>
+
+    <div class="sheet">
+      <div class="column" id="column"></div>
+    </div>
+
+    <div class="foot">
+      <span class="progress" id="progress"></span>
+      <button class="go" id="go" disabled>Ouvrir VoxoL →</button>
+    </div>
+
+    <div class="tag"><a href="index.html">← pistes</a><span>D · Lettre</span></div>
+    <div class="hint">ça s'écrit tout seul</div>
+
+    <script>
+      /* The app writes itself a letter, and the system answers inside the sentences. */
+      const LINES = [
+        { text: "Bonjour." },
+        { text: "Je transforme ta voix en texte, sur ce Mac, sans compte et sans cloud." },
+        { text: "Pour t'entendre, il me faut le micro.", chip: "Microphone" },
+        { text: "Pour écrire à ta place, l'accessibilité.", chip: "Accessibilité" },
+        { text: "Pour reconnaître ⌥ espace, l'entrée clavier.", chip: "Entrée" },
+        { text: "Je télécharge ensuite deux moteurs locaux, une fois.", chip: "1,3 Go" },
+        { text: "Puis tu maintiens ⌥ espace, tu parles, tu relâches." },
+        { text: "Et le texte arrive, propre, là où est ton curseur." },
+      ];
+
+      const column = document.getElementById("column");
+      const go = document.getElementById("go");
+      let index = 0;
+      let resolved = 0;
+      const totalChips = LINES.filter((line) => line.chip).length;
+
+      function updateProgress() {
+        document.getElementById("progress").textContent =
+          `${resolved} / ${totalChips} accordés`;
+        go.disabled = resolved < totalChips;
+      }
+
+      function typeLine(line, node, done) {
+        const words = line.text.split(" ");
+        let position = 0;
+        const caret = document.createElement("span");
+        caret.className = "caret";
+        node.appendChild(caret);
+
+        const timer = setInterval(() => {
+          if (position >= words.length) {
+            clearInterval(timer);
+            caret.remove();
+
+            if (line.chip) {
+              const chip = document.createElement("button");
+              chip.className = "chip";
+              chip.innerHTML = `<i></i>${line.chip}`;
+              chip.addEventListener("click", () => {
+                if (chip.classList.contains("done")) return;
+                chip.classList.add("done");
+                chip.innerHTML = `<i></i>${line.chip} · accordé`;
+                resolved += 1;
+                updateProgress();
+              });
+              node.appendChild(document.createTextNode(" "));
+              node.appendChild(chip);
+            }
+            done();
+            return;
+          }
+          caret.insertAdjacentText("beforebegin", (position ? " " : "") + words[position]);
+          position += 1;
+        }, 55);
+      }
+
+      function writeNext() {
+        if (index >= LINES.length) return;
+        const line = LINES[index];
+
+        [...column.children].forEach((node) => node.classList.add("past"));
+
+        const node = document.createElement("p");
+        node.className = "line";
+        column.appendChild(node);
+        requestAnimationFrame(() => node.classList.add("in"));
+
+        typeLine(line, node, () => {
+          index += 1;
+          setTimeout(writeNext, line.chip ? 900 : 420);
+        });
+      }
+
+      updateProgress();
+      setTimeout(writeNext, 500);
+
+      /* The signal only lives at the edges, so the page itself stays paper. */
+      const canvas = document.getElementById("edge");
+      const ctx = canvas.getContext("2d");
+      function resize() {
+        canvas.width = innerWidth * devicePixelRatio;
+        canvas.height = innerHeight * devicePixelRatio;
+        canvas.style.width = innerWidth + "px";
+        canvas.style.height = innerHeight + "px";
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      function draw(time) {
+        const w = canvas.width;
+        const h = canvas.height;
+        const cell = 8 * devicePixelRatio;
+        ctx.clearRect(0, 0, w, h);
+        for (let y = 0; y < h; y += cell) {
+          for (let x = 0; x < w; x += cell) {
+            const nx = x / w;
+            const ny = y / h;
+            const edge = Math.min(nx, 1 - nx);
+            const gate = Math.exp(-(edge * edge) / 0.012);
+            const wave = Math.sin(ny * 9 + time * 0.0006 + nx * 4) * 0.5 + 0.5;
+            const density = gate * (0.25 + wave * 0.5);
+            if (Math.random() < density * 0.5) {
+              ctx.fillStyle =
+                nx < 0.5 ? "rgba(36,73,248,0.5)" : "rgba(255,112,72,0.45)";
+              ctx.fillRect(x, y, 3, 3);
+            }
+          }
+        }
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+    </script>
+  </body>
+</html>

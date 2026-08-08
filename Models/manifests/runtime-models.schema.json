@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voxol.invalid/schemas/runtime-models.schema.json",
+  "title": "VoxoL runtime model manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "models"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2,
+      "description": "Bumped to 2 when the artifact block gained provider pinning; RuntimeModelManifest.swift enforces this value."
+    },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "repository",
+          "revision",
+          "license",
+          "source_url",
+          "engine",
+          "artifact"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "asr",
+              "polisher"
+            ]
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "engine": {
+            "enum": [
+              "core_ml",
+              "mlx"
+            ]
+          },
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "format",
+              "files"
+            ],
+            "properties": {
+              "state": {
+                "enum": [
+                  "pending_conversion",
+                  "ready"
+                ]
+              },
+              "format": {
+                "type": "string",
+                "minLength": 1
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "sha256",
+                    "download_url",
+                    "size_bytes"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "download_url": {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https://"
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              },
+              "provider": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "repository",
+                  "revision",
+                  "source_url"
+                ],
+                "description": "Immutable source of the converted artifact. Absent while the artifact is pending_conversion; required once it is ready.",
+                "properties": {
+                  "repository": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$",
+                    "description": "A commit, never a branch: RuntimeModelManifest.swift rejects a floating revision."
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https://"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

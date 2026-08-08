@@ -1,0 +1,88 @@
+@font-face {
+  font-family: "Outfit";
+  src: url("../signal-editorial-prototype/assets/fonts/Outfit-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --canvas: #f4f1e8;
+  --surface: #fffdf8;
+  --ink: #171713;
+  --muted: #77736a;
+  --cobalt: #2449f8;
+  --cobalt-soft: #dce4ff;
+  --coral: #ff7048;
+  --coral-soft: #ffe1d7;
+  --sage: #2e6b51;
+  --line: rgba(23, 23, 19, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: "Outfit", -apple-system, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The proposal chrome: a small tag so you always know which one you are looking at. */
+.tag {
+  position: fixed;
+  left: 20px;
+  bottom: 18px;
+  z-index: 99;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  mix-blend-mode: difference;
+  filter: invert(1) grayscale(1);
+}
+
+.tag a {
+  color: inherit;
+}
+
+.hint {
+  position: fixed;
+  right: 20px;
+  bottom: 18px;
+  z-index: 99;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.7;
+}

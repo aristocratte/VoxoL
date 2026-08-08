@@ -1,0 +1,646 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00000000000000000000000A /* VoxoLApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000007 /* VoxoLApp.swift */; };
+		00000000000000000000000B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000008 /* AppDelegate.swift */; };
+		0000000000000000000000A3 /* VoxoLSignal.metal in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A2 /* VoxoLSignal.metal */; };
+		0000000000000000000000A5 /* VoxoLSignalField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A4 /* VoxoLSignalField.swift */; };
+		00000000000000000000000C /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000009 /* MenuBarView.swift */; };
+		000000000000000000000017 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000022 /* AppLanguage.swift */; };
+		000000000000000000000018 /* MainRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000023 /* MainRootView.swift */; };
+		000000000000000000000019 /* VoxoLTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000024 /* VoxoLTheme.swift */; };
+		00000000000000000000001A /* HubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000025 /* HubView.swift */; };
+		00000000000000000000001B /* StudioComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000026 /* StudioComponents.swift */; };
+		00000000000000000000001C /* WorkspaceStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000027 /* WorkspaceStudios.swift */; };
+		00000000000000000000001D /* PersonalizationStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000028 /* PersonalizationStudios.swift */; };
+		00000000000000000000001E /* SystemStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000029 /* SystemStudios.swift */; };
+		00000000000000000000001F /* PreflightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000002A /* PreflightView.swift */; };
+		000000000000000000000020 /* VoiceCapsule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000002B /* VoiceCapsule.swift */; };
+		000000000000000000000021 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* Localizable.strings */; };
+		000000000000000000000033 /* TranscriptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000040 /* TranscriptStore.swift */; };
+		000000000000000000000034 /* PermissionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000041 /* PermissionCoordinator.swift */; };
+		000000000000000000000035 /* ModelInstallationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000042 /* ModelInstallationStore.swift */; };
+		000000000000000000000036 /* SetupRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000043 /* SetupRows.swift */; };
+		000000000000000000000037 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000044 /* HomeDashboardView.swift */; };
+		000000000000000000000038 /* TranscriptHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000045 /* TranscriptHistory.swift */; };
+		000000000000000000000039 /* RuntimeModelManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000046 /* RuntimeModelManifest.swift */; };
+		00000000000000000000003A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000047 /* Assets.xcassets */; };
+		00000000000000000000003B /* runtime-models.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000048 /* runtime-models.json */; };
+		00000000000000000000003C /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000004E /* InfoPlist.strings */; };
+		00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000055 /* DeterministicEndpointDetector.swift */; };
+		000000000000000000000050 /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000056 /* AudioRingBuffer.swift */; };
+		000000000000000000000051 /* AudioCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000057 /* AudioCaptureSession.swift */; };
+		000000000000000000000052 /* TextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000058 /* TextInjector.swift */; };
+		000000000000000000000053 /* GlobalHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000059 /* GlobalHotkeyMonitor.swift */; };
+		000000000000000000000054 /* DictationSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000005A /* DictationSessionCoordinator.swift */; };
+		00000000000000000000005B /* ResumableFileDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000005C /* ResumableFileDownload.swift */; };
+		000000000000000000000060 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000061 /* Types.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000062 /* AudioLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000063 /* AudioLoader.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000064 /* DecoderWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000065 /* DecoderWorker.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000066 /* FeatureBag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000067 /* FeatureBag.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		0000000000000000000000B1 /* DecodingBias.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000B2 /* DecodingBias.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		0000000000000000000000E5 /* ContextualBias.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E6 /* ContextualBias.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000068 /* GreedyTDTDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000069 /* GreedyTDTDecoder.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		00000000000000000000006A /* MelFeatureExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000006B /* MelFeatureExtractor.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		00000000000000000000006C /* MelFilterBank.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000006D /* MelFilterBank.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		00000000000000000000006E /* ModelCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000006F /* ModelCache.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000070 /* ModelRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000071 /* ModelRunner.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000072 /* Pipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000073 /* Pipeline.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000074 /* Tokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000075 /* Tokenizer.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000076 /* ParakeetTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000077 /* ParakeetTranscriber.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000078 /* ParakeetRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000079 /* ParakeetRuntime.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		0000000000000000000000E1 /* BugReportComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E2 /* BugReportComposer.swift */; };
+		0000000000000000000000E3 /* UpdateCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000E4 /* UpdateCheck.swift */; };
+		00000000000000000000007B /* HoldToTalkStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000007C /* HoldToTalkStateMachine.swift */; };
+		000000000000000000000080 /* ContextKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000090 /* ContextKit */; };
+		000000000000000000000081 /* FidelityKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000091 /* FidelityKit */; };
+		000000000000000000000082 /* PersonalizationKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000092 /* PersonalizationKit */; };
+		000000000000000000000083 /* QwenPolisher in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000093 /* QwenPolisher */; };
+		000000000000000000000084 /* TextProcessingKit in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000094 /* TextProcessingKit */; };
+		000000000000000000000085 /* PersonalizationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000087 /* PersonalizationStore.swift */; };
+		000000000000000000000086 /* DictationTextProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000088 /* DictationTextProcessor.swift */; };
+		000000000000000000000089 /* StableTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008A /* StableTranscript.swift */; };
+		0000000000000000000000D1 /* UpdateFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* UpdateFeed.swift */; };
+		00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008C /* PolisherSmokeRunner.swift */; };
+		00000000000000000000008E /* AppleDictationRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008D /* AppleDictationRuntime.swift */; };
+		000000000000000000000096 /* AudioSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000097 /* AudioSegmenter.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		000000000000000000000098 /* TDTDecodePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000099 /* TDTDecodePolicy.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		00000000000000000000009A /* ParityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009B /* ParityTypes.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
+		00000000000000000000009C /* Outfit-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009D /* Outfit-Variable.ttf */; };
+		00000000000000000000009E /* SignalIcons in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009F /* SignalIcons */; };
+		0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A1 /* SignalEditorialScreens.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000006 /* VoxoL.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoxoL.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000007 /* VoxoLApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxoLApp.swift; sourceTree = "<group>"; };
+		000000000000000000000008 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		000000000000000000000009 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		000000000000000000000022 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
+		000000000000000000000023 /* MainRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainRootView.swift; sourceTree = "<group>"; };
+		000000000000000000000024 /* VoxoLTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxoLTheme.swift; sourceTree = "<group>"; };
+		0000000000000000000000A2 /* VoxoLSignal.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = VoxoLSignal.metal; sourceTree = "<group>"; };
+		0000000000000000000000A4 /* VoxoLSignalField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxoLSignalField.swift; sourceTree = "<group>"; };
+		000000000000000000000025 /* HubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubView.swift; sourceTree = "<group>"; };
+		000000000000000000000026 /* StudioComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioComponents.swift; sourceTree = "<group>"; };
+		000000000000000000000027 /* WorkspaceStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStudios.swift; sourceTree = "<group>"; };
+		000000000000000000000028 /* PersonalizationStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationStudios.swift; sourceTree = "<group>"; };
+		000000000000000000000029 /* SystemStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStudios.swift; sourceTree = "<group>"; };
+		00000000000000000000002A /* PreflightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreflightView.swift; sourceTree = "<group>"; };
+		00000000000000000000002B /* VoiceCapsule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCapsule.swift; sourceTree = "<group>"; };
+		00000000000000000000002C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		000000000000000000000040 /* TranscriptStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStore.swift; sourceTree = "<group>"; };
+		000000000000000000000041 /* PermissionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCoordinator.swift; sourceTree = "<group>"; };
+		000000000000000000000042 /* ModelInstallationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallationStore.swift; sourceTree = "<group>"; };
+		000000000000000000000043 /* SetupRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupRows.swift; sourceTree = "<group>"; };
+		000000000000000000000044 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
+		000000000000000000000045 /* TranscriptHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/TranscriptHistory.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000046 /* RuntimeModelManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/ModelManagerKit/Sources/RuntimeModelManifest.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000047 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		000000000000000000000048 /* runtime-models.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Models/manifests/runtime-models.json; sourceTree = SOURCE_ROOT; };
+		000000000000000000000049 /* VoxoL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VoxoL.entitlements; sourceTree = "<group>"; };
+		00000000000000000000004A /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		000000000000000000000055 /* DeterministicEndpointDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/EndpointingKit/Sources/DeterministicEndpointDetector.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000056 /* AudioRingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AudioCaptureKit/Sources/AudioRingBuffer.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000057 /* AudioCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AudioCaptureKit/Sources/AudioCaptureSession.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000058 /* TextInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/InjectionKit/Sources/TextInjector.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000059 /* GlobalHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyMonitor.swift; sourceTree = "<group>"; };
+		00000000000000000000005A /* DictationSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationSessionCoordinator.swift; sourceTree = "<group>"; };
+		00000000000000000000005C /* ResumableFileDownload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResumableFileDownload.swift; sourceTree = "<group>"; };
+		000000000000000000000061 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
+		000000000000000000000063 /* AudioLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLoader.swift; sourceTree = "<group>"; };
+		000000000000000000000065 /* DecoderWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecoderWorker.swift; sourceTree = "<group>"; };
+		000000000000000000000067 /* FeatureBag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureBag.swift; sourceTree = "<group>"; };
+		0000000000000000000000B2 /* DecodingBias.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecodingBias.swift; sourceTree = "<group>"; };
+		0000000000000000000000E6 /* ContextualBias.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextualBias.swift; sourceTree = "<group>"; };
+		000000000000000000000069 /* GreedyTDTDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreedyTDTDecoder.swift; sourceTree = "<group>"; };
+		00000000000000000000006B /* MelFeatureExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelFeatureExtractor.swift; sourceTree = "<group>"; };
+		00000000000000000000006D /* MelFilterBank.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelFilterBank.swift; sourceTree = "<group>"; };
+		00000000000000000000006F /* ModelCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCache.swift; sourceTree = "<group>"; };
+		000000000000000000000071 /* ModelRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRunner.swift; sourceTree = "<group>"; };
+		000000000000000000000073 /* Pipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pipeline.swift; sourceTree = "<group>"; };
+		000000000000000000000075 /* Tokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokenizer.swift; sourceTree = "<group>"; };
+		000000000000000000000077 /* ParakeetTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetTranscriber.swift; sourceTree = "<group>"; };
+		000000000000000000000079 /* ParakeetRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetRuntime.swift; sourceTree = "<group>"; };
+		0000000000000000000000E2 /* BugReportComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/BugReportComposer.swift; sourceTree = SOURCE_ROOT; };
+		0000000000000000000000E4 /* UpdateCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/UpdateCheck.swift; sourceTree = SOURCE_ROOT; };
+		00000000000000000000007C /* HoldToTalkStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/HoldToTalkStateMachine.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000087 /* PersonalizationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationStore.swift; sourceTree = "<group>"; };
+		000000000000000000000088 /* DictationTextProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationTextProcessor.swift; sourceTree = "<group>"; };
+		00000000000000000000008A /* StableTranscript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/StableTranscript.swift; sourceTree = SOURCE_ROOT; };
+		0000000000000000000000D2 /* UpdateFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFeed.swift; sourceTree = "<group>"; };
+		00000000000000000000008C /* PolisherSmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolisherSmokeRunner.swift; sourceTree = "<group>"; };
+		00000000000000000000008D /* AppleDictationRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationRuntime.swift; sourceTree = "<group>"; };
+		000000000000000000000097 /* AudioSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSegmenter.swift; sourceTree = "<group>"; };
+		000000000000000000000099 /* TDTDecodePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TDTDecodePolicy.swift; sourceTree = "<group>"; };
+		00000000000000000000009B /* ParityTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParityTypes.swift; sourceTree = "<group>"; };
+		00000000000000000000009D /* Outfit-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Docs/ui-redesign/signal-editorial-prototype/assets/fonts/Outfit-Variable.ttf"; sourceTree = SOURCE_ROOT; };
+		00000000000000000000009F /* SignalIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Docs/ui-redesign/signal-editorial-prototype/assets/icons"; sourceTree = SOURCE_ROOT; };
+		0000000000000000000000A1 /* SignalEditorialScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalEditorialScreens.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		00000000000000000000000E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000080 /* ContextKit in Frameworks */,
+				000000000000000000000081 /* FidelityKit in Frameworks */,
+				000000000000000000000082 /* PersonalizationKit in Frameworks */,
+				000000000000000000000083 /* QwenPolisher in Frameworks */,
+				000000000000000000000084 /* TextProcessingKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000003 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000005 /* App */,
+				00000000000000000000004C /* Shared Sources */,
+				000000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000006 /* VoxoL.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		000000000000000000000005 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000007 /* VoxoLApp.swift */,
+				000000000000000000000008 /* AppDelegate.swift */,
+				000000000000000000000022 /* AppLanguage.swift */,
+				000000000000000000000023 /* MainRootView.swift */,
+				000000000000000000000049 /* VoxoL.entitlements */,
+				00000000000000000000002D /* DesignSystem */,
+				00000000000000000000002E /* Hub */,
+				00000000000000000000002F /* Onboarding */,
+				000000000000000000000030 /* Overlay */,
+				00000000000000000000004B /* Services */,
+				000000000000000000000031 /* Resources */,
+				000000000000000000000016 /* MenuBar */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		000000000000000000000016 /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000009 /* MenuBarView.swift */,
+			);
+			path = MenuBar;
+			sourceTree = "<group>";
+		};
+		00000000000000000000002D /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000024 /* VoxoLTheme.swift */,
+				0000000000000000000000A2 /* VoxoLSignal.metal */,
+				0000000000000000000000A4 /* VoxoLSignalField.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		00000000000000000000002E /* Hub */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000025 /* HubView.swift */,
+				0000000000000000000000A1 /* SignalEditorialScreens.swift */,
+				000000000000000000000044 /* HomeDashboardView.swift */,
+				000000000000000000000026 /* StudioComponents.swift */,
+				000000000000000000000027 /* WorkspaceStudios.swift */,
+				000000000000000000000028 /* PersonalizationStudios.swift */,
+				000000000000000000000029 /* SystemStudios.swift */,
+			);
+			path = Hub;
+			sourceTree = "<group>";
+		};
+		00000000000000000000002F /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				00000000000000000000002A /* PreflightView.swift */,
+				000000000000000000000043 /* SetupRows.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		000000000000000000000030 /* Overlay */ = {
+			isa = PBXGroup;
+			children = (
+				00000000000000000000002B /* VoiceCapsule.swift */,
+			);
+			path = Overlay;
+			sourceTree = "<group>";
+		};
+		000000000000000000000031 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				00000000000000000000009D /* Outfit-Variable.ttf */,
+				000000000000000000000047 /* Assets.xcassets */,
+				000000000000000000000048 /* runtime-models.json */,
+				000000000000000000000032 /* Localizable.strings */,
+				00000000000000000000004E /* InfoPlist.strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		00000000000000000000004B /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000040 /* TranscriptStore.swift */,
+				000000000000000000000087 /* PersonalizationStore.swift */,
+				000000000000000000000041 /* PermissionCoordinator.swift */,
+				000000000000000000000042 /* ModelInstallationStore.swift */,
+				00000000000000000000005C /* ResumableFileDownload.swift */,
+				000000000000000000000059 /* GlobalHotkeyMonitor.swift */,
+				00000000000000000000005A /* DictationSessionCoordinator.swift */,
+				000000000000000000000088 /* DictationTextProcessor.swift */,
+				0000000000000000000000D2 /* UpdateFeed.swift */,
+				00000000000000000000008C /* PolisherSmokeRunner.swift */,
+				00000000000000000000008D /* AppleDictationRuntime.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		00000000000000000000004C /* Shared Sources */ = {
+			isa = PBXGroup;
+			children = (
+				00000000000000000000007A /* ParakeetCore */,
+				0000000000000000000000E2 /* BugReportComposer.swift */,
+				0000000000000000000000E4 /* UpdateCheck.swift */,
+				00000000000000000000007C /* HoldToTalkStateMachine.swift */,
+				00000000000000000000008A /* StableTranscript.swift */,
+				000000000000000000000045 /* TranscriptHistory.swift */,
+				000000000000000000000046 /* RuntimeModelManifest.swift */,
+				000000000000000000000055 /* DeterministicEndpointDetector.swift */,
+				000000000000000000000056 /* AudioRingBuffer.swift */,
+				000000000000000000000057 /* AudioCaptureSession.swift */,
+				000000000000000000000058 /* TextInjector.swift */,
+			);
+			name = "Shared Sources";
+			sourceTree = "<group>";
+		};
+		00000000000000000000007A /* ParakeetCore */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000061 /* Types.swift */,
+				000000000000000000000063 /* AudioLoader.swift */,
+				000000000000000000000097 /* AudioSegmenter.swift */,
+				000000000000000000000065 /* DecoderWorker.swift */,
+				000000000000000000000067 /* FeatureBag.swift */,
+				0000000000000000000000B2 /* DecodingBias.swift */,
+				0000000000000000000000E6 /* ContextualBias.swift */,
+				000000000000000000000069 /* GreedyTDTDecoder.swift */,
+				000000000000000000000099 /* TDTDecodePolicy.swift */,
+				00000000000000000000009B /* ParityTypes.swift */,
+				00000000000000000000006B /* MelFeatureExtractor.swift */,
+				00000000000000000000006D /* MelFilterBank.swift */,
+				00000000000000000000006F /* ModelCache.swift */,
+				000000000000000000000071 /* ModelRunner.swift */,
+				000000000000000000000073 /* Pipeline.swift */,
+				000000000000000000000075 /* Tokenizer.swift */,
+				000000000000000000000077 /* ParakeetTranscriber.swift */,
+				000000000000000000000079 /* ParakeetRuntime.swift */,
+			);
+			name = ParakeetCore;
+			path = Packages/ParakeetCore/Sources;
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000002 /* VoxoL */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000011 /* Build configuration list for PBXNativeTarget "VoxoL" */;
+			buildPhases = (
+				00000000000000000000000D /* Sources */,
+				00000000000000000000000E /* Frameworks */,
+				00000000000000000000000F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VoxoL;
+			packageProductDependencies = (
+				000000000000000000000090 /* ContextKit */,
+				000000000000000000000091 /* FidelityKit */,
+				000000000000000000000092 /* PersonalizationKit */,
+				000000000000000000000093 /* QwenPolisher */,
+				000000000000000000000094 /* TextProcessingKit */,
+			);
+			productName = VoxoL;
+			productReference = 000000000000000000000006 /* VoxoL.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					000000000000000000000002 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000000000010 /* Build configuration list for PBXProject "VoxoL" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				fr,
+				Base,
+			);
+			mainGroup = 000000000000000000000003;
+			packageReferences = (
+				000000000000000000000095 /* XCLocalSwiftPackageReference "." */,
+			);
+			productRefGroup = 000000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000002 /* VoxoL */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		00000000000000000000000F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00000000000000000000009E /* SignalIcons in Resources */,
+				00000000000000000000009C /* Outfit-Variable.ttf in Resources */,
+				000000000000000000000021 /* Localizable.strings in Resources */,
+				00000000000000000000003A /* Assets.xcassets in Resources */,
+				00000000000000000000003B /* runtime-models.json in Resources */,
+				00000000000000000000003C /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		00000000000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				00000000000000000000000A /* VoxoLApp.swift in Sources */,
+				00000000000000000000000B /* AppDelegate.swift in Sources */,
+				00000000000000000000000C /* MenuBarView.swift in Sources */,
+				000000000000000000000017 /* AppLanguage.swift in Sources */,
+				000000000000000000000018 /* MainRootView.swift in Sources */,
+				000000000000000000000019 /* VoxoLTheme.swift in Sources */,
+				0000000000000000000000A3 /* VoxoLSignal.metal in Sources */,
+				0000000000000000000000A5 /* VoxoLSignalField.swift in Sources */,
+				00000000000000000000001A /* HubView.swift in Sources */,
+				0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */,
+				00000000000000000000001B /* StudioComponents.swift in Sources */,
+				00000000000000000000001C /* WorkspaceStudios.swift in Sources */,
+				00000000000000000000001D /* PersonalizationStudios.swift in Sources */,
+				00000000000000000000001E /* SystemStudios.swift in Sources */,
+				00000000000000000000001F /* PreflightView.swift in Sources */,
+				000000000000000000000020 /* VoiceCapsule.swift in Sources */,
+				000000000000000000000033 /* TranscriptStore.swift in Sources */,
+				000000000000000000000034 /* PermissionCoordinator.swift in Sources */,
+				000000000000000000000035 /* ModelInstallationStore.swift in Sources */,
+				00000000000000000000005B /* ResumableFileDownload.swift in Sources */,
+				000000000000000000000036 /* SetupRows.swift in Sources */,
+				000000000000000000000037 /* HomeDashboardView.swift in Sources */,
+				000000000000000000000038 /* TranscriptHistory.swift in Sources */,
+				000000000000000000000039 /* RuntimeModelManifest.swift in Sources */,
+				00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */,
+				000000000000000000000050 /* AudioRingBuffer.swift in Sources */,
+				000000000000000000000051 /* AudioCaptureSession.swift in Sources */,
+				000000000000000000000052 /* TextInjector.swift in Sources */,
+				000000000000000000000053 /* GlobalHotkeyMonitor.swift in Sources */,
+				000000000000000000000054 /* DictationSessionCoordinator.swift in Sources */,
+				000000000000000000000085 /* PersonalizationStore.swift in Sources */,
+				000000000000000000000086 /* DictationTextProcessor.swift in Sources */,
+				000000000000000000000089 /* StableTranscript.swift in Sources */,
+				0000000000000000000000D1 /* UpdateFeed.swift in Sources */,
+				00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */,
+				00000000000000000000008E /* AppleDictationRuntime.swift in Sources */,
+				000000000000000000000060 /* Types.swift in Sources */,
+				000000000000000000000062 /* AudioLoader.swift in Sources */,
+				000000000000000000000096 /* AudioSegmenter.swift in Sources */,
+				000000000000000000000064 /* DecoderWorker.swift in Sources */,
+				000000000000000000000066 /* FeatureBag.swift in Sources */,
+				0000000000000000000000B1 /* DecodingBias.swift in Sources */,
+				0000000000000000000000E5 /* ContextualBias.swift in Sources */,
+				000000000000000000000068 /* GreedyTDTDecoder.swift in Sources */,
+				000000000000000000000098 /* TDTDecodePolicy.swift in Sources */,
+				00000000000000000000009A /* ParityTypes.swift in Sources */,
+				00000000000000000000006A /* MelFeatureExtractor.swift in Sources */,
+				00000000000000000000006C /* MelFilterBank.swift in Sources */,
+				00000000000000000000006E /* ModelCache.swift in Sources */,
+				000000000000000000000070 /* ModelRunner.swift in Sources */,
+				000000000000000000000072 /* Pipeline.swift in Sources */,
+				000000000000000000000074 /* Tokenizer.swift in Sources */,
+				000000000000000000000076 /* ParakeetTranscriber.swift in Sources */,
+				000000000000000000000078 /* ParakeetRuntime.swift in Sources */,
+				0000000000000000000000E1 /* BugReportComposer.swift in Sources */,
+				0000000000000000000000E3 /* UpdateCheck.swift in Sources */,
+				00000000000000000000007B /* HoldToTalkStateMachine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000000000012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		000000000000000000000013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		000000000000000000000014 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/VoxoL.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = L4452G7VZN;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = VoxoL;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		000000000000000000000015 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/VoxoL.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = VoxoL;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000000000010 /* Build configuration list for PBXProject "VoxoL" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000012 /* Debug */,
+				000000000000000000000013 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000011 /* Build configuration list for PBXNativeTarget "VoxoL" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000014 /* Debug */,
+				000000000000000000000015 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		000000000000000000000095 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ".";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		000000000000000000000090 /* ContextKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000095 /* XCLocalSwiftPackageReference "." */;
+			productName = ContextKit;
+		};
+		000000000000000000000091 /* FidelityKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000095 /* XCLocalSwiftPackageReference "." */;
+			productName = FidelityKit;
+		};
+		000000000000000000000092 /* PersonalizationKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000095 /* XCLocalSwiftPackageReference "." */;
+			productName = PersonalizationKit;
+		};
+		000000000000000000000093 /* QwenPolisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000095 /* XCLocalSwiftPackageReference "." */;
+			productName = QwenPolisher;
+		};
+		000000000000000000000094 /* TextProcessingKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000095 /* XCLocalSwiftPackageReference "." */;
+			productName = TextProcessingKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+
+/* Begin PBXVariantGroup section */
+		000000000000000000000032 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				00000000000000000000002C /* fr */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		00000000000000000000004E /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				00000000000000000000004A /* fr */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}

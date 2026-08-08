@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "benchmarkID": "voxol-owner-pipeline-gate-v1",
+  "normalizationVersion": "voxol-asr-normalizer-v1",
+  "items": [
+    {
+      "id": "fr-general-001",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Bonjour Camille, je vais envoyer le rapport demain matin avant neuf heures.",
+      "clean": "Bonjour Camille, je vais envoyer le rapport demain matin avant neuf heures.",
+      "criticalSpans": [
+        {
+          "kind": "person",
+          "rawAccepted": ["Camille"],
+          "finalAccepted": ["Camille"]
+        }
+      ]
+    },
+    {
+      "id": "fr-time-002",
+      "language": "french",
+      "group": "french",
+      "verbatim": "La réunion commencera à quatorze heures trente et devrait durer environ quarante-cinq minutes.",
+      "clean": "La réunion commencera à 14 h 30 et devrait durer environ 45 minutes.",
+      "criticalSpans": [
+        {
+          "kind": "time",
+          "rawAccepted": ["quatorze heures trente", "14 h 30", "14h30", "14:30"],
+          "finalAccepted": ["14 h 30", "14h30", "14:30", "quatorze heures trente"]
+        },
+        {
+          "kind": "duration",
+          "rawAccepted": ["quarante-cinq minutes", "45 minutes"],
+          "finalAccepted": ["45 minutes", "quarante-cinq minutes"]
+        }
+      ]
+    },
+    {
+      "id": "fr-budget-003",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Le budget prévisionnel est de quarante-deux mille cinq cents euros, taxes comprises.",
+      "clean": "Le budget prévisionnel est de 42 500 euros, taxes comprises.",
+      "criticalSpans": [
+        {
+          "kind": "currency",
+          "rawAccepted": [
+            "quarante-deux mille cinq cents euros",
+            "42 500 euros",
+            "42500 euros"
+          ],
+          "finalAccepted": [
+            "42 500 euros",
+            "42500 euros",
+            "quarante-deux mille cinq cents euros"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fr-hesitation-004",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Nous avons terminé la présentation et je pense que, enfin je crois que nous pouvons maintenant l’envoyer au client.",
+      "clean": "Nous avons terminé la présentation et je crois que nous pouvons maintenant l’envoyer au client.",
+      "criticalSpans": [
+        {
+          "kind": "entity",
+          "rawAccepted": ["au client"],
+          "finalAccepted": ["au client"]
+        }
+      ]
+    },
+    {
+      "id": "fr-date-005",
+      "language": "french",
+      "group": "french",
+      "verbatim": "La livraison est prévue le vingt-quatre juillet deux mille vingt-six à quatorze heures trente.",
+      "clean": "La livraison est prévue le 24 juillet 2026 à 14 h 30.",
+      "criticalSpans": [
+        {
+          "kind": "date",
+          "rawAccepted": [
+            "vingt-quatre juillet deux mille vingt-six",
+            "24 juillet 2026"
+          ],
+          "finalAccepted": [
+            "24 juillet 2026",
+            "vingt-quatre juillet deux mille vingt-six"
+          ]
+        },
+        {
+          "kind": "time",
+          "rawAccepted": ["quatorze heures trente", "14 h 30", "14:30"],
+          "finalAccepted": ["14 h 30", "14:30", "quatorze heures trente"]
+        }
+      ]
+    },
+    {
+      "id": "fr-list-006",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Pour demain, il faut préparer la démonstration, mettre à jour les chiffres, contacter le client et publier la nouvelle version.",
+      "clean": "Pour demain, il faut préparer la démonstration, mettre à jour les chiffres, contacter le client et publier la nouvelle version.",
+      "criticalSpans": [
+        {
+          "kind": "task",
+          "rawAccepted": ["préparer la démonstration"],
+          "finalAccepted": ["préparer la démonstration"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["mettre à jour les chiffres"],
+          "finalAccepted": ["mettre à jour les chiffres"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["contacter le client"],
+          "finalAccepted": ["contacter le client"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["publier la nouvelle version"],
+          "finalAccepted": ["publier la nouvelle version"]
+        }
+      ]
+    },
+    {
+      "id": "fr-correction-007",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Le rendez-vous est prévu mardi, non pardon, mercredi matin à dix heures.",
+      "clean": "Le rendez-vous est prévu mercredi matin à 10 heures.",
+      "criticalSpans": [
+        {
+          "kind": "date",
+          "rawAccepted": ["mercredi matin"],
+          "finalAccepted": ["mercredi matin"]
+        },
+        {
+          "kind": "time",
+          "rawAccepted": ["dix heures", "10 heures"],
+          "finalAccepted": ["10 heures", "dix heures"]
+        }
+      ]
+    },
+    {
+      "id": "fr-email-008",
+      "language": "french",
+      "group": "french",
+      "verbatim": "Bonjour Madame Martin, je vous confirme que nous avons bien reçu votre demande et que nous reviendrons vers vous avant vendredi. Cordialement, Aris.",
+      "clean": "Bonjour Madame Martin, je vous confirme que nous avons bien reçu votre demande et que nous reviendrons vers vous avant vendredi. Cordialement, Aris.",
+      "criticalSpans": [
+        {
+          "kind": "person",
+          "rawAccepted": ["Madame Martin"],
+          "finalAccepted": ["Madame Martin"]
+        },
+        {
+          "kind": "date",
+          "rawAccepted": ["avant vendredi"],
+          "finalAccepted": ["avant vendredi"]
+        },
+        {
+          "kind": "person",
+          "rawAccepted": ["Aris"],
+          "finalAccepted": ["Aris"]
+        }
+      ]
+    },
+    {
+      "id": "en-document-009",
+      "language": "english",
+      "group": "english",
+      "verbatim": "Hello Camille, could you review the document before five thirty this afternoon?",
+      "clean": "Hello Camille, could you review the document before 5:30 this afternoon?",
+      "criticalSpans": [
+        {
+          "kind": "person",
+          "rawAccepted": ["Camille"],
+          "finalAccepted": ["Camille"]
+        },
+        {
+          "kind": "object",
+          "rawAccepted": ["the document"],
+          "finalAccepted": ["the document"]
+        },
+        {
+          "kind": "time",
+          "rawAccepted": ["five thirty", "5 30", "5:30"],
+          "finalAccepted": ["5 30", "5:30", "five thirty"]
+        }
+      ]
+    },
+    {
+      "id": "en-time-010",
+      "language": "english",
+      "group": "english",
+      "verbatim": "The meeting starts at nine fifteen and should last approximately forty-five minutes.",
+      "clean": "The meeting starts at 9:15 and should last approximately 45 minutes.",
+      "criticalSpans": [
+        {
+          "kind": "time",
+          "rawAccepted": ["nine fifteen", "9 15", "9:15"],
+          "finalAccepted": ["9 15", "9:15", "nine fifteen"]
+        },
+        {
+          "kind": "duration",
+          "rawAccepted": ["forty-five minutes", "45 minutes"],
+          "finalAccepted": ["45 minutes", "forty-five minutes"]
+        }
+      ]
+    },
+    {
+      "id": "en-budget-011",
+      "language": "english",
+      "group": "english",
+      "verbatim": "The estimated budget is forty-two thousand five hundred euros, including taxes.",
+      "clean": "The estimated budget is 42,500 euros, including taxes.",
+      "criticalSpans": [
+        {
+          "kind": "currency",
+          "rawAccepted": [
+            "forty-two thousand five hundred euros",
+            "42 500 euros",
+            "42500 euros"
+          ],
+          "finalAccepted": [
+            "42 500 euros",
+            "42500 euros",
+            "forty-two thousand five hundred euros"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "en-hesitation-012",
+      "language": "english",
+      "group": "english",
+      "verbatim": "We finished the presentation and I think, actually I believe, we can send it to the client now.",
+      "clean": "We finished the presentation and I believe we can send it to the client now.",
+      "criticalSpans": [
+        {
+          "kind": "entity",
+          "rawAccepted": ["to the client"],
+          "finalAccepted": ["to the client"]
+        }
+      ]
+    },
+    {
+      "id": "en-list-013",
+      "language": "english",
+      "group": "english",
+      "verbatim": "Please prepare the demonstration, update the figures, contact the customer, and publish the new version.",
+      "clean": "Please prepare the demonstration, update the figures, contact the customer, and publish the new version.",
+      "criticalSpans": [
+        {
+          "kind": "task",
+          "rawAccepted": ["prepare the demonstration"],
+          "finalAccepted": ["prepare the demonstration"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["update the figures"],
+          "finalAccepted": ["update the figures"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["contact the customer"],
+          "finalAccepted": ["contact the customer"]
+        },
+        {
+          "kind": "task",
+          "rawAccepted": ["publish the new version"],
+          "finalAccepted": ["publish the new version"]
+        }
+      ]
+    },
+    {
+      "id": "en-date-014",
+      "language": "english",
+      "group": "english",
+      "verbatim": "The release is scheduled for July twenty-fourth, twenty twenty-six, at two thirty in the afternoon.",
+      "clean": "The release is scheduled for July 24, 2026, at 2:30 in the afternoon.",
+      "criticalSpans": [
+        {
+          "kind": "date",
+          "rawAccepted": [
+            "July twenty-fourth twenty twenty-six",
+            "July 24 2026"
+          ],
+          "finalAccepted": [
+            "July 24 2026",
+            "July twenty-fourth twenty twenty-six"
+          ]
+        },
+        {
+          "kind": "time",
+          "rawAccepted": ["two thirty", "2 30", "2:30"],
+          "finalAccepted": ["2 30", "2:30", "two thirty"]
+        }
+      ]
+    },
+    {
+      "id": "tech-file-015",
+      "language": "french",
+      "group": "technical",
+      "verbatim": "Ouvre le fichier source App MainRootView point Swift, puis lance Swift test dans le terminal.",
+      "clean": "Ouvre le fichier source/App/MainRootView.swift, puis lance swift test dans le terminal.",
+      "criticalSpans": [
+        {
+          "kind": "path",
+          "rawAccepted": [
+            "source App MainRootView point Swift",
+            "source App MainRootView Swift",
+            "source App MainRootView.swift",
+            "source/App/MainRootView.swift"
+          ],
+          "finalAccepted": ["source/App/MainRootView.swift"]
+        },
+        {
+          "kind": "command",
+          "rawAccepted": ["Swift test"],
+          "finalAccepted": ["swift test"]
+        }
+      ]
+    },
+    {
+      "id": "tech-git-016",
+      "language": "french",
+      "group": "technical",
+      "verbatim": "Crée une nouvelle branche appelée feature direct insertion, puis exécute git status.",
+      "clean": "Crée une nouvelle branche appelée feature/direct-insertion, puis exécute git status.",
+      "criticalSpans": [
+        {
+          "kind": "branch",
+          "rawAccepted": ["feature direct insertion", "feature/direct-insertion"],
+          "finalAccepted": ["feature/direct-insertion"]
+        },
+        {
+          "kind": "command",
+          "rawAccepted": ["git status"],
+          "finalAccepted": ["git status"]
+        }
+      ]
+    },
+    {
+      "id": "tech-url-017",
+      "language": "french",
+      "group": "technical",
+      "verbatim": "Le serveur utilise le port huit mille quatre-vingts et la documentation se trouve sur example point com slash documentation.",
+      "clean": "Le serveur utilise le port 8080 et la documentation se trouve sur example.com/documentation.",
+      "criticalSpans": [
+        {
+          "kind": "port",
+          "rawAccepted": ["huit mille quatre-vingts", "8080"],
+          "finalAccepted": ["8080"]
+        },
+        {
+          "kind": "url",
+          "rawAccepted": [
+            "example point com slash documentation",
+            "example.com/documentation"
+          ],
+          "finalAccepted": ["example.com/documentation"]
+        }
+      ]
+    },
+    {
+      "id": "tech-code-switch-018",
+      "language": "french",
+      "group": "technical",
+      "verbatim": "Je vais shipper la nouvelle build après la code review, puis je vérifierai les logs dans le dashboard.",
+      "clean": "Je vais shipper la nouvelle build après la code review, puis je vérifierai les logs dans le dashboard.",
+      "criticalSpans": [
+        {
+          "kind": "technical",
+          "rawAccepted": ["code review"],
+          "finalAccepted": ["code review"]
+        },
+        {
+          "kind": "technical",
+          "rawAccepted": ["les logs"],
+          "finalAccepted": ["les logs"]
+        },
+        {
+          "kind": "technical",
+          "rawAccepted": ["le dashboard"],
+          "finalAccepted": ["le dashboard"]
+        }
+      ]
+    },
+    {
+      "id": "fr-long-019",
+      "language": "french",
+      "group": "long",
+      "verbatim": "Bonjour à toutes et à tous. L’objectif de cette réunion est de valider la nouvelle version de l’application. Nous allons d’abord vérifier les performances de la transcription, puis tester la correction automatique du texte et enfin confirmer que l’insertion fonctionne dans Notes, Safari et Visual Studio Code. Si aucun problème bloquant n’est détecté, nous publierons une version de test demain matin.",
+      "clean": "Bonjour à toutes et à tous. L’objectif de cette réunion est de valider la nouvelle version de l’application. Nous allons d’abord vérifier les performances de la transcription, puis tester la correction automatique du texte et enfin confirmer que l’insertion fonctionne dans Notes, Safari et Visual Studio Code. Si aucun problème bloquant n’est détecté, nous publierons une version de test demain matin.",
+      "criticalSpans": [
+        {
+          "kind": "application",
+          "rawAccepted": ["Notes"],
+          "finalAccepted": ["Notes"]
+        },
+        {
+          "kind": "application",
+          "rawAccepted": ["Safari"],
+          "finalAccepted": ["Safari"]
+        },
+        {
+          "kind": "application",
+          "rawAccepted": ["Visual Studio Code"],
+          "finalAccepted": ["Visual Studio Code"]
+        },
+        {
+          "kind": "date",
+          "rawAccepted": ["demain matin"],
+          "finalAccepted": ["demain matin"]
+        }
+      ]
+    }
+  ]
+}

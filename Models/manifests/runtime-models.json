@@ -1,0 +1,151 @@
+{
+  "schema_version": 2,
+  "models": [
+    {
+      "role": "asr",
+      "repository": "nvidia/parakeet-tdt-0.6b-v3",
+      "revision": "7c35754d166cca382ad1e53e68b01e7c575f3a1d",
+      "license": "CC-BY-4.0",
+      "source_url": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+      "engine": "core_ml",
+      "artifact": {
+        "state": "ready",
+        "format": "mlpackage",
+        "provider": {
+          "repository": "arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml",
+          "revision": "8ff3f781af07b2a186317babf73d13c171295c91",
+          "source_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml"
+        },
+        "files": [
+          {
+            "path": "decoder.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+            "sha256": "8d068618a9fd3a981d6cbc09ae9643a25b2e382f2c3e05d3b9412b9c25a4372e",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/decoder.mlpackage/Data/com.apple.CoreML/model.mlmodel?download=true",
+            "size_bytes": 12897
+          },
+          {
+            "path": "decoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+            "sha256": "36cd656ebf1105ee5aa85d1e55c00f25669327aef8b39346333a19260ca78018",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/decoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin?download=true",
+            "size_bytes": 24425600
+          },
+          {
+            "path": "decoder.mlpackage/Manifest.json",
+            "sha256": "ef610fe0ccaff752f58f086772207ffb08970e67bf41fd07c923f9e006f8e4ec",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/decoder.mlpackage/Manifest.json?download=true",
+            "size_bytes": 617
+          },
+          {
+            "path": "encoder.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+            "sha256": "91c5b22cfe42c89105060a0d10b963df3f2e55e2b5909003ee529c6f19250b95",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/encoder.mlpackage/Data/com.apple.CoreML/model.mlmodel?download=true",
+            "size_bytes": 734002
+          },
+          {
+            "path": "encoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+            "sha256": "b4ccde8e539505854af887c0d21bbb1048197847ab7ae77533054ade8d9f0ad2",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/encoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin?download=true",
+            "size_bytes": 604766912
+          },
+          {
+            "path": "encoder.mlpackage/Manifest.json",
+            "sha256": "ddcaa7a5ae0f5b43c40b1f8190057e3c01ea7791d548b4115625a19f516b23cb",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/encoder.mlpackage/Manifest.json?download=true",
+            "size_bytes": 617
+          },
+          {
+            "path": "joint.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+            "sha256": "cde4d7c509e8053ec7c90d04368f2d4bb5ad8db87a28b550de80541193100a39",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/joint.mlpackage/Data/com.apple.CoreML/model.mlmodel?download=true",
+            "size_bytes": 4025
+          },
+          {
+            "path": "joint.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+            "sha256": "d83381f8a19ac296033554a7cfec355063b8f3225129cb8bed013c92f6ab141f",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/joint.mlpackage/Data/com.apple.CoreML/weights/weight.bin?download=true",
+            "size_bytes": 10510028
+          },
+          {
+            "path": "joint.mlpackage/Manifest.json",
+            "sha256": "977190c2261e2040f081fd0669fa3da7c4089c7d3f04c04a3c2b25e63f77f45c",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/joint.mlpackage/Manifest.json?download=true",
+            "size_bytes": 617
+          },
+          {
+            "path": "language-penalty.json",
+            "sha256": "e591c1853b90c9829dc5d184ca89358bd7d225a308e51e413caec6e7943bfd79",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/language-penalty.json?download=true",
+            "size_bytes": 1260
+          },
+          {
+            "path": "quantization-report.json",
+            "sha256": "3620c4f338db9e8a74a2d3d7d6ba72e53bbc193c3e8cae2c0f96e1e728237061",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/quantization-report.json?download=true",
+            "size_bytes": 365
+          },
+          {
+            "path": "tokenizer.json",
+            "sha256": "bd321b096832a3f270bd3b2a88823957920f1a5c5ada71114a26ea729d0cbe91",
+            "download_url": "https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml/resolve/8ff3f781af07b2a186317babf73d13c171295c91/tokenizer.json?download=true",
+            "size_bytes": 1159960
+          }
+        ]
+      }
+    },
+    {
+      "role": "polisher",
+      "repository": "Qwen/Qwen3.5-0.8B",
+      "revision": "2fc06364715b967f1860aea9cf38778875588b17",
+      "license": "Apache-2.0",
+      "source_url": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
+      "engine": "mlx",
+      "artifact": {
+        "state": "ready",
+        "format": "mlx-4bit-qwen3.5",
+        "provider": {
+          "repository": "mlx-community/Qwen3.5-0.8B-4bit",
+          "revision": "da28692b5f139cb0ec58a356b437486b7dac7462",
+          "source_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit"
+        },
+        "files": [
+          {
+            "path": "chat_template.jinja",
+            "sha256": "273d8e0e683b885071fb17e08d71e5f2a5ddfb5309756181681de4f5a1822d80",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/chat_template.jinja?download=true",
+            "size_bytes": 7755
+          },
+          {
+            "path": "config.json",
+            "sha256": "ba7770da23eae5ebd6827571f086e331956b33f4442a9e876fb4aa10969a6772",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/config.json?download=true",
+            "size_bytes": 3112
+          },
+          {
+            "path": "model.safetensors",
+            "sha256": "f5a0d9dd3efa73510542a8023d610ff26be2b4b020d181cfc4bedaa1fcc5dd9e",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/model.safetensors?download=true",
+            "size_bytes": 625229487
+          },
+          {
+            "path": "model.safetensors.index.json",
+            "sha256": "6e48f2fa5d6f033a6d77bf833abfa9698ca24d1715ecea4c67447bcfaee44650",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/model.safetensors.index.json?download=true",
+            "size_bytes": 71473
+          },
+          {
+            "path": "tokenizer.json",
+            "sha256": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/tokenizer.json?download=true",
+            "size_bytes": 19989343
+          },
+          {
+            "path": "tokenizer_config.json",
+            "sha256": "e98f1901ac6f0adff67b1d540bfa0c36ac1a0cf59eb72ed78146ef89aafa1182",
+            "download_url": "https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit/resolve/da28692b5f139cb0ec58a356b437486b7dac7462/tokenizer_config.json?download=true",
+            "size_bytes": 1139
+          }
+        ]
+      }
+    }
+  ]
+}
