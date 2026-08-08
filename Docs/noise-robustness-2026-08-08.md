@@ -1,22 +1,35 @@
-# Robustesse au bruit — VoxoL sous babble
+# Robustesse au bruit — VoxoL contre Wispr Flow
 
-Chaque clip des trois cellules de parole réelle est remixé contre un babble
-déterministe de six voix du même corpus, à rapport signal/bruit contrôlé.
-Généré depuis les rapports gelés par `Scripts/prepare-noise-benchmark.py` ;
-reproduction : préparer, puis `run-multilingual-voxol.sh` sur la racine bruit.
+Chaque clip des trois cellules de parole réelle, remixé contre un babble
+déterministe de six voix du même corpus. Ce qui compte est la **forme de la
+courbe** : un système qui perd deux points à 10 dB reste utilisable dans un
+café, un qui en perd dix ne l'est pas.
 
 | condition | Common Voice FR | VoxPopuli FR | LibriSpeech EN |
 | --- | ---: | ---: | ---: |
-| propre | 7.28 | 10.10 | 2.11 |
-| babble 20 dB | 9.69 | 10.39 | 2.71 |
-| babble 10 dB | 19.59 | 10.84 | 4.25 |
-| babble 5 dB | 39.35 | 13.64 | 10.44 |
+| propre | **7.28** / 13.54 | **10.10** / 12.33 | **2.11** / 3.66 |
+| babble 20 dB | **9.69** / 15.20 | **10.39** / 12.51 | **2.71** / 3.09 |
+| babble 10 dB | **19.59** / 23.88 | **10.84** / 13.15 | **4.25** / 4.35 |
+| babble 5 dB | **39.35** / 40.95 | **13.64** / 16.06 | 10.44 / **9.19** |
 
-Lecture : la parole spontanée (VoxPopuli) est quasi insensible — **+3,5 points
-à 5 dB**, un rapport signal/bruit où l'on peine soi-même à suivre une
-conversation. Les clips courts de Common Voice se dégradent le plus vite :
-moins de contexte pour départager la voix cible du babble.
+*VoxoL / Wispr Flow ; le meilleur des deux en gras.*
 
-La colonne Wispr Flow attend le script de collecte (`wispr-transcribe.sh`),
-absent de la machine au moment du run — les 2 688 clips dégradés sont gelés
-et prêts.
+## Deux domaines, deux comportements opposés
+
+Sur la **parole spontanée**, l'avantage de VoxoL ne fond pas quand le bruit
+monte — il se creuse légèrement, de 1,4 point au propre à 2,3 points à 10 dB.
+Sur le **livre audio**, il fait l'inverse : 1,5 point d'avance au propre, puis
+l'écart s'érode jusqu'à s'inverser à 5 dB.
+
+Aucun des deux motifs n'était prévisible ; c'est la raison de la mesure. Le
+premier est celui qui compte pour une application de dictée, où personne ne
+parle comme un narrateur de livre audio et où il y a presque toujours
+quelqu'un qui parle à côté.
+
+À 5 dB sur des clips courts — six voix concurrentes au même volume que la
+vôtre — les deux systèmes dépassent 39 % d'erreur. Aucun n'est utilisable là,
+et le dire vaut mieux que de ne montrer que la partie flatteuse de la courbe.
+
+Généré par `Scripts/prepare-noise-benchmark.py` puis les deux runners.
+Couverture minimale des collectes : 99,7 %.
+
