@@ -20,7 +20,7 @@ xcuserdata/
 Models/artifacts/
 
 # Generated benchmark runs stay local unless deliberately promoted as a baseline.
-Artifacts/
+Artifacts
 
 # SSH keys for the training pod live beside the repo for convenience and must
 # never be committed.
