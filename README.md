@@ -4,6 +4,29 @@ VoxoL est une application macOS native de dictée intelligente, privée et enti�
 locale après l'installation explicite de ses modèles. Le dépôt est une création neuve et ne
 dérive d'aucune application existante.
 
+## Mesures
+
+Face à Wispr Flow, sur 31 benchmarks publics gelés (FLEURS, Common Voice 21,
+MLS, LibriSpeech, VoxPopuli), 8 langues, 9 258 clips :
+
+| | |
+| --- | --- |
+| Bilan | **14 victoires, 6 défaites, 11 égalités** |
+| Sur la parole réelle (micros grand public, parole spontanée) | **13 victoires sur 15, 0 défaite** |
+| Latence médiane | **115 ms** en local, 28× plus rapide |
+| Audio quittant la machine | **aucun** |
+
+Une victoire n'est comptée que si l'intervalle de confiance à 95 % exclut zéro,
+en rééchantillonnant les **locuteurs** et non les clips, avec correction pour
+31 tests simultanés. Les défaites sont publiées avec les victoires :
+[`Docs/RESULTS.md`](Docs/RESULTS.md), généré depuis les mesures et reproductible
+en quatre commandes.
+
+Ces corpus ne mesurent pas la dictée — ce sont des phrases lues et des livres
+audio. Ils ne voient pas si `B450` sort en chiffres ou en quatre mots, et c'est
+cette différence qui décide de l'utilisabilité. L'app sait construire un
+benchmark personnel sur la voix de son propriétaire pour ça.
+
 ## État actuel
 
 La fondation de capture et d'insertion de la Phase 1 est fonctionnelle. Le dépôt expose les états
