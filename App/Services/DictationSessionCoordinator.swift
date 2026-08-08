@@ -830,6 +830,17 @@ private extension DictationSessionCoordinator {
                     afterCursor: capturedContext?.afterCursor ?? ""
                 )
                 textForRecovery = textForInsertion
+                if setting("voxol.correctionCapture", default: false),
+                    !setting("voxol.privateMode", default: false) {
+                    PersonalBenchmarkRecorder.record(
+                        samples: capturedAudio.samples,
+                        rawText: rawText,
+                        finalText: textForInsertion,
+                        engine: result.engine.rawValue,
+                        language: languagePreference.decodingLanguageCode ?? "auto",
+                        application: processingContext.bundleIdentifier
+                    )
+                }
                 updateLastReport { report in
                     report.transcriptCharacterCount = text.count
                     report.normalizationDurationSeconds = normalizationDuration
@@ -1435,5 +1446,157 @@ private enum RepairShadowRecorder {
         } catch {
             // Diagnostics must never interfere with dictation.
         }
+    }
+}
+
+
+/// Saves each dictation locally so the owner can build a personal benchmark.
+///
+/// Every public corpus in the suite is someone else's voice reading someone
+/// else's text; the only measurement that predicts this product's quality for
+/// its owner is the owner's own dictation against the text they actually
+/// wanted. Each session stores the audio, the raw recognition, the inserted
+/// text, and a `corrected.txt` pre-filled with the inserted text — reviewing a
+/// session means fixing that file. `build-personal-benchmark.py` turns the
+/// reviewed sessions into a frozen benchmark and scores it.
+///
+/// Strictly opt-in, suppressed in private mode, nothing leaves the machine,
+/// and recording stops at 500 MB rather than rotating away old sessions the
+/// owner may not have reviewed yet.
+private enum PersonalBenchmarkRecorder {
+    private static let maximumBytes: UInt64 = 500_000_000
+    private static let sampleRate = 16_000.0
+
+    static func record(
+        samples: [Float],
+        rawText: String,
+        finalText: String,
+        engine: String,
+        language: String,
+        application: String?
+    ) {
+        guard !samples.isEmpty, !finalText.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            write(
+                samples: samples,
+                rawText: rawText,
+                finalText: finalText,
+                engine: engine,
+                language: language,
+                application: application
+            )
+        }
+    }
+
+    private static func write(
+        samples: [Float],
+        rawText: String,
+        finalText: String,
+        engine: String,
+        language: String,
+        application: String?
+    ) {
+        do {
+            let root = try FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            .appendingPathComponent("VoxoL/PersonalBenchmark", isDirectory: true)
+            let sessions = root.appendingPathComponent("sessions", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: sessions,
+                withIntermediateDirectories: true
+            )
+            guard directorySize(root) < maximumBytes else { return }
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd-HHmmss"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            let name =
+                formatter.string(from: Date()) + "-"
+                + UUID().uuidString.prefix(8).lowercased()
+            let directory = sessions.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+
+            try wavData(from: samples).write(
+                to: directory.appendingPathComponent("audio.wav")
+            )
+            // Reviewing a session means editing this file to what should have
+            // been written. Left untouched, it records "the output was right".
+            try Data(finalText.utf8).write(
+                to: directory.appendingPathComponent("corrected.txt")
+            )
+            let meta: [String: Any] = [
+                "schemaVersion": 1,
+                "date": ISO8601DateFormatter().string(from: Date()),
+                "engine": engine,
+                "language": language,
+                "application": application ?? "unknown",
+                "rawText": rawText,
+                "finalText": finalText,
+                "durationSeconds": Double(samples.count) / sampleRate,
+            ]
+            try JSONSerialization.data(
+                withJSONObject: meta,
+                options: [.sortedKeys]
+            )
+            .write(to: directory.appendingPathComponent("meta.json"))
+        } catch {
+            // A diagnostics feature must never be able to fail a dictation.
+        }
+    }
+
+    private static func wavData(from samples: [Float]) -> Data {
+        var pcm = Data(capacity: samples.count * 2)
+        for sample in samples {
+            let clamped = max(-1, min(1, sample))
+            var value = Int16(clamped * 32767)
+            withUnsafeBytes(of: &value) { pcm.append(contentsOf: $0) }
+        }
+        var header = Data()
+        func append(_ text: String) { header.append(Data(text.utf8)) }
+        func append32(_ value: UInt32) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { header.append(contentsOf: $0) }
+        }
+        func append16(_ value: UInt16) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { header.append(contentsOf: $0) }
+        }
+        append("RIFF")
+        append32(UInt32(36 + pcm.count))
+        append("WAVE")
+        append("fmt ")
+        append32(16)
+        append16(1)
+        append16(1)
+        append32(UInt32(sampleRate))
+        append32(UInt32(sampleRate) * 2)
+        append16(2)
+        append16(16)
+        append("data")
+        append32(UInt32(pcm.count))
+        return header + pcm
+    }
+
+    private static func directorySize(_ url: URL) -> UInt64 {
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: url,
+                includingPropertiesForKeys: [.fileSizeKey]
+            )
+        else { return 0 }
+        var total: UInt64 = 0
+        for case let file as URL in enumerator {
+            total += UInt64(
+                (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            )
+        }
+        return total
     }
 }

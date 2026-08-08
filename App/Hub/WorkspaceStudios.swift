@@ -5,6 +5,15 @@ import Foundation
 /// Nobody guesses that instant mode means a dictation past about twenty-four
 /// words gets no list formatting and no rephrasing. The measured price of
 /// turning it off is near one second.
+/// Public corpora measure other people's voices; only the owner's dictation
+/// measures this product. Capture is the raw material of that benchmark.
+let personalCaptureExplanationText = """
+    Keeps each dictation's audio and text locally so you can build a personal \
+    benchmark: fix corrected.txt where the output was wrong, then run \
+    Scripts/build-personal-benchmark.py. Nothing leaves this Mac; capped at \
+    500 MB; off in private mode.
+    """
+
 let instantModeExplanationText = """
     Skips model cleanup past about 24 words, which is where list formatting \
     and rephrasing happen. Turn it off to clean everything: measured cost is \
@@ -69,6 +78,7 @@ struct SignalDictationView: View {
     @AppStorage("voxol.removeFillers") private var removesFillers = true
     @AppStorage("voxol.automaticLists") private var automaticLists = true
     @AppStorage("voxol.fastPathEnabled") private var fastPathEnabled = true
+    @AppStorage("voxol.correctionCapture") private var correctionCapture = false
     @AppStorage("voxol.streamingEnabled") private var streamingEnabled = true
     @AppStorage("voxol.pipelineInspectorEnabled") private var pipelineInspectorEnabled = false
     @AppStorage("voxol.privateMode") private var privateMode = false
@@ -361,6 +371,7 @@ struct SignalDictationView: View {
             Text(instantModeDetail)
                 .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
                 .foregroundStyle(theme.secondaryInk)
+            Toggle("Personal benchmark capture", isOn: $correctionCapture)
             Toggle("Stable live transcript", isOn: $streamingEnabled)
                 .disabled(dictationLanguage != .automatic)
             Toggle("Pipeline inspector", isOn: pipelineInspectorBinding)
@@ -813,6 +824,7 @@ struct DictationStudioView: View {
     @AppStorage("voxol.removeFillers") private var removesFillers = true
     @AppStorage("voxol.automaticLists") private var automaticLists = true
     @AppStorage("voxol.fastPathEnabled") private var fastPathEnabled = true
+    @AppStorage("voxol.correctionCapture") private var correctionCapture = false
     @AppStorage("voxol.streamingEnabled") private var streamingEnabled = true
     @AppStorage("voxol.pipelineInspectorEnabled") private var pipelineInspectorEnabled = false
     @AppStorage("voxol.privateMode") private var privateMode = false
@@ -1156,6 +1168,19 @@ struct DictationStudioView: View {
                         ) {
                             Toggle("Instant mode", isOn: $fastPathEnabled)
                                 .labelsHidden()
+                        }
+
+                        Divider()
+
+                        SettingLine(
+                            title: "Personal benchmark capture",
+                            detail: LocalizedStringKey(personalCaptureExplanationText)
+                        ) {
+                            Toggle(
+                                "Personal benchmark capture",
+                                isOn: $correctionCapture
+                            )
+                            .labelsHidden()
                         }
 
                         Divider()
