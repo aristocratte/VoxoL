@@ -17,7 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        NSApplication.shared.setActivationPolicy(.accessory)
+        // A regular app: Dock icon, Cmd-Tab, a window you can find again after
+        // clicking away. It was .accessory with LSUIElement set, which makes a
+        // menu-bar-only utility — defensible for something you invoke by
+        // hotkey, but it left no way to reach the app like any other, and the
+        // menu-bar item stays either way.
+        NSApplication.shared.setActivationPolicy(.regular)
         VoiceCapsuleController.shared.prepare()
         DictationSessionCoordinator.shared.activate()
         prepareMainWindow()

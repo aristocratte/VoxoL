@@ -2842,7 +2842,17 @@ enum EditorialSettingsSection: String, CaseIterable, Hashable {
     }
 }
 
+/// Says what the capture stores and why the public benchmarks cannot replace it.
+let personalCaptureDetail = """
+    Keeps each dictation's audio locally so accuracy on your own voice can be \
+    measured — the public benchmarks cannot see technical vocabulary or how \
+    numbers are written. Correction learning below stores the text; this adds \
+    the audio a re-run needs. Nothing leaves this Mac, capped at 500 MB, off \
+    in private mode.
+    """
+
 struct EditorialSettingsView: View {
+    @AppStorage("voxol.correctionCapture") private var correctionCapture = false
     @Environment(VoxoLTheme.self) private var theme
     @Environment(ModelInstallationStore.self) private var models
     @Environment(PermissionCoordinator.self) private var permissions
@@ -3243,6 +3253,16 @@ struct EditorialSettingsView: View {
                 metrics: metrics
             ) {
                 Toggle("Bounded context", isOn: $contextEnabled).labelsHidden()
+            }
+            settingsDivider
+            settingsRow(
+                title: "Personal benchmark capture",
+                detail: LocalizedStringKey(personalCaptureDetail),
+                metrics: metrics
+            ) {
+                Toggle("Personal benchmark capture", isOn: $correctionCapture)
+                    .labelsHidden()
+                    .disabled(privateMode)
             }
             settingsDivider
             settingsRow(
