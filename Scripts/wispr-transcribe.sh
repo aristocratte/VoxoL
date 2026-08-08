@@ -69,7 +69,7 @@
 #   WISPR_DEFER_MANIFEST_REBUILD
 #                        "1" skips shared manifest rebuilds for parallel workers
 #   WISPR_MIN_REQUEST_INTERVAL
-#                        global delay between request starts (default: 0.35s)
+#                        global delay between request starts (default: 0.8s)
 #   WISPR_MAX_RETRIES    transient HTTP attempts per request (default: 6)
 #   WISPR_API_BASE, WISPR_SUPA_URL, WISPR_SESSION_FILE overrides
 # ---------------------------------------------------------------------------
@@ -89,7 +89,10 @@ SPEAKER_ID="${WISPR_SPEAKER_ID:-}"
 SESSION_ID="${WISPR_SESSION_ID:-}"
 MAX_CHUNK="${WISPR_MAX_CHUNK_SEC:-30}"
 MIN_SILENCE="${WISPR_MIN_SILENCE_SEC:-0.45}"
-MIN_INTERVAL="${WISPR_MIN_REQUEST_INTERVAL:-0.35}"
+# 0.35 s was the original default; four workers against it earned a 15% 429
+# rate on this service, so the floor is higher now. Raise it further if a run
+# still reports retries.
+MIN_INTERVAL="${WISPR_MIN_REQUEST_INTERVAL:-0.8}"
 MAX_RETRIES="${WISPR_MAX_RETRIES:-6}"
 DEFER_MANIFESTS="${WISPR_DEFER_MANIFEST_REBUILD:-0}"
 
@@ -230,14 +233,18 @@ post_chunk() {
     body="${response%$'\n'*}"
     case "$status" in
       200) printf '%s\t%s' "$status" "$body"; return 0 ;;
-      000|5*) : ;;
+      # 429 is the service asking for less, not refusing the request. Treating
+      # it as final made a first pass drop 47 of 300 clips, which the caller
+      # then had to re-request wholesale. It backs off harder than a transient
+      # network failure because the cause is this client's own rate.
+      429) sleep "$((attempt * attempt * 5))" ;;
+      000|5*) sleep "$((attempt * 2))" ;;
       *) printf '%s\t%s' "$status" "$body"; return 0 ;;
     esac
     if [ "$attempt" -ge "$MAX_RETRIES" ]; then
       printf '%s\t%s' "${status:-000}" "$body"
       return 0
     fi
-    sleep "$((attempt * 2))"
     attempt=$((attempt + 1))
   done
 }

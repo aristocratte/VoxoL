@@ -66,11 +66,9 @@ The same clips remixed against six competing voices at a controlled signal-to-no
 | Condition | ._commonvoice-fr (French) | ._librispeech-en (English) | ._voxpopuli-fr (French) | Common Voice 21.0 (French) | LibriSpeech test-clean (English) | VoxPopuli (French) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | clean | — | — | — | **7.28** vs 13.54 | **2.11** vs 3.66 | **10.10** vs 12.33 |
-| babble 20 dB | — | — | — | 9.69 | 2.71 | 10.39 |
-| babble 10 dB | — | — | — | 19.59 | 4.25 | 10.84 |
-| babble 5 dB | — | — | — | 39.35 | 10.44 | 13.64 |
-
-_Wispr Flow figures for these conditions are still being collected; VoxoL's curve is shown alone until they land._
+| babble 20 dB | — | — | — | **9.69** vs 15.20 | 2.71 | 10.39 |
+| babble 10 dB | — | — | — | **19.59** vs 23.88 | 4.25 | 10.84 |
+| babble 5 dB | — | — | — | **39.35** vs 40.95 | 10.44 | 13.64 |
 
 ## What is measured, and what is not
 
