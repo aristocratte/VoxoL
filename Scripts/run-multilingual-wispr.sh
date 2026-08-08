@@ -13,7 +13,7 @@ set -uo pipefail
 
 ROOT="${1:-/Volumes/0_Oueillez/VoxoL-Benchmarks-Multilingual}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-WISPR="${WISPR_SCRIPT:-$HOME/Documents/wispr/wispr-transcribe.sh}"
+WISPR="${WISPR_SCRIPT:-$REPO/Scripts/wispr-transcribe.sh}"
 CLI="$REPO/.build/release/voxol-asr-benchmark"
 WORKERS="${WORKERS:-4}"
 LOG="$ROOT/run-wispr.log"
