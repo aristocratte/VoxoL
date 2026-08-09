@@ -123,14 +123,13 @@ final class NumberFormattingTests: XCTestCase {
         XCTAssertEqual(french("zéro"), "0")
     }
 
-    func testFormatterRunsOnTheFastPathThroughPrepare() throws {
-        // The polisher is skipped for longer dictations, so the conversion has
-        // to live in the deterministic layer or it never runs when it matters.
+    func testFormatterRunsInTheDeterministicLayerWhateverTheRoute() throws {
+        // The conversion has to live in the deterministic layer rather than in
+        // the prompt: the polisher can be off, time out or be declined by the
+        // placeholder audit, and a number spelled out in words must survive all
+        // three. Written as a long dictation because that is the case that used
+        // to bypass the model entirely.
         let request = TextProcessingRequest(
-            // Long enough to stay past the twenty-four word window even after
-            // the number collapses to three characters — otherwise the
-            // conversion shortens the sentence into the range and the polisher
-            // runs after all, which is correct but not what this checks.
             rawTranscript: "Sur une B quatre cent cinquante le slot du haut est "
                 + "géré par le chipset et pas par la carte graphique installée "
                 + "dans le second emplacement disponible juste au-dessus de "
@@ -142,7 +141,6 @@ final class NumberFormattingTests: XCTestCase {
 
         let preparation = DeterministicTextProcessor.prepare(request)
 
-        XCTAssertFalse(preparation.shouldUsePolisher, "expected the fast path")
         XCTAssertTrue(preparation.normalizedText.contains("B450"))
         XCTAssertFalse(preparation.normalizedText.contains("quatre cent"))
     }
@@ -175,10 +173,13 @@ final class PolisherGatingTests: XCTestCase {
         XCTAssertTrue(prepare("non je voulais dire autre chose entièrement").shouldUsePolisher)
     }
 
-    func testAHesitationTheDeterministicLayerRemovesNeedsNoModel() {
-        // Intended: "unresolved" means what survived cleanup. Reading the
-        // signal before the removal looked like a fix and was not one.
-        XCTAssertFalse(prepare("euh envoie le rapport demain matin").shouldUsePolisher)
+    func testARemovedHesitationIsNoLongerAReasonToSkipTheModel() {
+        // The hesitation itself is resolved — that part of the old reasoning
+        // held. What did not hold is the conclusion: stripping "euh" leaves the
+        // *rest* of the sentence in spoken form, and that is the half only the
+        // model rewrites. Skipping it here is how ordinary dictation went out
+        // reading like a recogniser dump.
+        XCTAssertTrue(prepare("euh envoie le rapport demain matin").shouldUsePolisher)
     }
 
     func testWritingANumberAsDigitsDoesNotCancelCleanup() {
@@ -213,12 +214,14 @@ final class PolisherGatingTests: XCTestCase {
         XCTAssertTrue(prepare("Le slot du haut est géré par le chipset").shouldUsePolisher)
     }
 
-    func testALongCleanDictationDeliberatelySkipsIt() {
-        // Not a bug: past twenty-four words with nothing to repair, the model
-        // costs seconds and has nothing to contribute. Documented so a future
-        // reader knows this one is a choice.
+    func testALongDictationIsExactlyWhatTheModelIsFor() {
+        // This used to assert the opposite, on the reasoning that a long text
+        // with no detected artefact has nothing to repair. Real use disproved
+        // it: length is where false starts, repetition and speaking-order
+        // clauses accumulate, and none of them match an artefact pattern. The
+        // dictations that read worst were the ones this rule exempted.
         let long = (1...40).map { "mot\($0)" }.joined(separator: " ")
-        XCTAssertFalse(prepare(long).shouldUsePolisher)
+        XCTAssertTrue(prepare(long).shouldUsePolisher)
     }
 }
 

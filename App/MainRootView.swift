@@ -13,6 +13,9 @@ struct MainRootView: View {
         DictationLanguagePreference.preferred.rawValue
     /// Empty means "follow the system default input", which is the shipping behaviour.
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
+    /// The version that ran last, so an update can be told from a first launch.
+    @AppStorage("voxol.lastLaunchedVersion") private var lastLaunchedVersion = ""
+    @State private var releaseNotes: ReleaseNotes.Entry?
 
     var body: some View {
         Group {
@@ -39,6 +42,19 @@ struct MainRootView: View {
                 )
             }
         }
+        .blur(radius: releaseNotes == nil ? 0 : 9)
+        .overlay {
+            if let entry = releaseNotes {
+                ZStack {
+                    Color.black.opacity(0.32)
+                        .ignoresSafeArea()
+                        .onTapGesture { dismissReleaseNotes() }
+                    ReleaseNotesCard(entry: entry) { dismissReleaseNotes() }
+                }
+                .transition(.opacity)
+            }
+        }
+        .task { presentReleaseNotesAfterUpdate() }
         .environment(theme)
         .environment(permissions)
         .environment(dictationSession)
@@ -83,6 +99,34 @@ struct MainRootView: View {
 
     private var selectedLanguage: AppLanguage {
         AppLanguage(rawValue: languageCode) ?? .english
+    }
+
+    /// Shows the notes once, when the running version differs from the one that
+    /// ran last.
+    ///
+    /// A first install is deliberately silent: someone opening the app for the
+    /// first time has not just fixed anything, and a changelog is the wrong
+    /// first screen. The version is still recorded, so the *next* update is the
+    /// one that gets the card.
+    private func presentReleaseNotesAfterUpdate() {
+        let current = BugReportComposer.Environment.current().applicationVersion
+        guard lastLaunchedVersion != current else { return }
+        guard !lastLaunchedVersion.isEmpty, let entry = ReleaseNotes.entry(for: current) else {
+            lastLaunchedVersion = current
+            return
+        }
+        withAnimation(.easeOut(duration: 0.22)) {
+            releaseNotes = entry
+        }
+    }
+
+    private func dismissReleaseNotes() {
+        // Recorded on dismissal rather than on display, so a crash or a force
+        // quit while the card is up does not consume the one time it shows.
+        lastLaunchedVersion = BugReportComposer.Environment.current().applicationVersion
+        withAnimation(.easeOut(duration: 0.18)) {
+            releaseNotes = nil
+        }
     }
 }
 

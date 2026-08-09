@@ -11,7 +11,7 @@ struct SignalTodayView: View {
     let openInsights: () -> Void
     let openSettings: () -> Void
 
-    @AppStorage("voxol.historyEnabled") private var historyEnabled = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @State private var inspectedRecord: TranscriptRecord?
     @State private var resultCardIsHovered = false
 
@@ -791,7 +791,7 @@ struct HomeStudioView: View {
     let previewCapsule: () -> Void
     let replayPreflight: () -> Void
 
-    @AppStorage("voxol.historyEnabled") private var historyEnabled = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
 
     var body: some View {
         StudioPage(
@@ -961,6 +961,8 @@ struct HomeStudioView: View {
             Label("Copied", systemImage: "checkmark")
         case .previousVersionRestored:
             Label("Previous version restored", systemImage: "arrow.uturn.backward")
+        case .laterVersionRestored:
+            Label("Later version restored", systemImage: "arrow.uturn.forward")
         case .audioExported:
             Label("Audio exported", systemImage: "checkmark")
         case .noAudioRetained:
@@ -1015,7 +1017,7 @@ struct TranscriptActivityRow: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(PersonalizationStore.self) private var personalization
 
-    @AppStorage("voxol.learningEnabled") private var learningEnabled = false
+    @AppStorage("voxol.learningEnabled") private var learningEnabled = true
     @AppStorage("voxol.privateMode") private var privateMode = false
 
     let record: TranscriptRecord
@@ -1067,6 +1069,12 @@ struct TranscriptActivityRow: View {
                 }
             }
             .disabled(!record.canUndo)
+            Button("Restore later version") {
+                Task {
+                    await store.redoLastEdit(for: record.id)
+                }
+            }
+            .disabled(!record.canRedo)
             Divider()
             Button("Export retained audio") {
                 Task {
@@ -1150,6 +1158,16 @@ struct TranscriptActivityRow: View {
             }
             .disabled(!record.canUndo)
             .help("Restore previous version")
+
+            Button {
+                Task {
+                    await store.redoLastEdit(for: record.id)
+                }
+            } label: {
+                Image(systemName: "arrow.uturn.forward")
+            }
+            .disabled(!record.canRedo)
+            .help("Restore later version")
 
             Button {
                 Task {

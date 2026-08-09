@@ -76,6 +76,19 @@ final class TranscriptStore {
         }
     }
 
+    func redoLastEdit(for id: UUID) async {
+        guard let index = records.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        guard records[index].redoLastEdit() else {
+            return
+        }
+        toast = .laterVersionRestored
+        if !usesExampleData {
+            await persist()
+        }
+    }
+
     func replaceText(for id: UUID, with newText: String) async -> TranscriptEdit? {
         let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -146,6 +159,7 @@ final class TranscriptStore {
 enum TranscriptToast: Equatable {
     case copied
     case previousVersionRestored
+    case laterVersionRestored
     case audioExported
     case noAudioRetained
     case audioExportFailed

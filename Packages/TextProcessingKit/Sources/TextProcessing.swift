@@ -298,11 +298,25 @@ public enum DeterministicTextProcessor {
             language: language
         )
         let promptWordCount = wordCount(promptText)
-        let isShortCorrectionCandidate =
-            (3...24).contains(promptWordCount)
-            && !didDeterministicRewrite
-            && !isStructuredList(promptText)
-        let needsPolisher = hasUnresolvedSpeechArtifacts || isShortCorrectionCandidate
+        // Length is a reason to run the model, not to skip it. The previous
+        // rule said the opposite — the polisher was reserved for texts of at
+        // most 24 words — and combined with an artifact test that reads the
+        // *cleaned* text it left a hole big enough to swallow ordinary use: a
+        // long dictation whose "euh" the deterministic pass had already
+        // stripped scored zero artifacts and too many words, so it went out
+        // exactly as the recogniser produced it. Spoken syntax is what stays
+        // behind after fillers are gone — false starts, sentences chained on
+        // "et", clauses in speaking order — and that is the part only the model
+        // rewrites into something that reads as written.
+        //
+        // So the fast path keeps just its defensible case: a fragment too short
+        // for prose to matter, where the model would only add latency. Lists
+        // stay out because their shape is already the meaning, and reflowing
+        // them is damage rather than polish.
+        let isTrivialFragment = promptWordCount < 3
+        let needsPolisher =
+            hasUnresolvedSpeechArtifacts
+            || (!isTrivialFragment && !isStructuredList(promptText))
         let fastPath =
             request.preferences.fastPathEnabled
             && !needsPolisher

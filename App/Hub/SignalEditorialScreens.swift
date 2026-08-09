@@ -693,6 +693,19 @@ struct EditorialTodayView: View {
                             Task { await transcripts.undoLastEdit(for: record.id) }
                         }
                     }
+                    // The counterpart to the button above. Without it, seeing
+                    // the raw text cost you the polished one permanently, so
+                    // the honest thing was never to look.
+                    if record.canRedo {
+                        EditorialIconButton(
+                            icon: "arrow.uturn.forward",
+                            label: "Restore the cleaned-up text",
+                            size: 26,
+                            systemSymbol: true
+                        ) {
+                            Task { await transcripts.redoLastEdit(for: record.id) }
+                        }
+                    }
                     EditorialIconButton(
                         icon: "doc.on.doc",
                         label: "Copy transcription",
@@ -2581,7 +2594,7 @@ struct EditorialLibraryView: View {
 
     @AppStorage("voxol.writingProfile") private var writingProfile = WritingProfile.automatic
         .rawValue
-    @AppStorage("voxol.learningEnabled") private var learningEnabled = false
+    @AppStorage("voxol.learningEnabled") private var learningEnabled = true
     @AppStorage("voxol.privateMode") private var privateMode = false
 
     @State private var selectedTab = EditorialLibraryTab.dictionary
@@ -3212,9 +3225,9 @@ struct EditorialSettingsView: View {
     @AppStorage("voxol.cleanupMode") private var cleanup = DictationCleanupMode.faithful
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
     @AppStorage("voxol.privateMode") private var privateMode = false
-    @AppStorage("voxol.historyEnabled") private var historyEnabled = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
-    @AppStorage("voxol.learningEnabled") private var learningEnabled = false
+    @AppStorage("voxol.learningEnabled") private var learningEnabled = true
 
     @State private var visible = false
     @State private var showsAppearanceNote = false
@@ -3751,17 +3764,15 @@ struct EditorialSettingsView: View {
     private func checkForUpdate() async {
         updateCheckInFlight = true
         defer { updateCheckInFlight = false; updateCheckedOnce = true }
-        guard let feed = URL(string: UpdateFeed.releasesURL) else { return }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: feed)
-            let releases = try UpdateCheck.releases(fromGitHubJSON: data)
-            let current = BugReportComposer.Environment.current().applicationVersion
-            availableUpdate = UpdateCheck.availableUpdate(current: current, releases: releases)
-            if let availableUpdate { NSWorkspace.shared.open(availableUpdate.url) }
-        } catch {
-            // A failed check must never interrupt dictation; the row simply
-            // stays on its previous state.
-            availableUpdate = nil
+        // Delegated rather than duplicated: this used to run its own copy of
+        // the same fetch and comparison, so the row here and the sidebar badge
+        // could disagree about whether an update existed. One reader, one
+        // answer. `announce: false` keeps the alert out of the way of someone
+        // who is already looking at the result.
+        await UpdateNotifier.shared.check(announce: false)
+        availableUpdate = UpdateNotifier.shared.available
+        if availableUpdate != nil {
+            UpdateNotifier.shared.openDownloadPage()
         }
     }
 

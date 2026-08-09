@@ -191,6 +191,54 @@ struct HubView: View {
 
             Spacer(minLength: 12)
 
+            // Sits above the readiness row on purpose: an update is news, and
+            // news belongs where the eye already goes to check that things are
+            // fine. It stays until the version is actually installed rather
+            // than until it is acknowledged.
+            if let update = UpdateNotifier.shared.available {
+                Button {
+                    UpdateNotifier.shared.openDownloadPage()
+                } label: {
+                    HStack(spacing: 8) {
+                        // Cobalt rather than coral: an update is news, not a
+                        // fault, and coral is already what "something is wrong"
+                        // looks like one row below.
+                        EditorialIcon(name: "download-simple", size: 13)
+                            .foregroundStyle(theme.cobalt)
+                            .frame(width: compact ? 24 : 26, height: compact ? 24 : 26)
+                            .background(theme.cobaltSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("Update available")
+                                .font(
+                                    VoxoLTypography.font(
+                                        size: 11,
+                                        weight: .semibold,
+                                        relativeTo: .caption
+                                    )
+                                )
+                                .foregroundStyle(theme.ink)
+                                .lineLimit(1)
+                            Text(verbatim: "VoxoL \(update.version)")
+                                .font(VoxoLTypography.font(size: 10.5, relativeTo: .caption))
+                                .foregroundStyle(theme.secondaryInk)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        EditorialIcon(name: "caret-right", size: 16)
+                            .foregroundStyle(theme.secondaryInk)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, minHeight: compact ? 64 : 58)
+                    .background(theme.cobaltSoft.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(SignalPressButtonStyle())
+                .padding(.bottom, 8)
+            }
+
             Button {
                 if systemReady {
                     settingsSection = .general
@@ -372,6 +420,7 @@ struct HubView: View {
         switch toast {
         case .copied: "Copied to clipboard"
         case .previousVersionRestored: "Previous version restored"
+        case .laterVersionRestored: "Later version restored"
         case .audioExported: "Audio exported"
         case .noAudioRetained: "No audio was retained"
         case .audioExportFailed: "Audio export failed"

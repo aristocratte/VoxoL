@@ -161,6 +161,29 @@ public final class TextInjector {
         self.restoreDelay = restoreDelay
     }
 
+    /// Reads everything the destination control currently holds, when the
+    /// application exposes it over Accessibility.
+    ///
+    /// Nil is a normal answer, not a failure: plenty of destinations — web
+    /// views, canvases, apps that decline the attribute — never expose a value,
+    /// and the caller's job is to give up quietly rather than to guess.
+    public func currentText(of target: TextInsertionTarget) -> String? {
+        guard AXIsProcessTrusted(), let element = target.element else {
+            return nil
+        }
+        guard !isSecure(element: element) else {
+            return nil
+        }
+        var value: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
+                == .success
+        else {
+            return nil
+        }
+        return value as? String
+    }
+
     /// Captures the current editable destination before asynchronous transcription starts.
     public func captureTarget() throws -> TextInsertionTarget {
         guard AXIsProcessTrusted() else {

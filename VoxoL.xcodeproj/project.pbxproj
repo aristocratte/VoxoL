@@ -16,6 +16,7 @@
 		000000000000000000000018 /* MainRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000023 /* MainRootView.swift */; };
 		000000000000000000000019 /* VoxoLTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000024 /* VoxoLTheme.swift */; };
 		00000000000000000000001A /* HubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000025 /* HubView.swift */; };
+		000000000000000000000FA5 /* ReleaseNotesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA6 /* ReleaseNotesCard.swift */; };
 		00000000000000000000001B /* StudioComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000026 /* StudioComponents.swift */; };
 		00000000000000000000001C /* WorkspaceStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000027 /* WorkspaceStudios.swift */; };
 		00000000000000000000001D /* PersonalizationStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000028 /* PersonalizationStudios.swift */; };
@@ -68,6 +69,8 @@
 		000000000000000000000089 /* StableTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008A /* StableTranscript.swift */; };
 		0000000000000000000000D1 /* UpdateFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* UpdateFeed.swift */; };
 		000000000000000000000FA1 /* UpdateNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA2 /* UpdateNotifier.swift */; };
+		000000000000000000000FA7 /* InsertionCorrectionWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */; };
+		000000000000000000000FA3 /* DefaultSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA4 /* DefaultSettings.swift */; };
 		00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008C /* PolisherSmokeRunner.swift */; };
 		00000000000000000000008E /* AppleDictationRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008D /* AppleDictationRuntime.swift */; };
 		000000000000000000000096 /* AudioSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000097 /* AudioSegmenter.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
@@ -89,6 +92,7 @@
 		0000000000000000000000A2 /* VoxoLSignal.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = VoxoLSignal.metal; sourceTree = "<group>"; };
 		0000000000000000000000A4 /* VoxoLSignalField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxoLSignalField.swift; sourceTree = "<group>"; };
 		000000000000000000000025 /* HubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubView.swift; sourceTree = "<group>"; };
+		000000000000000000000FA6 /* ReleaseNotesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesCard.swift; sourceTree = "<group>"; };
 		000000000000000000000026 /* StudioComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioComponents.swift; sourceTree = "<group>"; };
 		000000000000000000000027 /* WorkspaceStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStudios.swift; sourceTree = "<group>"; };
 		000000000000000000000028 /* PersonalizationStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationStudios.swift; sourceTree = "<group>"; };
@@ -137,6 +141,8 @@
 		00000000000000000000008A /* StableTranscript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/StableTranscript.swift; sourceTree = SOURCE_ROOT; };
 		0000000000000000000000D2 /* UpdateFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFeed.swift; sourceTree = "<group>"; };
 		000000000000000000000FA2 /* UpdateNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateNotifier.swift; sourceTree = "<group>"; };
+		000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertionCorrectionWatcher.swift; sourceTree = "<group>"; };
+		000000000000000000000FA4 /* DefaultSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSettings.swift; sourceTree = "<group>"; };
 		00000000000000000000008C /* PolisherSmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolisherSmokeRunner.swift; sourceTree = "<group>"; };
 		00000000000000000000008D /* AppleDictationRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationRuntime.swift; sourceTree = "<group>"; };
 		000000000000000000000097 /* AudioSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSegmenter.swift; sourceTree = "<group>"; };
@@ -221,6 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000025 /* HubView.swift */,
+				000000000000000000000FA6 /* ReleaseNotesCard.swift */,
 				0000000000000000000000A1 /* SignalEditorialScreens.swift */,
 				000000000000000000000044 /* HomeDashboardView.swift */,
 				000000000000000000000026 /* StudioComponents.swift */,
@@ -273,6 +280,8 @@
 				000000000000000000000088 /* DictationTextProcessor.swift */,
 				0000000000000000000000D2 /* UpdateFeed.swift */,
 				000000000000000000000FA2 /* UpdateNotifier.swift */,
+				000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */,
+				000000000000000000000FA4 /* DefaultSettings.swift */,
 				00000000000000000000008C /* PolisherSmokeRunner.swift */,
 				00000000000000000000008D /* AppleDictationRuntime.swift */,
 			);
@@ -417,6 +426,7 @@
 				0000000000000000000000A3 /* VoxoLSignal.metal in Sources */,
 				0000000000000000000000A5 /* VoxoLSignalField.swift in Sources */,
 				00000000000000000000001A /* HubView.swift in Sources */,
+				000000000000000000000FA5 /* ReleaseNotesCard.swift in Sources */,
 				0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */,
 				00000000000000000000001B /* StudioComponents.swift in Sources */,
 				00000000000000000000001C /* WorkspaceStudios.swift in Sources */,
@@ -443,6 +453,8 @@
 				000000000000000000000089 /* StableTranscript.swift in Sources */,
 				0000000000000000000000D1 /* UpdateFeed.swift in Sources */,
 				000000000000000000000FA1 /* UpdateNotifier.swift in Sources */,
+				000000000000000000000FA7 /* InsertionCorrectionWatcher.swift in Sources */,
+				000000000000000000000FA3 /* DefaultSettings.swift in Sources */,
 				00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */,
 				00000000000000000000008E /* AppleDictationRuntime.swift in Sources */,
 				000000000000000000000060 /* Types.swift in Sources */,
@@ -529,7 +541,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
@@ -559,7 +571,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;

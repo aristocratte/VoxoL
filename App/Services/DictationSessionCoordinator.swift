@@ -154,6 +154,9 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private var configuredPolisherRoot: URL?
     @ObservationIgnored private var textProcessor = DictationTextProcessor(modelRoot: nil)
     @ObservationIgnored private var personalizationStore: PersonalizationStore?
+    @ObservationIgnored private lazy var correctionWatcher = InsertionCorrectionWatcher(
+        injector: injector
+    )
     @ObservationIgnored private var transcriptStore: TranscriptStore?
     @ObservationIgnored private var shortcutHeld = false
     @ObservationIgnored private var toggleSessionIsActive = false
@@ -283,6 +286,44 @@ final class DictationSessionCoordinator {
                 self?.lastError = error.localizedDescription
             }
             self?.modelPreparationTask = nil
+        }
+    }
+
+    /// Records a repair the user made in the destination app, so the dictionary
+    /// can learn the word that was misheard.
+    ///
+    /// Gated on the same two switches as every other form of learning: this
+    /// reads the contents of another application's text field, and doing that
+    /// without consent is not a feature. Private mode declines outright.
+    private func watchForCorrection(
+        target: TextInsertionTarget,
+        insertedText: String,
+        rawTranscript: String,
+        bundleIdentifier: String?
+    ) {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "voxol.learningEnabled"),
+            !defaults.bool(forKey: "voxol.privateMode")
+        else {
+            correctionWatcher.cancel()
+            return
+        }
+        correctionWatcher.watch(
+            target: target,
+            insertedText: insertedText
+        ) { [weak self] corrected in
+            guard let personalizationStore = self?.personalizationStore else { return }
+            Task {
+                await personalizationStore.addCorrection(
+                    CorrectionPair(
+                        rawTranscript: rawTranscript,
+                        correctedText: corrected,
+                        bundleIdentifier: bundleIdentifier,
+                        profile: .automatic,
+                        language: .any
+                    )
+                )
+            }
         }
     }
 
@@ -918,6 +959,15 @@ private extension DictationSessionCoordinator {
                 state = .insertionSucceeded(method)
                 VoiceCapsuleController.shared.show(.success)
                 dismissCapsule(after: .milliseconds(900))
+
+                if let insertionTarget {
+                    watchForCorrection(
+                        target: insertionTarget,
+                        insertedText: textForInsertion,
+                        rawTranscript: textForInsertion,
+                        bundleIdentifier: bundleIdentifier
+                    )
+                }
             } catch is CancellationError {
                 abandonRehearsal()
                 state = .ready

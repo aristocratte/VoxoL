@@ -5,7 +5,7 @@ struct HistoryStudioView: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(TranscriptStore.self) private var transcripts
 
-    @AppStorage("voxol.historyEnabled") private var historyEnabled = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @State private var searchText = ""
 
     var body: some View {
@@ -135,9 +135,9 @@ struct SystemStudioView: View {
     let replayPreflight: () -> Void
 
     @AppStorage("voxol.privateMode") private var privateMode = false
-    @AppStorage("voxol.historyEnabled") private var historyEnabled = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
-    @AppStorage("voxol.learningEnabled") private var learningEnabled = false
+    @AppStorage("voxol.learningEnabled") private var learningEnabled = true
 
     var body: some View {
         StudioPage(

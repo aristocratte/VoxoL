@@ -42,6 +42,9 @@ public struct TranscriptRecord: Codable, Equatable, Identifiable, Sendable {
     /// Earlier text values ordered from oldest to newest.
     public var revisions: [TranscriptRevision]
 
+    /// Values removed by undo, newest last, awaiting redo.
+    public var undoneRevisions: [TranscriptRevision] = []
+
     /// An opt-in path relative to VoxoL's application-support directory.
     public let audioRelativePath: String?
 
@@ -71,6 +74,35 @@ public struct TranscriptRecord: Codable, Equatable, Identifiable, Sendable {
         self.isExample = isExample
     }
 
+    /// Decodes a record, tolerating history written before redo existed.
+    ///
+    /// Worth the boilerplate: the synthesized decoder treats a missing key as a
+    /// failure even when the property has a default, so shipping `undoneRevisions`
+    /// without this would have made every previously saved `transcripts.json`
+    /// throw on load — and the store answers a load failure by falling back to
+    /// example data, which reads exactly like the user's history being erased by
+    /// an update.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        applicationName = try container.decode(String.self, forKey: .applicationName)
+        applicationBundleIdentifier = try container.decodeIfPresent(
+            String.self,
+            forKey: .applicationBundleIdentifier
+        )
+        text = try container.decode(String.self, forKey: .text)
+        durationSeconds = try container.decode(TimeInterval.self, forKey: .durationSeconds)
+        revisions = try container.decode([TranscriptRevision].self, forKey: .revisions)
+        undoneRevisions =
+            try container.decodeIfPresent(
+                [TranscriptRevision].self,
+                forKey: .undoneRevisions
+            ) ?? []
+        audioRelativePath = try container.decodeIfPresent(String.self, forKey: .audioRelativePath)
+        isExample = try container.decodeIfPresent(Bool.self, forKey: .isExample) ?? false
+    }
+
     /// The whitespace-delimited number of words in the current text.
     public var wordCount: Int {
         text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
@@ -89,13 +121,36 @@ public struct TranscriptRecord: Codable, Equatable, Identifiable, Sendable {
         !revisions.isEmpty
     }
 
+    /// Whether an undone value can be put back.
+    public var canRedo: Bool {
+        !undoneRevisions.isEmpty
+    }
+
     /// Restores the most recent revision, if one exists.
+    ///
+    /// The displaced text is kept rather than dropped. Undo used to destroy it,
+    /// which made the first press irreversible: the polished text became the
+    /// raw transcript and there was no way back to compare the two, so the one
+    /// question worth asking — what did the model actually change? — could not
+    /// be answered twice.
     @discardableResult
-    public mutating func undoLastEdit() -> Bool {
+    public mutating func undoLastEdit(at date: Date = Date()) -> Bool {
         guard let revision = revisions.popLast() else {
             return false
         }
+        undoneRevisions.append(TranscriptRevision(text: text, createdAt: date))
         text = revision.text
+        return true
+    }
+
+    /// Restores the most recently undone value, if one exists.
+    @discardableResult
+    public mutating func redoLastEdit(at date: Date = Date()) -> Bool {
+        guard let undone = undoneRevisions.popLast() else {
+            return false
+        }
+        revisions.append(TranscriptRevision(text: text, createdAt: date))
+        text = undone.text
         return true
     }
 
@@ -105,7 +160,19 @@ public struct TranscriptRecord: Codable, Equatable, Identifiable, Sendable {
             return
         }
         revisions.append(TranscriptRevision(text: text, createdAt: date))
+        // A fresh edit forks the history: the versions that were undone are no
+        // longer reachable from here, and keeping them would let redo jump to
+        // text that never followed this one.
+        undoneRevisions.removeAll()
         text = newText
+    }
+
+    /// The transcript as the recogniser produced it, before any later revision.
+    ///
+    /// Held at the bottom of the undo stack rather than in its own field, so it
+    /// stays correct whichever direction the user has stepped through.
+    public var originalText: String {
+        revisions.first?.text ?? text
     }
 }
 

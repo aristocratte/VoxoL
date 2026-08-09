@@ -8,6 +8,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: NSWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Before anything reads a preference, including the SwiftUI views built
+        // further down: registering after a read leaves that read on the old
+        // default.
+        DefaultSettings.register()
+
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains(PolisherSmokeRunner.argument) {
             NSApplication.shared.setActivationPolicy(.prohibited)
@@ -29,8 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // A copy installed on another Mac would otherwise never learn a newer
         // release exists unless the user happened to open Settings and press
-        // the button. Check once per launch and surface it.
-        UpdateNotifier.checkOnLaunch()
+        // the button. Check at launch, then keep checking.
+        UpdateNotifier.shared.start()
 
         let popover = NSPopover()
         popover.behavior = .transient

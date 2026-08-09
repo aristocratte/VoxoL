@@ -97,9 +97,28 @@ final class PersonalizationStore {
             try await repository.addCorrection(correction)
             corrections.insert(correction, at: 0)
             lastError = nil
+            await promoteRepeatedCorrections()
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Adds dictionary entries for mistakes the user has now corrected more
+    /// than once.
+    ///
+    /// Corrections used to accumulate and do nothing: the only thing that read
+    /// them was an offline script, so a word the recogniser got wrong every
+    /// time stayed wrong unless it was typed into the dictionary by hand. The
+    /// thresholds live in `DictionaryLearning` — repeated evidence, and a
+    /// change small enough to be a mishearing rather than a rewrite.
+    private func promoteRepeatedCorrections() async {
+        let learned = DictionaryLearning.suggestions(
+            from: corrections,
+            existing: snapshot.dictionary
+        )
+        guard !learned.isEmpty else { return }
+        snapshot.dictionary.append(contentsOf: learned)
+        await persist()
     }
 
     func removeAllCorrections() async {

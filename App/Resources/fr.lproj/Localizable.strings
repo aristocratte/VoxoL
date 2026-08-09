@@ -992,3 +992,34 @@
 "Replay the tour and re-check this Mac" = "Rejouer la visite et revérifier ce Mac";
 "Replay" = "Rejouer";
 "About & support" = "À propos et aide";
+
+/* Mises à jour */
+"Check for updates" = "Rechercher des mises à jour";
+"Checking…" = "Recherche…";
+"Up to date" = "À jour";
+"Update to %@" = "Mettre à jour vers %@";
+"Update available" = "Mise à jour disponible";
+"Version" = "Version";
+"%@ · macOS only" = "%@ · macOS uniquement";
+
+/* Signalement */
+"Report" = "Signaler";
+"Report a problem" = "Signaler un problème";
+"Opens a prefilled issue · timings only, never your text" = "Ouvre un ticket prérempli · uniquement des mesures, jamais votre texte";
+"Personal benchmark capture" = "Capture de référence personnelle";
+
+/* Historique : rétablir */
+"Later version restored" = "Version suivante restaurée";
+"Restore later version" = "Restaurer la version suivante";
+"Restore the cleaned-up text" = "Restaurer le texte corrigé";
+
+/* Notes de version 0.1.2 */
+"Dictation now reads like something you wrote." = "La dictée ressemble enfin à un texte écrit.";
+"Cleanup runs on long dictations" = "La correction s'applique aux dictées longues";
+"It was skipped past twenty-four words — exactly the dictations that needed it most, which is why they read like a raw transcript." = "Elle était ignorée au-delà de vingt-quatre mots — précisément les dictées qui en avaient le plus besoin, d'où ce texte qui ressemblait à une transcription brute.";
+"History and statistics are on by default" = "L'historique et les statistiques sont activés par défaut";
+"They stayed off until you found the switch, so a fresh install showed zeroes forever. Private mode still turns everything off in one click." = "Ils restaient désactivés jusqu'à ce que vous trouviez le réglage, et une nouvelle installation affichait donc des zéros indéfiniment. Le mode privé désactive toujours tout en un clic.";
+"Undo now has a redo" = "L'annulation a désormais un rétablissement";
+"Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them." = "Restaurer le texte brut détruisait définitivement la version corrigée. Vous pouvez maintenant naviguer dans les deux sens et les comparer.";
+"Updates find you" = "Les mises à jour viennent à vous";
+"VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings." = "VoxoL vérifie seul les nouvelles versions et les signale dans la barre latérale, au lieu d'attendre que vous ouvriez les réglages.";

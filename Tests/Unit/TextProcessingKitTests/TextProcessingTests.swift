@@ -251,10 +251,13 @@ final class TextProcessingTests: XCTestCase {
         XCTAssertFalse(snippetResult.shouldUsePolisher)
     }
 
-    func testCleanCaptureAndResolvedCorrectionUseFastPath() {
+    func testOnlyATwoWordFragmentStaysOnTheFastPath() {
         let short = DeterministicTextProcessor.prepare(
             TextProcessingRequest(rawTranscript: "hello Maya", preferredLanguage: .english)
         )
+        // A spoken self-correction is the model's job precisely because the
+        // deterministic layer cannot know which of the two days was meant.
+        // Dropping "actually" resolves the marker and leaves the contradiction.
         let correction = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: "send it Tuesday actually Wednesday morning",
@@ -263,10 +266,10 @@ final class TextProcessingTests: XCTestCase {
         )
 
         XCTAssertFalse(short.shouldUsePolisher)
-        XCTAssertFalse(correction.shouldUsePolisher)
+        XCTAssertTrue(correction.shouldUsePolisher)
     }
 
-    func testResolvedFillerAndExplicitListStayOnFastPath() {
+    func testAnExplicitListStaysOnTheFastPathButProseDoesNot() {
         let filler = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: "euh envoie le rapport demain matin à VoxoL",
@@ -280,8 +283,12 @@ final class TextProcessingTests: XCTestCase {
             )
         )
 
+        // The deterministic pass still does its half — the filler is gone and
+        // the sentence is capitalised before the model ever sees it.
         XCTAssertEqual(filler.normalizedText, "Envoie le rapport demain matin à VoxoL")
-        XCTAssertFalse(filler.shouldUsePolisher)
+        XCTAssertTrue(filler.shouldUsePolisher)
+        // A list is the one shape worth protecting from the model: its layout
+        // already carries the meaning, so rewriting it is damage.
         XCTAssertEqual(list.normalizedText, "• Apples\n• Bananas")
         XCTAssertFalse(list.shouldUsePolisher)
     }
