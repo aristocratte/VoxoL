@@ -961,10 +961,15 @@ private extension DictationSessionCoordinator {
                 dismissCapsule(after: .milliseconds(900))
 
                 if let insertionTarget {
+                    // rawText, not textForInsertion: the pair the dictionary
+                    // learns from must span the recogniser's actual output to
+                    // the user's fix, the same as the Hub's edit path. Passing
+                    // the polished text here would hide any mishearing the
+                    // polisher had already papered over.
                     watchForCorrection(
                         target: insertionTarget,
                         insertedText: textForInsertion,
-                        rawTranscript: textForInsertion,
+                        rawTranscript: rawText,
                         bundleIdentifier: bundleIdentifier
                     )
                 }

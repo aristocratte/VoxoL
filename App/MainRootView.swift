@@ -111,7 +111,12 @@ struct MainRootView: View {
     private func presentReleaseNotesAfterUpdate() {
         let current = BugReportComposer.Environment.current().applicationVersion
         guard lastLaunchedVersion != current else { return }
-        guard !lastLaunchedVersion.isEmpty, let entry = ReleaseNotes.entry(for: current) else {
+        // An empty stored version does not mean a first install: builds before
+        // this feature never recorded one, so every user updating from them
+        // arrives here empty-handed — precisely the update the card exists to
+        // explain. A completed preflight is the proof the app ran before.
+        let isUpdate = !lastLaunchedVersion.isEmpty || hasCompletedPreflight
+        guard isUpdate, let entry = ReleaseNotes.entry(for: current) else {
             lastLaunchedVersion = current
             return
         }

@@ -171,6 +171,14 @@ public final class TextInjector {
         guard AXIsProcessTrusted(), let element = target.element else {
             return nil
         }
+        // These reads are synchronous IPC into another process, made from the
+        // main thread, repeatedly, well after the dictation ended. The system
+        // default lets each one block for several seconds when the target app
+        // is busy — long enough to freeze VoxoL's own UI over a feature the
+        // user never asked to wait for. A watcher that misses one poll loses
+        // nothing; a beachball costs trust.
+        AXUIElementSetMessagingTimeout(element, 0.25)
+        defer { AXUIElementSetMessagingTimeout(element, 0) }
         guard !isSecure(element: element) else {
             return nil
         }
