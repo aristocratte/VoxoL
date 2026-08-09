@@ -940,3 +940,55 @@
 "Right Control, held alone" = "Contrôle droit, maintenu seul";
 "Fn, held alone" = "Fn, maintenue seule";
 "Dictation shortcut" = "Raccourci de dictée";
+
+/* Accueil refondu et marque */
+"Welcome back, %@" = "Bon retour, %@";
+"total words" = "mots au total";
+"wpm" = "mots/min";
+"recovered today" = "gagnées aujourd’hui";
+"Local" = "Local";
+
+/* Tableau de bord Insights */
+"Words per minute" = "Mots par minute";
+"Typing sits around 40." = "La frappe tourne autour de 40.";
+"Fixes made by VoxoL" = "Corrections faites par VoxoL";
+"words rewritten after the microphone" = "mots réécrits après le micro";
+"results cleaned up" = "résultats corrigés";
+"Total words dictated" = "Total de mots dictés";
+"About %lld pages of writing." = "Environ %lld pages d’écriture.";
+"Every word stays on this Mac." = "Chaque mot reste sur ce Mac.";
+"minutes recovered" = "minutes gagnées";
+"Streak" = "Série";
+"days in a row" = "jours d’affilée";
+"Longest %lld" = "Record %lld";
+
+/* Bibliothèque › Profils */
+"Choose how VoxoL writes" = "Choisis comment VoxoL écrit";
+"Every profile keeps your meaning and your facts. Only the shape changes." = "Chaque profil garde ton sens et tes informations. Seule la forme change.";
+"Per-app rules" = "Règles par app";
+"Without a rule, VoxoL reads the destination: Mail writes an email, Slack a message, Xcode code." = "Sans règle, VoxoL lit la destination : Mail écrit un e-mail, Slack un message, Xcode du code.";
+"No rule yet — the profile above applies everywhere." = "Aucune règle — le profil ci-dessus s’applique partout.";
+"Reads the destination app and picks one of the others." = "Lit l’app de destination et choisit l’un des autres.";
+"Short, spoken, light punctuation." = "Court, parlé, ponctuation légère.";
+"Structured sentences and a clean sign-off." = "Des phrases structurées et une formule nette.";
+"Full paragraphs and real punctuation." = "Des paragraphes complets et une vraie ponctuation.";
+"Identifiers, paths and technical terms kept exact." = "Identifiants, chemins et termes techniques exacts.";
+"A clear instruction, no filler." = "Une consigne claire, sans remplissage.";
+"Exactly what was heard, untouched." = "Exactement ce qui a été entendu, tel quel.";
+"Whatever the app in front of you expects." = "Ce que l’app devant toi attend.";
+"Delete" = "Supprimer";
+"works for me, thursday 9?" = "on se cale jeudi 9h ?";
+"Hello, could we move it to Thursday at 9 a.m.? Best," = "Bonjour, pouvons-nous décaler à jeudi 9 h ? Bien à vous,";
+"The check-in is moved to Thursday at 9 a.m." = "Le point est décalé à jeudi 9 h.";
+"Rename `authToken` to `sessionToken` in src/auth.ts." = "Renomme `authToken` en `sessionToken` dans src/auth.ts.";
+"Move the check-in to Thursday 9 a.m. and tell the team." = "Décale le point à jeudi 9 h et préviens l’équipe.";
+"uh we move the check-in thursday no thursday 9" = "euh on décale le point à jeudi non jeudi 9h";
+
+/* Réglages réorganisés */
+"Permissions" = "Autorisations";
+"Local engines" = "Moteurs locaux";
+"This Mac" = "Ce Mac";
+"Guided setup" = "Configuration guidée";
+"Replay the tour and re-check this Mac" = "Rejouer la visite et revérifier ce Mac";
+"Replay" = "Rejouer";
+"About & support" = "À propos et aide";

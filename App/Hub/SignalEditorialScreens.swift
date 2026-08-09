@@ -324,6 +324,8 @@ private struct EditorialStatusChip: View {
         }
         .font(VoxoLTypography.font(size: 10.5, weight: .semibold, relativeTo: .caption))
         .foregroundStyle(tone ?? theme.success)
+        .lineLimit(1)
+        .fixedSize()
         .padding(.horizontal, 9)
         .frame(minHeight: 24)
         .background((tone ?? theme.success).opacity(0.09))
@@ -476,45 +478,35 @@ struct EditorialTodayView: View {
     var body: some View {
         GeometryReader { geometry in
             let metrics = EditorialMetrics(geometry.size)
+            let sidebarWidth: CGFloat = metrics.compact ? 0 : 232
 
-            VStack(alignment: .leading, spacing: 0) {
-                EditorialPageHeader(
-                    metrics: metrics,
-                    eyebrow: LocalizedStringKey(todayLabel),
-                    title: "Ready when you are.",
-                    summary:
-                        "Speak naturally. VoxoL prepares the text and inserts it into the active app."
-                ) {
-                    EditorialIconButton(
-                        icon: "sliders-horizontal",
-                        label: "Open settings",
-                        action: openSettings
-                    )
+            HStack(alignment: .top, spacing: metrics.compact ? 0 : 26) {
+                VStack(alignment: .leading, spacing: 0) {
+                    welcomeHeader(metrics: metrics)
+                        .editorialStagger(0, visible: visible)
+
+                    triggerRow(metrics: metrics)
+                        .padding(.top, metrics.compact ? 18 : 24)
+                        .editorialStagger(1, visible: visible)
+
+                    if metrics.compact {
+                        statsRow(metrics: metrics)
+                            .padding(.top, 18)
+                            .editorialStagger(2, visible: visible)
+                    }
+
+                    historyFeed(metrics: metrics)
+                        .padding(.top, metrics.compact ? 22 : 30)
+                        .frame(maxHeight: .infinity)
+                        .editorialStagger(2, visible: visible)
                 }
-                .padding(.bottom, metrics.headingGap)
-                .editorialStagger(0, visible: visible)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                triggerRow(metrics: metrics)
-                    .editorialStagger(1, visible: visible)
-
-                usageLine(metrics: metrics)
-                    .padding(.top, metrics.cardGap)
-                    .editorialStagger(2, visible: visible)
-
-                EditorialRule()
-                    .padding(.top, metrics.cardGap)
-
-                latestBlock(metrics: metrics)
-                    .padding(.top, metrics.cardGap)
-                    .editorialStagger(3, visible: visible)
-
-                EditorialRule()
-                    .padding(.top, metrics.cardGap)
-
-                historyBlock(metrics: metrics)
-                    .padding(.top, metrics.compact ? 14 : 18)
-                    .frame(maxHeight: .infinity)
-                    .editorialStagger(4, visible: visible)
+                if !metrics.compact {
+                    statsColumn(metrics: metrics)
+                        .frame(width: sidebarWidth)
+                        .editorialStagger(3, visible: visible)
+                }
             }
             .padding(.horizontal, metrics.pagePadding)
             .padding(.top, metrics.pagePadding)
@@ -529,13 +521,34 @@ struct EditorialTodayView: View {
         }
     }
 
-    /// The one action of the page, and the state it depends on. No band, no artwork competing
-    /// with it: a single dark button reads as the only thing to press.
+    /// A home page should say hello and name the day, not open on a control panel.
+    private func welcomeHeader(metrics: EditorialMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(LocalizedStringKey("Welcome back, \(accountName)"))
+                .font(
+                    VoxoLTypography.font(
+                        size: metrics.compact ? 25 : 30, weight: .semibold, relativeTo: .largeTitle)
+                )
+                .foregroundStyle(theme.ink)
+                .tracking(-0.8)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    /// The macOS account's first name, which is the only name VoxoL knows without asking.
+    private var accountName: String {
+        let full = NSFullUserName()
+        let first = full.split(separator: " ").first.map(String.init) ?? full
+        return first.isEmpty ? NSUserName() : first
+    }
+
+    /// The one action of the page, its live state, and the microphone it will use.
     private func triggerRow(metrics: EditorialMetrics) -> some View {
-        HStack(spacing: metrics.compact ? 14 : 20) {
+        HStack(spacing: metrics.compact ? 12 : 16) {
             HStack(spacing: 9) {
                 EditorialIcon(
-                    name: setupReady ? "microphone" : "sliders-horizontal", size: 15)
+                    name: setupReady ? "microphone" : "sliders-horizontal", size: 16)
                 Text(setupReady ? primaryActionLabel : LocalizedStringKey("Finish setup"))
                     .lineLimit(1)
                     .fixedSize()
@@ -546,23 +559,25 @@ struct EditorialTodayView: View {
                         )
                         .foregroundStyle(theme.surface.opacity(0.7))
                         .padding(.horizontal, 7)
-                        .frame(height: 19)
+                        .frame(height: 20)
                         .background(Color.white.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
             }
-            .font(VoxoLTypography.font(size: 13, weight: .semibold, relativeTo: .body))
+            .font(VoxoLTypography.font(size: 14, weight: .semibold, relativeTo: .body))
             .foregroundStyle(theme.surface)
-            .padding(.horizontal, 16)
-            .frame(height: 40)
+            .padding(.horizontal, 18)
+            .frame(height: 46)
             .background(theme.ink)
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             .fixedSize()
             .layoutPriority(1)
             .editorialDictationTrigger(setupReady: setupReady, openSetup: openSetup)
             .help(setupReady ? Text(primaryActionLabel) : Text("Open guided setup"))
             .accessibilityLabel(setupReady ? Text(primaryActionLabel) : Text("Finish setup"))
 
+            // The live state lives here and nowhere else: it used to be repeated in the window
+            // bar, which said the same thing twice in two different wordings.
             if setupReady {
                 EditorialStatusChip(title: runtimeStatus, tone: runtimeTone)
                     .help(Text(runtimeStatusHelp ?? runtimeStatus))
@@ -577,123 +592,12 @@ struct EditorialTodayView: View {
             Spacer(minLength: 8)
 
             AudioInputPicker(selectedUID: $inputDeviceUID, compact: metrics.compact)
-
-            if !metrics.compact {
-                Text(dictationInstruction)
-                    .font(VoxoLTypography.font(size: metrics.summarySize, relativeTo: .body))
-                    .foregroundStyle(theme.secondaryInk)
-                    .lineLimit(1)
-                    .layoutPriority(-1)
-            }
         }
     }
 
-    /// Today in one quiet line rather than a panel of its own.
-    private func usageLine(metrics: EditorialMetrics) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: metrics.compact ? 18 : 28) {
-            usageMetric(value: todayRecovered, label: "recovered")
-            usageMetric(value: todayWords.formatted(), label: "words")
-            usageMetric(value: todaySessions.formatted(), label: "dictations")
-
-            Spacer(minLength: 8)
-
-            Button(action: openInsights) {
-                HStack(spacing: 5) {
-                    Text("View insights")
-                    EditorialIcon(name: "arrow-right", size: 12)
-                }
-                .font(VoxoLTypography.font(size: 12, weight: .semibold, relativeTo: .body))
-                .foregroundStyle(theme.cobalt)
-            }
-            .buttonStyle(SignalPressButtonStyle())
-        }
-    }
-
-    private func usageMetric(value: String, label: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text(verbatim: value)
-                .font(VoxoLTypography.font(size: 19, weight: .semibold, relativeTo: .title3))
-                .foregroundStyle(theme.ink)
-                .monospacedDigit()
-            Text(label)
-                .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-        }
-        .fixedSize()
-    }
-
-    /// The last result, in plain sight: click it to copy, or use the two actions it offers.
-    private func latestBlock(metrics: EditorialMetrics) -> some View {
-        EditorialSection(metrics: metrics, title: "Latest result") {
-            HStack(spacing: 8) {
-                if let record = inspectableRecord, record.canUndo {
-                    EditorialIconButton(
-                        icon: "arrow.uturn.backward",
-                        label: "Restore the raw text",
-                        size: 28,
-                        systemSymbol: true
-                    ) {
-                        Task { await transcripts.undoLastEdit(for: record.id) }
-                    }
-                }
-                if inspectableRecord != nil {
-                    EditorialIconButton(
-                        icon: "text.magnifyingglass",
-                        label: "Result detail",
-                        size: 28,
-                        systemSymbol: true,
-                        action: inspectLatest
-                    )
-                }
-            }
-        } content: {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(latestText)
-                    .font(VoxoLTypography.font(size: metrics.compact ? 15 : 16, relativeTo: .body))
-                    .foregroundStyle(theme.ink)
-                    .lineSpacing(3)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    Text(latestSubtitle)
-                    Text(verbatim: "·")
-                    Text(latestDuration)
-                    if inspectableRecord != nil {
-                        Text(verbatim: "·")
-                        Text(recentCardIsHovered ? "Click to copy" : "Prepared locally")
-                            .foregroundStyle(
-                                recentCardIsHovered ? theme.cobalt : theme.secondaryInk
-                            )
-                            .contentTransition(.opacity)
-                    }
-                }
-                .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1)
-                .padding(.top, 10)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture { copyLatest() }
-            .onHover { hovering in
-                withAnimation(EditorialMotion.soft) { recentCardIsHovered = hovering }
-            }
-            .accessibilityElement(children: .contain)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction(named: Text("Copy transcription")) { copyLatest() }
-            .accessibilityAction(named: Text("Result detail")) { inspectLatest() }
-        }
-    }
-
-    /// Everything kept on this Mac, newest first.
-    private func historyBlock(metrics: EditorialMetrics) -> some View {
-        EditorialSection(metrics: metrics, title: "All results") {
-            Text(verbatim: transcripts.records.count.formatted())
-                .font(VoxoLTypography.font(size: 11, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-                .monospacedDigit()
-        } content: {
+    /// The history, grouped by day, as the substance of the page rather than a footnote.
+    private func historyFeed(metrics: EditorialMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             if transcripts.records.isEmpty {
                 Text("Your next local result will appear here.")
                     .font(VoxoLTypography.font(size: metrics.bodySize, relativeTo: .body))
@@ -701,66 +605,122 @@ struct EditorialTodayView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(transcripts.records) { record in
-                            historyRow(record, metrics: metrics)
+                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        ForEach(historyDays, id: \.day) { group in
+                            Section {
+                                VStack(spacing: 0) {
+                                    ForEach(group.records) { record in
+                                        historyRow(record, metrics: metrics)
+                                    }
+                                }
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(theme.canvas.opacity(0.5))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(theme.line, lineWidth: 1)
+                                )
+                                .padding(.bottom, metrics.compact ? 18 : 24)
+                            } header: {
+                                Text(verbatim: group.title)
+                                    .font(
+                                        VoxoLTypography.font(
+                                            size: metrics.eyebrowSize,
+                                            weight: .semibold,
+                                            relativeTo: .caption
+                                        )
+                                    )
+                                    .foregroundStyle(theme.secondaryInk)
+                                    .textCase(.uppercase)
+                                    .tracking(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                                    .background(theme.surface)
+                            }
                         }
                     }
                 }
                 .scrollIndicators(.visible)
-                .frame(maxHeight: .infinity)
             }
+        }
+    }
+
+    /// Records newest first, split into calendar days with a readable heading.
+    private var historyDays: [(day: Date, title: String, records: [TranscriptRecord])] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: transcripts.records) {
+            calendar.startOfDay(for: $0.createdAt)
+        }
+        return grouped.keys.sorted(by: >).map { day in
+            (
+                day: day,
+                title: day.formatted(
+                    .dateTime.weekday(.wide).day().month(.wide).locale(locale)
+                ).uppercased(with: locale),
+                records: grouped[day]?.sorted { $0.createdAt > $1.createdAt } ?? []
+            )
         }
     }
 
     private func historyRow(_ record: TranscriptRecord, metrics: EditorialMetrics) -> some View {
         let hovered = hoveredRecordID == record.id
-        return HStack(alignment: .center, spacing: 14) {
-            Text(verbatim: record.text)
-                .font(VoxoLTypography.font(size: metrics.bodySize, relativeTo: .body))
-                .foregroundStyle(theme.ink)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(verbatim: record.applicationName)
+        return HStack(alignment: .top, spacing: 16) {
+            Text(record.createdAt, format: .dateTime.hour().minute())
                 .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
                 .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1)
-                .frame(width: metrics.compact ? 62 : 84, alignment: .leading)
+                .monospacedDigit()
+                .frame(width: 52, alignment: .leading)
+                .padding(.top, 2)
 
-            if hovered {
-                HStack(spacing: 6) {
+            Text(verbatim: record.text)
+                .font(VoxoLTypography.font(size: metrics.compact ? 13.5 : 14.5, relativeTo: .body))
+                .foregroundStyle(theme.ink)
+                .lineSpacing(3)
+                .lineLimit(hovered ? 6 : 3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                if hovered {
                     if record.canUndo {
                         EditorialIconButton(
                             icon: "arrow.uturn.backward",
                             label: "Restore the raw text",
-                            size: 24,
+                            size: 26,
                             systemSymbol: true
                         ) {
                             Task { await transcripts.undoLastEdit(for: record.id) }
                         }
                     }
                     EditorialIconButton(
+                        icon: "doc.on.doc",
+                        label: "Copy transcription",
+                        size: 26,
+                        systemSymbol: true
+                    ) {
+                        transcripts.copy(record)
+                    }
+                    EditorialIconButton(
                         icon: "text.magnifyingglass",
                         label: "Result detail",
-                        size: 24,
+                        size: 26,
                         systemSymbol: true
                     ) {
                         inspectedRecord = record
                     }
+                } else {
+                    Text(verbatim: record.applicationName)
+                        .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                        .foregroundStyle(theme.secondaryInk)
+                        .lineLimit(1)
                 }
-                .frame(width: metrics.compact ? 74 : 84, alignment: .trailing)
-            } else {
-                Text(record.createdAt, format: .relative(presentation: .named))
-                    .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
-                    .foregroundStyle(theme.secondaryInk)
-                    .lineLimit(1)
-                    .frame(width: metrics.compact ? 74 : 84, alignment: .trailing)
             }
+            .frame(width: metrics.compact ? 96 : 108, alignment: .trailing)
         }
-        .padding(.vertical, 6)
-        .frame(minHeight: metrics.rowHeight)
+        .padding(.horizontal, metrics.compact ? 14 : 18)
+        .padding(.vertical, metrics.compact ? 12 : 14)
+        .background(hovered ? theme.selection.opacity(0.45) : .clear)
         .contentShape(Rectangle())
         .onTapGesture { transcripts.copy(record) }
         .onHover { hovering in
@@ -772,11 +732,103 @@ struct EditorialTodayView: View {
                 }
             }
         }
-        .overlay(alignment: .bottom) { EditorialRule() }
+        .overlay(alignment: .bottom) {
+            if record.id != lastRecordID(inSameDayAs: record) {
+                EditorialRule().padding(.leading, metrics.compact ? 14 : 18)
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: Text("Copy transcription")) { transcripts.copy(record) }
         .accessibilityAction(named: Text("Result detail")) { inspectedRecord = record }
+    }
+
+    private func lastRecordID(inSameDayAs record: TranscriptRecord) -> UUID? {
+        let calendar = Calendar.current
+        return
+            historyDays
+            .first { calendar.isDate($0.day, inSameDayAs: record.createdAt) }?
+            .records.last?.id
+    }
+
+    /// The same numbers as the column, on one line, for windows too narrow to carry a column.
+    private func statsRow(metrics: EditorialMetrics) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 22) {
+            statTile(value: totalWords.formatted(), label: "total words")
+            statTile(value: averageWordsPerMinute.formatted(), label: "wpm")
+            statTile(value: todayRecovered, label: "recovered")
+            Spacer(minLength: 8)
+            Button(action: openInsights) {
+                HStack(spacing: 5) {
+                    Text("View insights")
+                    EditorialIcon(name: "arrow-right", size: 12)
+                }
+                .font(VoxoLTypography.font(size: 12, weight: .semibold, relativeTo: .body))
+                .foregroundStyle(theme.cobalt)
+            }
+            .buttonStyle(SignalPressButtonStyle())
+            .fixedSize()
+        }
+    }
+
+    /// The numbers, kept out of the reading column.
+    private func statsColumn(metrics: EditorialMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            statTile(value: totalWords.formatted(), label: "total words")
+            EditorialRule().padding(.vertical, 14)
+            statTile(value: averageWordsPerMinute.formatted(), label: "wpm")
+            EditorialRule().padding(.vertical, 14)
+            statTile(value: todayRecovered, label: "recovered")
+
+            Button(action: openInsights) {
+                HStack(spacing: 5) {
+                    Text("View insights")
+                    EditorialIcon(name: "arrow-right", size: 12)
+                }
+                .font(VoxoLTypography.font(size: 12, weight: .semibold, relativeTo: .body))
+                .foregroundStyle(theme.cobalt)
+                .frame(minHeight: 30)
+            }
+            .buttonStyle(SignalPressButtonStyle())
+            .padding(.top, 16)
+
+            Spacer(minLength: 0)
+        }
+        .padding(metrics.compact ? 16 : 20)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(theme.canvas.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(theme.line, lineWidth: 1)
+        )
+    }
+
+    private func statTile(value: String, label: LocalizedStringKey) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Text(verbatim: value)
+                .font(VoxoLTypography.font(size: 21, weight: .semibold, relativeTo: .title2))
+                .foregroundStyle(theme.ink)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(label)
+                .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                .foregroundStyle(theme.secondaryInk)
+                .lineLimit(1)
+                .fixedSize()
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var totalWords: Int {
+        usesPrototypeFixture ? 20_837 : TranscriptHistoryMetrics(records: transcripts.records).words
+    }
+
+    private var averageWordsPerMinute: Int {
+        usesPrototypeFixture
+            ? 148 : TranscriptHistoryMetrics(records: transcripts.records).averageWordsPerMinute
     }
 
     /// The record behind the card, when it is a real dictation rather than the prototype copy.
@@ -1294,6 +1346,17 @@ private struct EditorialAppShare: Identifiable {
 private enum ApplicationIconCache {
     private static var cache: [String: NSImage?] = [:]
 
+    /// The name macOS shows for an application, so rules read as apps and not as bundle ids.
+    static func name(forBundleIdentifier bundleIdentifier: String?) -> String? {
+        guard let bundleIdentifier, !bundleIdentifier.isEmpty,
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else {
+            return nil
+        }
+        return FileManager.default.displayName(atPath: url.path)
+            .replacingOccurrences(of: ".app", with: "")
+    }
+
     static func icon(forBundleIdentifier bundleIdentifier: String?) -> NSImage? {
         guard let bundleIdentifier, !bundleIdentifier.isEmpty else { return nil }
         if let cached = cache[bundleIdentifier] { return cached }
@@ -1303,6 +1366,103 @@ private enum ApplicationIconCache {
         .map { NSWorkspace.shared.icon(forFile: $0.path) }
         cache[bundleIdentifier] = resolved
         return resolved
+    }
+}
+
+/// A half-circle gauge for speaking pace, scaled against a typing baseline.
+private struct EditorialPaceGauge: View {
+    @Environment(VoxoLTheme.self) private var theme
+
+    /// Words per minute.
+    let value: Int
+    /// The top of the scale: fast dictation, not a world record.
+    private let ceiling = 200.0
+
+    var body: some View {
+        Canvas(opaque: false, colorMode: .nonLinear) { context, size in
+            let radius = min(size.width / 2, size.height) - 6
+            guard radius > 8 else { return }
+            let centre = CGPoint(x: size.width / 2, y: size.height - 2)
+            let width = max(6, radius * 0.22)
+
+            var track = Path()
+            track.addArc(
+                center: centre, radius: radius,
+                startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+            context.stroke(
+                track, with: .color(theme.selection),
+                style: StrokeStyle(lineWidth: width, lineCap: .round))
+
+            // The fill traces the same path as the track — 180° to 360° — rather than sweeping
+            // the other way round the circle, where it would be drawn below the centre and clipped.
+            let fraction = min(1, max(0.02, Double(value) / ceiling))
+            var filled = Path()
+            filled.addArc(
+                center: centre, radius: radius,
+                startAngle: .degrees(180), endAngle: .degrees(180 + 180 * fraction),
+                clockwise: false)
+            context.stroke(
+                filled, with: .color(theme.cobalt),
+                style: StrokeStyle(lineWidth: width, lineCap: .round))
+
+            // The typing baseline, so the number has a reference rather than a vibe.
+            let typingAngle = Angle.degrees(180 + 180 * (40.0 / ceiling)).radians
+            var marker = Path()
+            marker.move(
+                to: CGPoint(
+                    x: centre.x + cos(typingAngle) * (radius - width / 2 - 2),
+                    y: centre.y + sin(typingAngle) * (radius - width / 2 - 2)))
+            marker.addLine(
+                to: CGPoint(
+                    x: centre.x + cos(typingAngle) * (radius + width / 2 + 2),
+                    y: centre.y + sin(typingAngle) * (radius + width / 2 + 2)))
+            context.stroke(marker, with: .color(theme.ink.opacity(0.45)), lineWidth: 1.5)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Ninety days of activity, one cell per day, in the product's ink.
+private struct EditorialStreakCalendar: View {
+    @Environment(VoxoLTheme.self) private var theme
+
+    let days: [(date: Date, count: Int)]
+
+    var body: some View {
+        GeometryReader { geometry in
+            let columns = max(1, Int(ceil(Double(days.count) / 7)))
+            let spacing: CGFloat = 3
+            let cell = max(
+                6,
+                min(13, (geometry.size.width - spacing * CGFloat(columns - 1)) / CGFloat(columns))
+            )
+
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(0..<columns, id: \.self) { column in
+                    VStack(spacing: spacing) {
+                        ForEach(0..<7, id: \.self) { row in
+                            let index = column * 7 + row
+                            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                                .fill(tone(forDayAt: index))
+                                .frame(width: cell, height: cell)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 13 * 7 + 3 * 6)
+        .accessibilityHidden(true)
+    }
+
+    private func tone(forDayAt index: Int) -> Color {
+        guard days.indices.contains(index) else { return theme.selection.opacity(0.4) }
+        switch days[index].count {
+        case 0: return theme.selection
+        case 1...2: return theme.cobalt.opacity(0.35)
+        case 3...5: return theme.cobalt.opacity(0.65)
+        default: return theme.cobalt
+        }
     }
 }
 
@@ -1411,22 +1571,19 @@ struct EditorialInsightsView: View {
                     .padding(.bottom, metrics.headingGap)
                     .editorialStagger(0, visible: visible)
 
-                    headlineNumbers(metrics: metrics)
-                        .editorialStagger(1, visible: visible)
+                    HStack(alignment: .top, spacing: metrics.cardGap) {
+                        paceCard(metrics: metrics)
+                        correctionsCard(metrics: metrics)
+                        volumeCard(metrics: metrics)
+                    }
+                    .editorialStagger(1, visible: visible)
 
-                    EditorialRule()
-                        .padding(.top, metrics.cardGap)
-
-                    rhythmSection(metrics: metrics)
-                        .padding(.top, metrics.cardGap)
-                        .editorialStagger(2, visible: visible)
-
-                    EditorialRule()
-                        .padding(.top, metrics.cardGap)
-
-                    appSection(metrics: metrics)
-                        .padding(.top, metrics.cardGap)
-                        .editorialStagger(3, visible: visible)
+                    HStack(alignment: .top, spacing: metrics.cardGap) {
+                        appsCard(metrics: metrics)
+                        streakCard(metrics: metrics)
+                    }
+                    .padding(.top, metrics.cardGap)
+                    .editorialStagger(2, visible: visible)
                 }
                 .padding(.horizontal, metrics.pagePadding)
                 .padding(.top, metrics.pagePadding)
@@ -1439,128 +1596,144 @@ struct EditorialInsightsView: View {
         .onDisappear { visible = false }
     }
 
-    /// The period in numbers: the recovered time leads, the rest follows it on the same line.
-    private func headlineNumbers(metrics: EditorialMetrics) -> some View {
+    // MARK: Cards
+
+    private func dashboardCard<Content: View>(
+        metrics: EditorialMetrics,
+        title: LocalizedStringKey,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: metrics.compact ? 22 : 34) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(verbatim: recoveredMinutes.formatted())
-                        .font(
-                            VoxoLTypography.font(
-                                size: metrics.compact ? 38 : 44,
-                                weight: .semibold,
-                                relativeTo: .largeTitle
-                            )
-                        )
-                        .foregroundStyle(theme.ink)
-                        .monospacedDigit()
-                        .tracking(-1.4)
-                    Text("min recovered")
-                        .font(
-                            VoxoLTypography.font(size: 12, weight: .semibold, relativeTo: .caption)
-                        )
-                        .foregroundStyle(theme.secondaryInk)
-                }
-                .fixedSize()
-
-                Spacer(minLength: 8)
-
-                insightNumber(value: averageWPM.formatted(), label: "words / min")
-                insightNumber(value: wordsPerSession, label: "words / dictation")
-                if !metrics.compact {
-                    insightNumber(value: appCount.formatted(), label: "apps used")
-                }
-            }
-
-            Text(heroSummary)
-                .font(VoxoLTypography.font(size: metrics.summarySize, relativeTo: .body))
+            Text(title)
+                .font(
+                    VoxoLTypography.font(
+                        size: metrics.eyebrowSize, weight: .semibold, relativeTo: .caption)
+                )
                 .foregroundStyle(theme.secondaryInk)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+                .textCase(.uppercase)
+                .tracking(1)
+
+            content()
+                .padding(.top, 12)
         }
+        .padding(metrics.compact ? 16 : 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(theme.canvas.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(theme.line, lineWidth: 1)
+        )
     }
 
-    private func insightNumber(value: String, label: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(verbatim: value)
-                .font(VoxoLTypography.font(size: 19, weight: .semibold, relativeTo: .title3))
-                .foregroundStyle(theme.ink)
-                .monospacedDigit()
-                .lineLimit(1)
-            Text(label)
-                .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1)
-        }
-        .fixedSize()
-    }
-
-    private func rhythmSection(metrics: EditorialMetrics) -> some View {
-        EditorialSection(metrics: metrics, title: "Rhythm") {
-            Text(trendLabel)
-                .font(VoxoLTypography.font(size: 11, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(theme.success)
-                .padding(.horizontal, 9)
-                .frame(height: 22)
-                .background(theme.sageSoft)
-                .clipShape(Capsule())
-        } content: {
+    private func paceCard(metrics: EditorialMetrics) -> some View {
+        dashboardCard(metrics: metrics, title: "Words per minute") {
             VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: averageWPM.formatted())
+                    .font(
+                        VoxoLTypography.font(size: 40, weight: .semibold, relativeTo: .largeTitle)
+                    )
+                    .foregroundStyle(theme.ink)
+                    .monospacedDigit()
+                    .tracking(-1.4)
+
+                EditorialPaceGauge(value: averageWPM)
+                    .frame(height: 58)
+                    .padding(.top, 10)
+
+                Text("Typing sits around 40.")
+                    .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    private func correctionsCard(metrics: EditorialMetrics) -> some View {
+        dashboardCard(metrics: metrics, title: "Fixes made by VoxoL") {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: correctedWordCount.formatted())
+                    .font(
+                        VoxoLTypography.font(size: 40, weight: .semibold, relativeTo: .largeTitle)
+                    )
+                    .foregroundStyle(theme.ink)
+                    .monospacedDigit()
+                    .tracking(-1.4)
+
+                Text("words rewritten after the microphone")
+                    .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
+
+                EditorialRule().padding(.vertical, 12)
+
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(verbatim: periodWords.formatted())
-                        .font(VoxoLTypography.font(size: 17, weight: .semibold, relativeTo: .body))
+                    Text(verbatim: correctedResultCount.formatted())
+                        .font(VoxoLTypography.font(size: 16, weight: .semibold, relativeTo: .body))
                         .foregroundStyle(theme.ink)
                         .monospacedDigit()
-                    Text("words over 7 days")
+                    Text("results cleaned up")
                         .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
                         .foregroundStyle(theme.secondaryInk)
                 }
-
-                EditorialGrainBars(values: dayBars, labels: dayLabels)
-                    .frame(height: metrics.compact ? 108 : 124)
-                    .padding(.top, 14)
-
-                HStack(spacing: 6) {
-                    Text("Busiest day")
-                    Text(verbatim: busiestDayLabel)
-                        .foregroundStyle(theme.ink)
-                        .fontWeight(.semibold)
-                    Text(verbatim: "·")
-                    Text("\(dailyAverageWords) words a day")
-                }
-                .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1)
-                .padding(.top, 12)
             }
         }
     }
 
-    private func appSection(metrics: EditorialMetrics) -> some View {
-        EditorialSection(metrics: metrics, title: "Where you dictate") {
-            Text(appHeadline)
-                .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
-                .foregroundStyle(theme.secondaryInk)
-                .lineLimit(1)
-        } content: {
+    private func volumeCard(metrics: EditorialMetrics) -> some View {
+        dashboardCard(metrics: metrics, title: "Total words dictated") {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: metrics.compact ? shortWordCount : metrics2.words.formatted())
+                    .font(
+                        VoxoLTypography.font(size: 40, weight: .semibold, relativeTo: .largeTitle)
+                    )
+                    .foregroundStyle(theme.ink)
+                    .monospacedDigit()
+                    .tracking(-1.4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                Text(volumeComparison)
+                    .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
+
+                EditorialRule().padding(.vertical, 12)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(verbatim: recoveredMinutes.formatted())
+                        .font(VoxoLTypography.font(size: 16, weight: .semibold, relativeTo: .body))
+                        .foregroundStyle(theme.ink)
+                        .monospacedDigit()
+                    Text("minutes recovered")
+                        .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                        .foregroundStyle(theme.secondaryInk)
+                }
+            }
+        }
+    }
+
+    private func appsCard(metrics: EditorialMetrics) -> some View {
+        dashboardCard(metrics: metrics, title: "Where you dictate") {
             VStack(spacing: metrics.compact ? 12 : 14) {
                 ForEach(appShares) { item in
                     HStack(spacing: 12) {
                         Group {
                             if let icon = item.icon {
-                                Image(nsImage: icon)
-                                    .resizable()
-                                    .interpolation(.high)
+                                Image(nsImage: icon).resizable().interpolation(.high)
                             } else {
                                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                                     .fill(theme.selection)
                             }
                         }
-                        .frame(width: 20, height: 20)
+                        .frame(width: 22, height: 22)
 
                         Text(verbatim: item.name)
-                            .frame(width: metrics.compact ? 72 : 96, alignment: .leading)
+                            .frame(width: metrics.compact ? 78 : 104, alignment: .leading)
                             .lineLimit(1)
 
                         GeometryReader { geometry in
@@ -1573,18 +1746,128 @@ struct EditorialInsightsView: View {
                                             width: geometry.size.width * CGFloat(item.share) / 100)
                                 }
                         }
-                        .frame(height: 6)
+                        .frame(height: 8)
 
                         Text(verbatim: "\(item.share) %")
                             .fontWeight(.semibold)
                             .monospacedDigit()
-                            .frame(width: 42, alignment: .trailing)
+                            .frame(width: 44, alignment: .trailing)
                     }
                     .font(VoxoLTypography.font(size: 12, relativeTo: .body))
                     .foregroundStyle(theme.ink)
                 }
+
+                if appShares.isEmpty {
+                    Text("Your apps will appear here.")
+                        .font(VoxoLTypography.font(size: 12, relativeTo: .body))
+                        .foregroundStyle(theme.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
+    }
+
+    private func streakCard(metrics: EditorialMetrics) -> some View {
+        dashboardCard(metrics: metrics, title: "Streak") {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(verbatim: currentStreak.formatted())
+                        .font(
+                            VoxoLTypography.font(size: 22, weight: .semibold, relativeTo: .title2)
+                        )
+                        .foregroundStyle(theme.ink)
+                        .monospacedDigit()
+                    Text("days in a row")
+                        .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                        .foregroundStyle(theme.secondaryInk)
+                    Spacer(minLength: 8)
+                    Text(LocalizedStringKey("Longest \(longestStreak)"))
+                        .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                        .foregroundStyle(theme.secondaryInk)
+                }
+
+                EditorialStreakCalendar(days: streakDays)
+                    .padding(.top, 14)
+            }
+        }
+    }
+
+    // MARK: Numbers
+
+    /// `metrics` is the period summary; this alias keeps the volume card readable.
+    private var metrics2: TranscriptHistoryMetrics { metrics }
+
+    private var shortWordCount: String {
+        let words = metrics.words
+        guard words >= 10_000 else { return words.formatted() }
+        return (Double(words) / 1_000).formatted(.number.precision(.fractionLength(1))) + "K"
+    }
+
+    private var volumeComparison: LocalizedStringKey {
+        // A page of prose is about 500 words; it is a scale people actually have a feel for.
+        let pages = max(0, metrics.words / 500)
+        return pages > 0
+            ? LocalizedStringKey("About \(pages) pages of writing.")
+            : "Every word stays on this Mac."
+    }
+
+    /// Results the model actually rewrote, and how many words changed in them.
+    private var correctionSummary: (results: Int, words: Int) {
+        if usesPrototypeFixture { return (307, 846) }
+        var results = 0
+        var words = 0
+        for record in filteredRecords {
+            guard let raw = record.revisions.first?.text,
+                let tokens = TranscriptDiff.tokens(raw: raw, final: record.text)
+            else {
+                continue
+            }
+            results += 1
+            words += tokens.filter { $0.change != .unchanged }.count
+        }
+        return (results, words)
+    }
+
+    private var correctedResultCount: Int { correctionSummary.results }
+    private var correctedWordCount: Int { correctionSummary.words }
+
+    /// Days with at least one dictation, oldest first, over the plotted window.
+    private var streakDays: [(date: Date, count: Int)] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let counts = Dictionary(grouping: transcripts.records) {
+            calendar.startOfDay(for: $0.createdAt)
+        }
+        .mapValues(\.count)
+        return (0..<91).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
+                return nil
+            }
+            return (date: date, count: counts[date] ?? 0)
+        }
+    }
+
+    private var currentStreak: Int {
+        var streak = 0
+        for day in streakDays.reversed() {
+            guard day.count > 0 else { break }
+            streak += 1
+        }
+        return streak
+    }
+
+    private var longestStreak: Int {
+        var best = 0
+        var running = 0
+        for day in streakDays {
+            if day.count > 0 {
+                running += 1
+                best = max(best, running)
+            } else {
+                running = 0
+            }
+        }
+        return best
     }
 
     private func editorialEyebrow(_ title: LocalizedStringKey) -> some View {
@@ -2258,15 +2541,15 @@ struct EditorialMeetingsView: View {
 
 // MARK: - Library
 
+/// The Library holds what the user teaches VoxoL. The dictation history moved to the home page,
+/// where it is the substance of the screen rather than a fourth tab showing the same records.
 private enum EditorialLibraryTab: String, CaseIterable, Hashable {
-    case history
     case dictionary
     case snippets
     case profiles
 
     var title: LocalizedStringKey {
         switch self {
-        case .history: "History"
         case .dictionary: "Dictionary"
         case .snippets: "Snippets"
         case .profiles: "Profiles"
@@ -2290,14 +2573,6 @@ private enum EditorialLibrarySheet: Identifiable {
     }
 }
 
-private struct EditorialHistoryItem: Identifiable {
-    let id: String
-    let time: String
-    let text: String
-    let application: String
-    let record: TranscriptRecord?
-}
-
 struct EditorialLibraryView: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(TranscriptStore.self) private var transcripts
@@ -2309,7 +2584,7 @@ struct EditorialLibraryView: View {
     @AppStorage("voxol.learningEnabled") private var learningEnabled = false
     @AppStorage("voxol.privateMode") private var privateMode = false
 
-    @State private var selectedTab = EditorialLibraryTab.history
+    @State private var selectedTab = EditorialLibraryTab.dictionary
     @State private var presentedSheet: EditorialLibrarySheet?
     @State private var visible = false
 
@@ -2355,8 +2630,6 @@ struct EditorialLibraryView: View {
     @ViewBuilder
     private func libraryContent(metrics: EditorialMetrics) -> some View {
         switch selectedTab {
-        case .history:
-            historyList(metrics: metrics)
         case .dictionary:
             dictionaryList(metrics: metrics)
         case .snippets:
@@ -2364,69 +2637,6 @@ struct EditorialLibraryView: View {
         case .profiles:
             profilesList(metrics: metrics)
         }
-    }
-
-    private func historyList(metrics: EditorialMetrics) -> some View {
-        EditorialCard {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(historyItems) { item in
-                        if let record = item.record, !record.isExample {
-                            Button {
-                                presentedSheet = .transcript(record)
-                            } label: {
-                                historyRow(item, metrics: metrics)
-                            }
-                            .buttonStyle(SignalPressButtonStyle())
-                            .contextMenu {
-                                Button("Copy text") { transcripts.copy(record) }
-                                Button("Edit text") { presentedSheet = .transcript(record) }
-                                Button("Restore previous version") {
-                                    Task { await transcripts.undoLastEdit(for: record.id) }
-                                }
-                                .disabled(!record.canUndo)
-                                Divider()
-                                Button("Export retained audio") {
-                                    Task { await transcripts.exportAudio(for: record) }
-                                }
-                                .disabled(record.audioRelativePath == nil)
-                            }
-                        } else {
-                            historyRow(item, metrics: metrics)
-                        }
-
-                        if item.id != historyItems.last?.id {
-                            Divider().overlay(theme.line)
-                        }
-                    }
-                }
-                .padding(.horizontal, metrics.compact ? 16 : 24)
-            }
-            .scrollIndicators(.visible)
-        }
-    }
-
-    private func historyRow(_ item: EditorialHistoryItem, metrics: EditorialMetrics) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Text(verbatim: item.time)
-                .frame(width: 64, alignment: .leading)
-            // Three lines is enough to recognise a result; the whole text lives one click away
-            // in its detail sheet, and a list of ten-line paragraphs cannot be scanned.
-            Text(verbatim: item.text)
-                .font(VoxoLTypography.font(size: 14, relativeTo: .body))
-                .foregroundStyle(theme.ink)
-                .lineSpacing(2)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(verbatim: item.application)
-                .frame(width: 80, alignment: .leading)
-        }
-        .font(VoxoLTypography.font(size: 12, relativeTo: .caption))
-        .foregroundStyle(theme.secondaryInk)
-        .padding(.vertical, metrics.compact ? 12 : 16)
-        .frame(minHeight: metrics.compact ? 72 : 88, alignment: .top)
-        .contentShape(Rectangle())
     }
 
     private func dictionaryList(metrics: EditorialMetrics) -> some View {
@@ -2520,68 +2730,222 @@ struct EditorialLibraryView: View {
 
     private func profilesList(metrics: EditorialMetrics) -> some View {
         EditorialCard {
-            VStack(spacing: 0) {
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Default writing profile")
-                            .font(
-                                VoxoLTypography.font(
-                                    size: 16,
-                                    weight: .medium,
-                                    relativeTo: .body
-                                )
-                            )
-                        Text("The shape changes; meaning and protected facts do not.")
-                            .font(VoxoLTypography.font(size: 14, relativeTo: .body))
-                            .foregroundStyle(theme.secondaryInk)
-                    }
-                    Spacer()
-                    Picker("Profile", selection: $writingProfile) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Choose how VoxoL writes")
+                        .font(
+                            VoxoLTypography.font(
+                                size: metrics.eyebrowSize, weight: .semibold, relativeTo: .caption)
+                        )
+                        .foregroundStyle(theme.secondaryInk)
+                        .textCase(.uppercase)
+                        .tracking(1)
+
+                    Text("Every profile keeps your meaning and your facts. Only the shape changes.")
+                        .font(VoxoLTypography.font(size: metrics.summarySize, relativeTo: .body))
+                        .foregroundStyle(theme.secondaryInk)
+                        .padding(.top, 4)
+
+                    // What each profile actually does, with the sentence it would produce.
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 12),
+                            count: metrics.compact ? 2 : 3
+                        ),
+                        spacing: 12
+                    ) {
                         ForEach(WritingProfile.allCases) { profile in
-                            Text(profileTitle(profile)).tag(profile.rawValue)
+                            profileCard(profile, metrics: metrics)
                         }
                     }
-                    .labelsHidden()
-                    .frame(width: 150)
-                }
-                .padding(.horizontal, metrics.compact ? 16 : 24)
-                .frame(minHeight: metrics.compact ? 72 : 88)
-                Divider().overlay(theme.line)
+                    .padding(.top, 16)
 
-                libraryToolbar(
-                    title: "Automatic assignments",
-                    detail: "Choose a profile for one app or domain",
-                    actionTitle: "Add",
-                    action: { presentedSheet = .profile }
-                )
+                    EditorialRule().padding(.vertical, 22)
 
-                if personalization.snapshot.applicationProfiles.isEmpty {
-                    emptyLibraryState(
-                        title: "No automatic assignments",
-                        detail: "The default profile applies everywhere."
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(personalization.snapshot.applicationProfiles) { rule in
-                                libraryDataRow(
-                                    leading: rule.bundleIdentifier,
-                                    detail: rule.domain ?? String(localized: "Every domain"),
-                                    trailing: profileTitleString(rule.profile)
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Per-app rules")
+                                .font(
+                                    VoxoLTypography.font(
+                                        size: metrics.eyebrowSize,
+                                        weight: .semibold,
+                                        relativeTo: .caption
+                                    )
                                 )
-                                .contextMenu {
-                                    Button("Delete", role: .destructive) {
-                                        Task {
-                                            await personalization.removeProfileRule(id: rule.id)
-                                        }
-                                    }
+                                .foregroundStyle(theme.secondaryInk)
+                                .textCase(.uppercase)
+                                .tracking(1)
+                            Text(
+                                "Without a rule, VoxoL reads the destination: Mail writes an email, Slack a message, Xcode code."
+                            )
+                            .font(
+                                VoxoLTypography.font(size: metrics.summarySize, relativeTo: .body)
+                            )
+                            .foregroundStyle(theme.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 12)
+                        Button("Add") { presentedSheet = .profile }
+                            .buttonStyle(SignalQuietButtonStyle())
+                    }
+                    .padding(.top, 2)
+
+                    if personalization.snapshot.applicationProfiles.isEmpty {
+                        Text("No rule yet — the profile above applies everywhere.")
+                            .font(VoxoLTypography.font(size: metrics.bodySize, relativeTo: .body))
+                            .foregroundStyle(theme.secondaryInk)
+                            .padding(.top, 14)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(personalization.snapshot.applicationProfiles) { rule in
+                                profileRuleRow(rule, metrics: metrics)
+                                if rule.id != personalization.snapshot.applicationProfiles.last?.id
+                                {
+                                    EditorialRule()
                                 }
-                                Divider().overlay(theme.line)
                             }
                         }
+                        .padding(.top, 12)
                     }
                 }
+                .padding(.horizontal, metrics.compact ? 16 : 24)
+                .padding(.vertical, metrics.compact ? 16 : 22)
             }
+            .scrollIndicators(.visible)
+        }
+    }
+
+    /// One profile, its promise and the sentence it produces, selectable as the default.
+    private func profileCard(_ profile: WritingProfile, metrics: EditorialMetrics) -> some View {
+        let selected = writingProfile == profile.rawValue
+        return Button {
+            withAnimation(EditorialMotion.soft) { writingProfile = profile.rawValue }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Text(profileTitle(profile))
+                        .font(
+                            VoxoLTypography.font(size: 13.5, weight: .semibold, relativeTo: .body)
+                        )
+                        .foregroundStyle(theme.ink)
+                    Spacer(minLength: 4)
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.cobalt)
+                    }
+                }
+
+                Text(profileDetail(profile))
+                    .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 3)
+
+                Text(profileExample(profile))
+                    .font(VoxoLTypography.font(size: 11.5, relativeTo: .body))
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(theme.canvas.opacity(0.7))
+                    )
+                    .padding(.top, 10)
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(selected ? theme.cobaltSoft.opacity(0.35) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(selected ? theme.cobalt.opacity(0.5) : theme.line, lineWidth: 1)
+            )
+        }
+        .buttonStyle(SignalPressButtonStyle())
+    }
+
+    private func profileRuleRow(
+        _ rule: ApplicationProfileRule,
+        metrics: EditorialMetrics
+    ) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let icon = ApplicationIconCache.icon(forBundleIdentifier: rule.bundleIdentifier)
+                {
+                    Image(nsImage: icon).resizable().interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(theme.selection)
+                }
+            }
+            .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(
+                    verbatim: ApplicationIconCache.name(forBundleIdentifier: rule.bundleIdentifier)
+                        ?? rule.bundleIdentifier
+                )
+                .font(VoxoLTypography.font(size: 13, weight: .medium, relativeTo: .body))
+                .foregroundStyle(theme.ink)
+                .lineLimit(1)
+
+                Text(verbatim: rule.domain ?? String(localized: "Every domain"))
+                    .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(profileTitle(rule.profile))
+                .font(VoxoLTypography.font(size: 11.5, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(theme.ink)
+                .padding(.horizontal, 9)
+                .frame(height: 24)
+                .background(Capsule().fill(theme.selection))
+
+            Button {
+                Task { await personalization.removeProfileRule(id: rule.id) }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.secondaryInk)
+            }
+            .buttonStyle(SignalPressButtonStyle())
+            .help("Delete")
+        }
+        .padding(.vertical, 10)
+    }
+
+    /// What the profile changes, in one line.
+    private func profileDetail(_ profile: WritingProfile) -> LocalizedStringKey {
+        switch profile {
+        case .automatic: "Reads the destination app and picks one of the others."
+        case .chat: "Short, spoken, light punctuation."
+        case .email: "Structured sentences and a clean sign-off."
+        case .document: "Full paragraphs and real punctuation."
+        case .developer: "Identifiers, paths and technical terms kept exact."
+        case .prompt: "A clear instruction, no filler."
+        case .raw: "Exactly what was heard, untouched."
+        }
+    }
+
+    /// The same dictation, as each profile would write it.
+    private func profileExample(_ profile: WritingProfile) -> LocalizedStringKey {
+        switch profile {
+        case .automatic: "Whatever the app in front of you expects."
+        case .chat: "works for me, thursday 9?"
+        case .email: "Hello, could we move it to Thursday at 9 a.m.? Best,"
+        case .document: "The check-in is moved to Thursday at 9 a.m."
+        case .developer: "Rename `authToken` to `sessionToken` in src/auth.ts."
+        case .prompt: "Move the check-in to Thursday 9 a.m. and tell the team."
+        case .raw: "uh we move the check-in thursday no thursday 9"
         }
     }
 
@@ -2703,49 +3067,6 @@ struct EditorialLibraryView: View {
         }
     }
 
-    private var historyItems: [EditorialHistoryItem] {
-        if transcripts.usesExampleData || transcripts.records.isEmpty {
-            return [
-                EditorialHistoryItem(
-                    id: "fixture-1",
-                    time: "15:42",
-                    text: String(
-                        localized:
-                            "The budget is 4,500 euros and delivery is scheduled for Wednesday morning."
-                    ),
-                    application: "Notes",
-                    record: nil
-                ),
-                EditorialHistoryItem(
-                    id: "fixture-2",
-                    time: "14:18",
-                    text: String(
-                        localized: "Can you prepare a summary with the decisions and next actions."),
-                    application: "Mail",
-                    record: nil
-                ),
-                EditorialHistoryItem(
-                    id: "fixture-3",
-                    time: "11:06",
-                    text: String(
-                        localized:
-                            "We keep the local version and measure latency on the reference Mac."),
-                    application: "Cursor",
-                    record: nil
-                ),
-            ]
-        }
-        return transcripts.records.map { record in
-            EditorialHistoryItem(
-                id: record.id.uuidString,
-                time: record.createdAt.formatted(.dateTime.hour().minute()),
-                text: record.text,
-                application: record.applicationName,
-                record: record
-            )
-        }
-    }
-
     private func profileTitle(_ profile: WritingProfile) -> LocalizedStringKey {
         switch profile {
         case .automatic: "Automatic"
@@ -2823,21 +3144,41 @@ private struct EditorialProfileRuleEditor: View {
 // MARK: - Settings
 
 enum EditorialSettingsSection: String, CaseIterable, Hashable {
-    case setup
     case general
     case audio
     case engines
+    case setup
     case privacy
     case about
 
     var title: LocalizedStringKey {
         switch self {
-        case .setup: "Setup"
         case .general: "General"
         case .audio: "Dictation"
-        case .engines: "Local engines · settings"
+        case .engines: "Local engines"
+        case .setup: "Permissions"
         case .privacy: "Privacy"
         case .about: "About & support"
+        }
+    }
+
+    /// SF Symbol shown beside the section, so the list reads at a glance.
+    var symbol: String {
+        switch self {
+        case .general: "slider.horizontal.3"
+        case .audio: "mic"
+        case .engines: "cpu"
+        case .setup: "lock.shield"
+        case .privacy: "hand.raised"
+        case .about: "info.circle"
+        }
+    }
+
+    /// Sections about how VoxoL behaves come first; sections about the machine follow.
+    var group: LocalizedStringKey {
+        switch self {
+        case .general, .audio, .engines: "Settings"
+        case .setup, .privacy, .about: "This Mac"
         }
     }
 }
@@ -2920,32 +3261,71 @@ struct EditorialSettingsView: View {
     }
 
     private func settingsNavigation(metrics: EditorialMetrics) -> some View {
-        VStack(spacing: 4) {
-            ForEach(EditorialSettingsSection.allCases, id: \.self) { item in
-                Button {
-                    withAnimation(EditorialMotion.soft) {
-                        section = item
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(settingsGroups.enumerated()), id: \.offset) { index, group in
+                Text(group.title)
+                    .font(
+                        VoxoLTypography.font(
+                            size: metrics.eyebrowSize, weight: .semibold, relativeTo: .caption)
+                    )
+                    .foregroundStyle(theme.secondaryInk)
+                    .textCase(.uppercase)
+                    .tracking(1)
+                    .padding(.leading, 10)
+                    .padding(.top, index == 0 ? 0 : 20)
+                    .padding(.bottom, 6)
+
+                ForEach(group.sections, id: \.self) { item in
+                    Button {
+                        withAnimation(EditorialMotion.soft) { section = item }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: item.symbol)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(section == item ? theme.ink : theme.secondaryInk)
+                                .frame(width: 16)
+                            Text(item.title)
+                                .font(
+                                    VoxoLTypography.font(
+                                        size: 13, weight: .medium, relativeTo: .body)
+                                )
+                                .foregroundStyle(theme.ink)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(section == item ? theme.selection : .clear)
+                        )
                     }
-                } label: {
-                    Text(item.title)
-                        .font(VoxoLTypography.font(size: 14, weight: .medium, relativeTo: .body))
-                        .foregroundStyle(theme.ink)
-                        .padding(.horizontal, 12)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .background(section == item ? theme.selection : .clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .buttonStyle(SignalPressButtonStyle())
+                    .accessibilityAddTraits(section == item ? .isSelected : [])
                 }
-                .buttonStyle(SignalPressButtonStyle())
-                .accessibilityAddTraits(section == item ? .isSelected : [])
             }
+            Spacer(minLength: 0)
         }
+    }
+
+    private var settingsGroups: [(title: LocalizedStringKey, sections: [EditorialSettingsSection])]
+    {
+        [
+            ("Settings", [.general, .audio, .engines]),
+            ("This Mac", [.setup, .privacy, .about]),
+        ]
     }
 
     @ViewBuilder
     private func settingsCard(metrics: EditorialMetrics) -> some View {
-        EditorialCard {
-            // Sections grew past the window's height once dictation moved in here, so the card
-            // scrolls rather than clipping its last row.
+        VStack(alignment: .leading, spacing: 0) {
+            Text(section.title)
+                .font(VoxoLTypography.font(size: 17, weight: .semibold, relativeTo: .title3))
+                .foregroundStyle(theme.ink)
+                .padding(.bottom, 12)
+
+            // Sections outgrew the window once dictation moved in here, so the panel scrolls
+            // rather than clipping its last row.
             ScrollView {
                 VStack(spacing: 0) {
                     switch section {
@@ -2963,9 +3343,17 @@ struct EditorialSettingsView: View {
                         aboutRows(metrics: metrics)
                     }
                 }
-                .padding(.horizontal, metrics.compact ? 16 : 24)
+                .padding(.horizontal, metrics.compact ? 16 : 20)
             }
             .scrollIndicators(.visible)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(theme.canvas.opacity(0.55))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(theme.line, lineWidth: 1)
+            )
         }
     }
 
@@ -3010,14 +3398,6 @@ struct EditorialSettingsView: View {
                     .buttonStyle(EditorialSettingsButtonStyle())
                 }
             }
-            settingsDivider
-            settingsRow(
-                title: "Dictation shortcut",
-                detail: LocalizedStringKey(shortcut.label),
-                metrics: metrics
-            ) {
-                shortcutMenu
-            }
         }
     }
 
@@ -3028,23 +3408,27 @@ struct EditorialSettingsView: View {
                 detail: languageCode == AppLanguage.french.rawValue ? "Français" : "English",
                 metrics: metrics
             ) {
-                Button("Change") {
-                    languageCode =
-                        languageCode == AppLanguage.french.rawValue
-                        ? AppLanguage.english.rawValue : AppLanguage.french.rawValue
+                Menu(String(localized: "Change")) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Button {
+                            languageCode = option.rawValue
+                        } label: {
+                            if languageCode == option.rawValue {
+                                Label {
+                                    Text(verbatim: option.displayName)
+                                } icon: {
+                                    Image(systemName: "checkmark")
+                                }
+                            } else {
+                                Text(verbatim: option.displayName)
+                            }
+                        }
+                    }
                 }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
                 .buttonStyle(EditorialSettingsButtonStyle())
-            }
-            settingsDivider
-            settingsRow(
-                title: "Dictation shortcut",
-                detail: LocalizedStringKey(shortcut.label),
-                metrics: metrics
-            ) {
-                Button("Change") {
-                    withAnimation(EditorialMotion.soft) { section = .audio }
-                }
-                .buttonStyle(EditorialSettingsButtonStyle())
+                .fixedSize()
             }
             settingsDivider
             settingsRow(
@@ -3069,13 +3453,22 @@ struct EditorialSettingsView: View {
                             )
                             .font(VoxoLTypography.font(size: 13, relativeTo: .body))
                             .foregroundStyle(theme.secondaryInk)
-                            Button("Replay preflight", action: replayPreflight)
-                                .buttonStyle(SignalPrimaryButtonStyle())
                         }
                         .padding(18)
                         .frame(width: 300)
                         .background(theme.surface)
                     }
+            }
+            settingsDivider
+            // Replaying the tour was buried inside the appearance popover, where nobody would
+            // think to look for it.
+            settingsRow(
+                title: "Guided setup",
+                detail: "Replay the tour and re-check this Mac",
+                metrics: metrics
+            ) {
+                Button("Replay", action: replayPreflight)
+                    .buttonStyle(EditorialSettingsButtonStyle())
             }
         }
     }
@@ -3390,21 +3783,22 @@ struct EditorialSettingsView: View {
         metrics: EditorialMetrics,
         @ViewBuilder control: () -> Control
     ) -> some View {
-        HStack(spacing: 24) {
-            VStack(alignment: .leading, spacing: 0) {
+        HStack(alignment: .center, spacing: 20) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(VoxoLTypography.font(size: 16, weight: .medium, relativeTo: .body))
+                    .font(VoxoLTypography.font(size: 13.5, weight: .semibold, relativeTo: .body))
                     .foregroundStyle(theme.ink)
                 Text(detail)
-                    .font(VoxoLTypography.font(size: 14, relativeTo: .body))
+                    .font(VoxoLTypography.font(size: 12, relativeTo: .body))
                     .foregroundStyle(theme.secondaryInk)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             control()
         }
-        .padding(.vertical, metrics.compact ? 12 : 16)
-        .frame(minHeight: metrics.compact ? 72 : 88)
+        .padding(.vertical, metrics.compact ? 12 : 14)
+        .frame(minHeight: metrics.compact ? 56 : 62)
     }
 
     private var settingsDivider: some View {

@@ -88,8 +88,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // The Hub is a two-column reading interface: a sidebar, a page of results and a column of
+        // numbers. Below roughly 1100 points the numbers fold away and the rows start truncating,
+        // so that is the floor rather than a size anyone should have to discover by resizing.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 1320, height: 880),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -98,10 +101,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
-        window.minSize = NSSize(width: 820, height: 620)
+        window.minSize = NSSize(width: 1_100, height: 720)
         window.isReleasedWhenClosed = false
-        window.center()
+        // The hosting controller is installed first on purpose: assigning it resizes the window
+        // to SwiftUI's ideal size, which would undo any frame set before it.
         window.contentViewController = NSHostingController(rootView: MainRootView())
+
+        // A remembered frame is restored the moment the autosave name is set, and it can be
+        // smaller than the Hub needs — saved by an older build, or clamped by AppKit. The window
+        // is grown back to a comfortable size measured against the screen actually available: a
+        // hard-coded 880 points of height does not fit a 14-inch display once the menu bar and
+        // the Dock are subtracted.
+        window.setFrameAutosaveName("voxol.mainWindow")
+        let usable =
+            (window.screen ?? NSScreen.main)?.visibleFrame.size
+            ?? NSSize(width: 1_440, height: 900)
+        let preferredSize = NSSize(
+            width: min(1_320, max(window.minSize.width, usable.width - 120)),
+            height: min(900, max(window.minSize.height, usable.height - 48))
+        )
+        if window.frame.width < preferredSize.width || window.frame.height < preferredSize.height {
+            window.setContentSize(preferredSize)
+            window.center()
+        }
+
         mainWindowController = NSWindowController(window: window)
     }
 

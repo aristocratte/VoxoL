@@ -103,7 +103,7 @@ struct HubView: View {
                     windowBar
                     HStack(spacing: 8) {
                         sidebar(compact: compact)
-                            .frame(width: compact ? 168 : 194)
+                            .frame(width: compact ? 186 : 210)
                         detailPanel
                     }
                     .padding(.horizontal, 8)
@@ -160,44 +160,6 @@ struct HubView: View {
             Text(verbatim: "VoxoL")
                 .font(VoxoLTypography.font(size: 12, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(theme.secondaryInk)
-
-            HStack {
-                Spacer()
-                Button {
-                    if systemReady {
-                        settingsSection = .general
-                        select(.settings)
-                    } else {
-                        openSetup()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(systemReady ? theme.success : theme.coral)
-                            .frame(width: 8, height: 8)
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        (systemReady ? theme.sageSoft : theme.coralSoft),
-                                        lineWidth: 4
-                                    )
-                            }
-                        Text(topStatusTitle)
-                        if !systemReady {
-                            EditorialIcon(name: "caret-right", size: 14)
-                        }
-                    }
-                    .font(VoxoLTypography.font(size: 11, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(theme.secondaryInk)
-                    .padding(.horizontal, 10)
-                    .frame(height: 26)
-                    .background(theme.surface.opacity(0.66))
-                    .clipShape(Capsule())
-                    .overlay { Capsule().stroke(Color.black.opacity(0.04), lineWidth: 1) }
-                }
-                .buttonStyle(SignalPressButtonStyle())
-                .help(systemReady ? "Open settings" : "Open guided setup")
-            }
         }
         .padding(.horizontal, 14)
         .frame(height: 40)
@@ -206,14 +168,19 @@ struct HubView: View {
     private func sidebar(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                VoxoLMark(size: 24)
-                Text(verbatim: "voxol")
-                    .font(VoxoLTypography.font(size: 15, weight: .semibold, relativeTo: .headline))
+                VoxoLMark(size: compact ? 30 : 34)
+                Text(verbatim: "VoxoL")
+                    .font(
+                        VoxoLTypography.font(
+                            size: compact ? 22 : 25, weight: .semibold, relativeTo: .title2)
+                    )
                     .foregroundStyle(theme.ink)
-                    .tracking(-0.6)
+                    .tracking(-0.8)
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .padding(.horizontal, 8)
-            .frame(height: compact ? 44 : 50)
+            .frame(height: compact ? 56 : 62)
 
             VStack(spacing: compact ? 4 : 6) {
                 ForEach(HubDestination.navigable) { destination in
@@ -385,14 +352,6 @@ struct HubView: View {
         permissions.requiredPermissionsGranted
             && models.allInstalled
             && dictationSession.shortcutIsActive
-    }
-
-    private var topStatusTitle: LocalizedStringKey {
-        switch dictationSession.state {
-        case .listening, .speechDetected: "Listening locally"
-        case .transcribing, .polishing, .inserting: "Preparing locally"
-        default: systemReady ? "Ready on this Mac" : "Setup required"
-        }
     }
 
     private var localStatusDetail: String {
