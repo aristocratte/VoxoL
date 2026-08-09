@@ -67,6 +67,7 @@
 		000000000000000000000086 /* DictationTextProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000088 /* DictationTextProcessor.swift */; };
 		000000000000000000000089 /* StableTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008A /* StableTranscript.swift */; };
 		0000000000000000000000D1 /* UpdateFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* UpdateFeed.swift */; };
+		000000000000000000000FA1 /* UpdateNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA2 /* UpdateNotifier.swift */; };
 		00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008C /* PolisherSmokeRunner.swift */; };
 		00000000000000000000008E /* AppleDictationRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008D /* AppleDictationRuntime.swift */; };
 		000000000000000000000096 /* AudioSegmenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000097 /* AudioSegmenter.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
@@ -135,6 +136,7 @@
 		000000000000000000000088 /* DictationTextProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationTextProcessor.swift; sourceTree = "<group>"; };
 		00000000000000000000008A /* StableTranscript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/StableTranscript.swift; sourceTree = SOURCE_ROOT; };
 		0000000000000000000000D2 /* UpdateFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFeed.swift; sourceTree = "<group>"; };
+		000000000000000000000FA2 /* UpdateNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateNotifier.swift; sourceTree = "<group>"; };
 		00000000000000000000008C /* PolisherSmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolisherSmokeRunner.swift; sourceTree = "<group>"; };
 		00000000000000000000008D /* AppleDictationRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationRuntime.swift; sourceTree = "<group>"; };
 		000000000000000000000097 /* AudioSegmenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSegmenter.swift; sourceTree = "<group>"; };
@@ -270,6 +272,7 @@
 				00000000000000000000005A /* DictationSessionCoordinator.swift */,
 				000000000000000000000088 /* DictationTextProcessor.swift */,
 				0000000000000000000000D2 /* UpdateFeed.swift */,
+				000000000000000000000FA2 /* UpdateNotifier.swift */,
 				00000000000000000000008C /* PolisherSmokeRunner.swift */,
 				00000000000000000000008D /* AppleDictationRuntime.swift */,
 			);
@@ -439,6 +442,7 @@
 				000000000000000000000086 /* DictationTextProcessor.swift in Sources */,
 				000000000000000000000089 /* StableTranscript.swift in Sources */,
 				0000000000000000000000D1 /* UpdateFeed.swift in Sources */,
+				000000000000000000000FA1 /* UpdateNotifier.swift in Sources */,
 				00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */,
 				00000000000000000000008E /* AppleDictationRuntime.swift in Sources */,
 				000000000000000000000060 /* Types.swift in Sources */,

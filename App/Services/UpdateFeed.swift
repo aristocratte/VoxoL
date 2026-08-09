@@ -7,5 +7,5 @@ import Foundation
 /// the first release is tagged. Swapping in Sparkle later replaces the
 /// transport, not the version comparison.
 enum UpdateFeed {
-    static let releasesURL = "https://api.github.com/repos/arhesstide/voxol/releases"
+    static let releasesURL = "https://api.github.com/repos/aristocratte/VoxoL/releases"
 }

@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DictationSessionCoordinator.shared.activate()
         prepareMainWindow()
 
+        // A copy installed on another Mac would otherwise never learn a newer
+        // release exists unless the user happened to open Settings and press
+        // the button. Check once per launch and surface it.
+        UpdateNotifier.checkOnLaunch()
+
         let popover = NSPopover()
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 300, height: 300)
