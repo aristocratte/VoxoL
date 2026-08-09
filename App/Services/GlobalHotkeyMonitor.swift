@@ -13,13 +13,35 @@ enum GlobalHotkeyAction: Sendable {
 enum DictationShortcut: String, CaseIterable, Identifiable {
     case optionSpace
     case controlSpace
+    case rightCommand
+    case rightOption
+    case rightControl
+    case fnKey
 
     var id: String { rawValue }
+
+    /// Shortcuts that are a single key held on their own, with the key code that reports them.
+    ///
+    /// A modifier arrives as a `flagsChanged` event rather than a key press, so these are matched
+    /// on the physical key rather than on a combination.
+    var soloKeyCode: Int64? {
+        switch self {
+        case .rightCommand: 54
+        case .rightOption: 61
+        case .rightControl: 62
+        case .fnKey: 63
+        case .optionSpace, .controlSpace: nil
+        }
+    }
 
     var label: String {
         switch self {
         case .optionSpace: "⌥ Space"
         case .controlSpace: "⌃ Space"
+        case .rightCommand: "⌘ droite"
+        case .rightOption: "⌥ droite"
+        case .rightControl: "⌃ droite"
+        case .fnKey: "fn"
         }
     }
 
@@ -27,6 +49,10 @@ enum DictationShortcut: String, CaseIterable, Identifiable {
         switch self {
         case .optionSpace: "Option + Space"
         case .controlSpace: "Control + Space"
+        case .rightCommand: "Right Command, held alone"
+        case .rightOption: "Right Option, held alone"
+        case .rightControl: "Right Control, held alone"
+        case .fnKey: "Fn, held alone"
         }
     }
 
@@ -42,7 +68,28 @@ enum DictationShortcut: String, CaseIterable, Identifiable {
             return hasOption && !hasControl
         case .controlSpace:
             return hasControl && !hasOption
+        case .rightCommand, .rightOption, .rightControl, .fnKey:
+            return false
         }
+    }
+
+    /// The flag a solo modifier raises, used to tell a press from a release.
+    fileprivate var soloFlag: CGEventFlags? {
+        switch self {
+        case .rightCommand: .maskCommand
+        case .rightOption: .maskAlternate
+        case .rightControl: .maskControl
+        case .fnKey: .maskSecondaryFn
+        case .optionSpace, .controlSpace: nil
+        }
+    }
+
+    /// Reads the user's choice, falling back to the shipping default.
+    static var current: DictationShortcut {
+        let stored =
+            UserDefaults.standard.string(forKey: "voxol.dictationShortcut")
+            ?? DictationShortcut.optionSpace.rawValue
+        return DictationShortcut(rawValue: stored) ?? .optionSpace
     }
 }
 
@@ -56,6 +103,11 @@ final class GlobalHotkeyMonitor {
     private var dictationSpaceIsDown = false
     private var testSpaceIsDown = false
     private var cancelKeyIsDown = false
+    /// True while a solo-modifier shortcut is being held for dictation.
+    private var soloModifierIsDown = false
+    /// Set when another key is pressed during a solo hold: the user was typing a combination,
+    /// not dictating, so the capture is cancelled and not restarted until the key comes back up.
+    private var soloModifierAborted = false
 
     init(action: @escaping (GlobalHotkeyAction) -> Void) {
         self.action = action
@@ -77,6 +129,7 @@ final class GlobalHotkeyMonitor {
         let mask =
             (CGEventMask(1) << CGEventType.keyDown.rawValue)
             | (CGEventMask(1) << CGEventType.keyUp.rawValue)
+            | (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
         guard
             let eventTap = CGEvent.tapCreate(
                 tap: .cgSessionEventTap,
@@ -111,6 +164,8 @@ final class GlobalHotkeyMonitor {
         dictationSpaceIsDown = false
         testSpaceIsDown = false
         cancelKeyIsDown = false
+        soloModifierIsDown = false
+        soloModifierAborted = false
     }
 
     fileprivate func shouldPassThrough(type: CGEventType, event: CGEvent) -> Bool {
@@ -122,6 +177,20 @@ final class GlobalHotkeyMonitor {
         }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+
+        if type == .flagsChanged {
+            handleFlagsChanged(keyCode: keyCode, flags: event.flags)
+            // Modifiers are never swallowed: holding one must keep working as a modifier.
+            return true
+        }
+
+        // Any other key pressed during a solo hold means a shortcut was being typed.
+        if type == .keyDown, soloModifierIsDown, !soloModifierAborted {
+            soloModifierAborted = true
+            soloModifierIsDown = false
+            action(.cancelRequested)
+            return true
+        }
         if type == .keyUp {
             if keyCode == 53, cancelKeyIsDown {
                 cancelKeyIsDown = false
@@ -173,13 +242,7 @@ final class GlobalHotkeyMonitor {
             return false
         }
 
-        let shortcutRawValue =
-            UserDefaults.standard.string(forKey: "voxol.dictationShortcut")
-            ?? DictationShortcut.optionSpace.rawValue
-        let shortcut =
-            DictationShortcut(rawValue: shortcutRawValue)
-            ?? .optionSpace
-        guard shortcut.matches(flags) else {
+        guard DictationShortcut.current.matches(flags) else {
             return true
         }
 
@@ -188,6 +251,46 @@ final class GlobalHotkeyMonitor {
             action(.dictationPressed)
         }
         return false
+    }
+}
+
+extension GlobalHotkeyMonitor {
+    /// Turns a modifier press and release into the same hold-to-talk gesture as a key combination.
+    fileprivate func handleFlagsChanged(keyCode: Int64, flags: CGEventFlags) {
+        let shortcut = DictationShortcut.current
+        guard let soloKeyCode = shortcut.soloKeyCode, let soloFlag = shortcut.soloFlag else {
+            // A combination shortcut: releasing its modifier ends a hold that the space key
+            // started, otherwise the capture would run on after the user let go.
+            if dictationSpaceIsDown, !shortcut.matches(flags) {
+                dictationSpaceIsDown = false
+                action(.dictationReleased)
+            }
+            return
+        }
+
+        guard keyCode == soloKeyCode else {
+            return
+        }
+
+        if flags.contains(soloFlag) {
+            // Only a modifier held on its own starts dictation; combined with another modifier it
+            // belongs to a shortcut the user is typing.
+            var others: CGEventFlags = [.maskCommand, .maskAlternate, .maskControl, .maskShift]
+            others.remove(soloFlag)
+            guard flags.intersection(others).isEmpty else {
+                return
+            }
+            guard !soloModifierIsDown, !soloModifierAborted else { return }
+            soloModifierIsDown = true
+            action(.dictationPressed)
+        } else {
+            let wasHolding = soloModifierIsDown
+            soloModifierIsDown = false
+            soloModifierAborted = false
+            if wasHolding {
+                action(.dictationReleased)
+            }
+        }
     }
 }
 

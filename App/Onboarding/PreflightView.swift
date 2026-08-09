@@ -717,8 +717,7 @@ struct PreflightView: View {
                 Text("Shortcut")
                     .font(VoxoLTypography.font(size: 12, relativeTo: .caption))
                     .foregroundStyle(theme.secondaryInk)
-                shortcutPill(.optionSpace)
-                shortcutPill(.controlSpace)
+                shortcutMenu
 
                 if rehearsal == .complete {
                     Text(verbatim: "·")
@@ -835,22 +834,44 @@ struct PreflightView: View {
         }
     }
 
-    private func shortcutPill(_ shortcut: DictationShortcut) -> some View {
-        let selected = selectedShortcut == shortcut
-        return Button {
-            withAnimation(GrainMotion.quick) { dictationShortcutRaw = shortcut.rawValue }
+    /// Every trigger VoxoL supports, including the single keys — someone who wants right Command
+    /// should be able to choose it here rather than discovering the option later in Settings.
+    private var shortcutMenu: some View {
+        Menu {
+            ForEach(DictationShortcut.allCases) { option in
+                Button {
+                    withAnimation(GrainMotion.quick) { dictationShortcutRaw = option.rawValue }
+                } label: {
+                    if option == selectedShortcut {
+                        Label {
+                            Text(option.localizedTitle)
+                        } icon: {
+                            Image(systemName: "checkmark")
+                        }
+                    } else {
+                        Text(option.localizedTitle)
+                    }
+                }
+            }
         } label: {
-            Text(verbatim: shortcut.label)
-                .font(.system(.caption, design: .monospaced).weight(.semibold))
-                .foregroundStyle(selected ? theme.canvas : theme.ink)
-                .padding(.horizontal, 11)
-                .frame(height: 30)
-                .background(Capsule().fill(selected ? theme.ink : theme.raisedSurface))
-                .overlay(Capsule().stroke(selected ? Color.clear : theme.line, lineWidth: 1))
+            HStack(spacing: 6) {
+                Text(verbatim: selectedShortcut.label)
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(theme.secondaryInk)
+            }
+            .foregroundStyle(theme.ink)
+            .padding(.horizontal, 11)
+            .frame(height: 30)
+            .background(Capsule().fill(theme.raisedSurface))
+            .overlay(Capsule().stroke(theme.line, lineWidth: 1))
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel(Text(shortcut.localizedTitle))
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel(Text("Dictation shortcut"))
     }
 
     private var rehearsalPrompt: LocalizedStringKey {
