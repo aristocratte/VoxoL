@@ -37,19 +37,37 @@ final class CaptureTakeQualityTests: XCTestCase {
         )
     }
 
-    func testFaintSpeechReadsAsTooQuiet() {
+    func testDetectedSpeechIsNeverCalledQuiet() {
+        // Pinned to a field report: a normal take was flagged "too quiet".
+        // Measured afterwards, the owner's successful dictations peak
+        // anywhere from 0.017 to 0.074 — an absolute level on a working take
+        // cannot separate fine from far, so it must not try.
+        XCTAssertEqual(
+            CaptureTakeQuality.assess(capture(seconds: 4, peak: 0.018, speech: true)),
+            .good
+        )
         XCTAssertEqual(
             CaptureTakeQuality.assess(capture(seconds: 4, peak: 0.01, speech: true)),
-            .tooQuiet
+            .good
         )
     }
 
     func testALongSilentTakeIsTheTooFarSignature() {
-        // Held the key for four seconds, endpointer heard nothing, level tiny:
-        // the person almost certainly spoke, from too far away.
+        // Held the key for four seconds, endpointer heard nothing, level below
+        // anything that ever transcribed: the person almost certainly spoke,
+        // from too far away.
         XCTAssertEqual(
             CaptureTakeQuality.assess(capture(seconds: 4, peak: 0.005, speech: false)),
             .tooQuiet
+        )
+    }
+
+    func testAQuietRoomWithoutSpeechStaysUnjudged() {
+        // Long take, no speech, but the level says a live room rather than a
+        // distant voice — that is a stray key press, not a placement problem.
+        XCTAssertEqual(
+            CaptureTakeQuality.assess(capture(seconds: 4, peak: 0.02, speech: false)),
+            .good
         )
     }
 

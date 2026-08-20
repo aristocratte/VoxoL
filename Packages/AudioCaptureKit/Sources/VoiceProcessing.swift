@@ -45,15 +45,31 @@ public enum CaptureTakeQuality: Equatable, Sendable {
     /// A meaningful share of samples hit the converter's ceiling.
     case clipped
 
-    /// Peak RMS below this never happens with a well-placed microphone once
-    /// the automatic gain stage has had its say.
-    public static let quietPeakThreshold: Float = 0.03
+    /// Peak RMS below which a long take almost certainly carried no usable
+    /// speech.
+    ///
+    /// Calibrated against the owner's real captures, not intuition: measured
+    /// with the exact tap-processor arithmetic, ordinary successful
+    /// dictations peaked anywhere from 0.017 to 0.074 — the same person, the
+    /// same microphone, days apart. The first version of this threshold sat
+    /// at 0.03, inside that range, and flagged six of those ten perfectly
+    /// transcribed takes as "too quiet". The floor now sits well below the
+    /// quietest take that ever worked.
+    public static let quietPeakThreshold: Float = 0.010
 
     /// Fraction of clipped samples above which distortion is audible — and
     /// audible distortion is exactly what recognisers mis-hear.
     public static let clippedFractionThreshold: Double = 0.005
 
     /// Judges a completed capture.
+    ///
+    /// A take with detected speech is never called quiet, whatever its level:
+    /// good takes span a 4× level range, so an absolute threshold cannot
+    /// separate "fine" from "far" without accusing real use — and a hint that
+    /// second-guesses successful dictations trains people to ignore it. The
+    /// quiet verdict therefore requires failure evidence: the key held long
+    /// enough that silence-by-choice is implausible, the endpointer hearing
+    /// nothing, and a level below anything that ever transcribed.
     public static func assess(_ audio: CapturedAudio) -> CaptureTakeQuality {
         guard !audio.samples.isEmpty else {
             return .good
@@ -66,12 +82,10 @@ public enum CaptureTakeQuality: Equatable, Sendable {
         {
             return .clipped
         }
-        // A quiet verdict needs either detected speech (spoke, but faintly) or
-        // a take long enough that silence-by-choice is implausible: holding
-        // the key for two seconds while the endpointer hears nothing is the
-        // too-far microphone's exact signature.
-        let plausiblyTriedToSpeak = audio.speechDetected || audio.durationSeconds >= 2
-        if plausiblyTriedToSpeak, audio.maximumRootMeanSquare < quietPeakThreshold {
+        if !audio.speechDetected,
+            audio.durationSeconds >= 2,
+            audio.maximumRootMeanSquare < quietPeakThreshold
+        {
             return .tooQuiet
         }
         return .good
