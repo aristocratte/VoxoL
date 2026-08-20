@@ -1044,3 +1044,14 @@
 /* Mode Réécriture */
 "Rewrite" = "Réécriture";
 "Rewritten to read like written text" = "Réécrit pour se lire comme un texte rédigé";
+
+/* Notes de version 0.1.3 */
+"Spoken French in, written French out." = "Du français parlé en entrée, du français écrit en sortie.";
+"Rewrite mode" = "Le mode Réécriture";
+"Settings → Preparation → Rewrite: crutches like “du coup”, “en fait” and false starts are dropped, and the sentence is punctuated like written text. Faithful stays the default." = "Réglages → Préparation → Réécriture : les béquilles comme « du coup », « en fait » et les faux départs disparaissent, et la phrase est ponctuée comme un texte rédigé. Fidèle reste le réglage par défaut.";
+"The built-in mic gets Apple's cleanup" = "Le micro intégré reçoit le nettoyage d'Apple";
+"Noise reduction tuned for MacBook microphones, on automatically when no external mic is used. A short hint tells you when a take was too far away or too loud." = "Réduction de bruit calibrée pour les micros MacBook, activée automatiquement sans micro externe. Une indication brève signale une prise trop lointaine ou saturée.";
+"The dictionary shows what it learns" = "Le dictionnaire montre ce qu'il apprend";
+"A toast names each learned word, one correction is enough to get a suggestion, and a learned word is recognized immediately — not at the next launch." = "Chaque mot appris est annoncé, une seule correction suffit pour obtenir une suggestion, et un mot appris est reconnu immédiatement — pas au prochain lancement.";
+"Words on screen are heard better" = "Les mots à l'écran sont mieux entendus";
+"Names and terms visible in the target app guide the recognizer for that dictation." = "Les noms et termes visibles dans l'application cible guident la reconnaissance pour cette dictée.";

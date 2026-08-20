@@ -25,6 +25,28 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.3",
+                headline: "Spoken French in, written French out.",
+                items: [
+                    Item(
+                        title: "Rewrite mode",
+                        detail: "Settings → Preparation → Rewrite: crutches like “du coup”, “en fait” and false starts are dropped, and the sentence is punctuated like written text. Faithful stays the default."
+                    ),
+                    Item(
+                        title: "The built-in mic gets Apple's cleanup",
+                        detail: "Noise reduction tuned for MacBook microphones, on automatically when no external mic is used. A short hint tells you when a take was too far away or too loud."
+                    ),
+                    Item(
+                        title: "The dictionary shows what it learns",
+                        detail: "A toast names each learned word, one correction is enough to get a suggestion, and a learned word is recognized immediately — not at the next launch."
+                    ),
+                    Item(
+                        title: "Words on screen are heard better",
+                        detail: "Names and terms visible in the target app guide the recognizer for that dictation."
+                    ),
+                ]
+            ),
+            Entry(
                 version: "0.1.2",
                 headline: "Dictation now reads like something you wrote.",
                 items: [
