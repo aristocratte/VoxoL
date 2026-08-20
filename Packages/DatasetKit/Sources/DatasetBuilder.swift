@@ -36,9 +36,18 @@ public struct CleanupDatasetExample: Codable, Equatable, Sendable {
     public let split: String?
     /// Source-level group that must never cross explicit splits.
     public let splitGroup: String?
+    /// Cleanup contract: nil or `faithful`, or `rewrite`.
+    ///
+    /// The contract shapes everything downstream — which system instruction
+    /// the pair trains, and which fidelity rules its target must satisfy to
+    /// enter the dataset at all. Faithful validation silently rejected every
+    /// teacher output that dropped a discourse word, which is how a corpus
+    /// meant to teach rewriting taught timidity instead.
+    public let mode: String?
 
     enum CodingKeys: String, CodingKey {
         case id, language, profile, dictionary, operations, source, approved, split
+        case mode
         case appCategory = "app_category"
         case beforeCursor = "before_cursor"
         case afterCursor = "after_cursor"
@@ -64,7 +73,8 @@ public struct CleanupDatasetExample: Codable, Equatable, Sendable {
         source: String,
         approved: Bool,
         split: String? = nil,
-        splitGroup: String? = nil
+        splitGroup: String? = nil,
+        mode: String? = nil
     ) {
         self.id = id
         self.language = language
@@ -81,6 +91,7 @@ public struct CleanupDatasetExample: Codable, Equatable, Sendable {
         self.approved = approved
         self.split = split
         self.splitGroup = splitGroup
+        self.mode = mode
     }
 }
 
@@ -344,6 +355,7 @@ private extension DatasetBuilder {
                     afterCursor: example.afterCursor
                 ),
                 preferences: TextProcessingPreferences(
+                    cleanupMode: example.mode == "rewrite" ? .rewrite : .faithful,
                     fastPathEnabled: fastPathEnabled,
                     profile: profile
                 ),

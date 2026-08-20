@@ -49,6 +49,7 @@ private extension PolisherSmokeRunner {
                         URL(fileURLWithPath: $0, isDirectory: true)
                     },
                     transcript: transcript,
+                    rewrite: arguments.contains("--rewrite"),
                     generationConfiguration: generationConfiguration(arguments: arguments)
                 )
             }
@@ -57,7 +58,10 @@ private extension PolisherSmokeRunner {
             let preparation = DeterministicTextProcessor.prepare(
                 TextProcessingRequest(
                     rawTranscript: transcript,
-                    preferences: TextProcessingPreferences(fastPathEnabled: false),
+                    preferences: TextProcessingPreferences(
+                        cleanupMode: arguments.contains("--rewrite") ? .rewrite : .faithful,
+                        fastPathEnabled: false
+                    ),
                     personalization: PersonalizationSnapshot()
                 )
             )
@@ -117,12 +121,16 @@ private extension PolisherSmokeRunner {
         modelRoot: URL,
         adapterRoot: URL?,
         transcript: String,
+        rewrite: Bool,
         generationConfiguration: QwenPolisherGenerationConfiguration
     ) async throws -> Int32 {
         let preparation = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: transcript,
-                preferences: TextProcessingPreferences(fastPathEnabled: false),
+                preferences: TextProcessingPreferences(
+                        cleanupMode: rewrite ? .rewrite : .faithful,
+                        fastPathEnabled: false
+                    ),
                 personalization: PersonalizationSnapshot()
             )
         )
