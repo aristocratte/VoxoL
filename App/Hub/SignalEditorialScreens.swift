@@ -2600,6 +2600,9 @@ struct EditorialLibraryView: View {
     @State private var selectedTab = EditorialLibraryTab.dictionary
     @State private var presentedSheet: EditorialLibrarySheet?
     @State private var visible = false
+    /// Bumped when a suggestion is ignored, so the strip recomputes — the
+    /// ignore list lives in UserDefaults, which SwiftUI does not observe.
+    @State private var suggestionRefresh = 0
 
     var body: some View {
         GeometryReader { geometry in
@@ -2652,6 +2655,27 @@ struct EditorialLibraryView: View {
         }
     }
 
+    /// Suggestions the learning pipeline is one correction short of adopting.
+    private var pendingDictionarySuggestions: [DictionaryEntry] {
+        guard learningEnabled, !privateMode else { return [] }
+        let ignored = Set(
+            UserDefaults.standard.stringArray(forKey: "voxol.dictionarySuggestionIgnores") ?? []
+        )
+        return DictionaryLearning.pendingSuggestions(
+            from: personalization.corrections,
+            existing: personalization.snapshot.dictionary
+        )
+        .filter { !ignored.contains(DictionaryLearning.suggestionKey($0)) }
+    }
+
+    private func ignoreDictionarySuggestion(_ entry: DictionaryEntry) {
+        let key = "voxol.dictionarySuggestionIgnores"
+        var ignored = UserDefaults.standard.stringArray(forKey: key) ?? []
+        ignored.append(DictionaryLearning.suggestionKey(entry))
+        UserDefaults.standard.set(ignored, forKey: key)
+        suggestionRefresh += 1
+    }
+
     private func dictionaryList(metrics: EditorialMetrics) -> some View {
         EditorialCard {
             VStack(spacing: 0) {
@@ -2663,7 +2687,50 @@ struct EditorialLibraryView: View {
                 )
                 Divider().overlay(theme.line)
 
-                if personalization.snapshot.dictionary.isEmpty {
+                // One correction is not yet a rule — but it is worth showing.
+                // The add button supplies the confidence a second occurrence
+                // would have; ignore makes the proposal stay dismissed.
+                let suggestions = pendingDictionarySuggestions
+                if !suggestions.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(suggestions) { suggestion in
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(theme.cobalt)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(verbatim: suggestion.canonical)
+                                        .font(
+                                            VoxoLTypography.font(
+                                                size: 13, weight: .medium, relativeTo: .body)
+                                        )
+                                        .foregroundStyle(theme.ink)
+                                    Text(
+                                        "Corrected once from “\(suggestion.spokenForms.first ?? "")”"
+                                    )
+                                    .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                                    .foregroundStyle(theme.secondaryInk)
+                                }
+                                Spacer()
+                                Button("Ignore") { ignoreDictionarySuggestion(suggestion) }
+                                    .buttonStyle(EditorialSettingsButtonStyle())
+                                Button("Add") {
+                                    Task {
+                                        await personalization.addDictionaryEntry(suggestion)
+                                    }
+                                }
+                                .buttonStyle(EditorialSettingsButtonStyle())
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(theme.cobaltSoft.opacity(0.25))
+                            Divider().overlay(theme.line)
+                        }
+                    }
+                    .id(suggestionRefresh)
+                }
+
+                if personalization.snapshot.dictionary.isEmpty, suggestions.isEmpty {
                     emptyLibraryState(
                         title: "No dictionary entries yet",
                         detail: "Add names and terms that VoxoL must write exactly."
@@ -2677,9 +2744,11 @@ struct EditorialLibraryView: View {
                                     detail: entry.spokenForms.isEmpty
                                         ? String(localized: "Exact form")
                                         : entry.spokenForms.joined(separator: ", "),
-                                    trailing: entry.isEnabled
-                                        ? String(localized: "Active")
-                                        : String(localized: "Paused")
+                                    trailing: !entry.isEnabled
+                                        ? String(localized: "Paused")
+                                        : entry.origin == .learned
+                                            ? String(localized: "Learned")
+                                            : String(localized: "Active")
                                 )
                                 .contextMenu {
                                     Button("Edit") { presentedSheet = .dictionary(entry) }

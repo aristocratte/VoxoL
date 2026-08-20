@@ -14,6 +14,7 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
     case noSpeech
     case tooQuiet
     case tooLoud
+    case learned
     case error
 
     var id: String { rawValue }
@@ -40,6 +41,9 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             "Weak signal — closer to the mic?"
         case .tooLoud:
             "Input too loud — lower the gain"
+        case .learned:
+            // Placeholder only: the rendered label interpolates the term.
+            "New word learned"
         case .error:
             "Something went wrong"
         }
@@ -69,6 +73,8 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             NSSize(width: 292, height: 48)
         case .tooLoud:
             NSSize(width: 300, height: 48)
+        case .learned:
+            NSSize(width: 260, height: 48)
         case .error:
             NSSize(width: 244, height: 48)
         }
@@ -101,6 +107,8 @@ final class VoiceCapsuleModel {
     var phase = VoiceCapsulePhase.listening
     var failure = VoiceCapsuleFailure.transcriptionFailed
     var inputLevel: Float = 0
+    /// The word behind a `.learned` toast.
+    var learnedTerm = ""
 }
 
 @MainActor
@@ -147,6 +155,22 @@ final class VoiceCapsuleController {
 
     func updateInputLevel(_ level: Float) {
         model.inputLevel = min(1, max(0, level))
+    }
+
+    /// Briefly confirms a word the dictionary just learned on its own.
+    ///
+    /// Self-dismissing, because it arrives outside the dictation flow —
+    /// seconds after insertion, when nothing else is scheduled to close the
+    /// capsule. It also yields: if a new dictation starts meanwhile, the phase
+    /// has moved on and the delayed dismissal below leaves it alone.
+    func showLearnedWord(_ term: String) {
+        model.learnedTerm = term
+        show(.learned)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(2_400))
+            guard let self, self.model.phase == .learned else { return }
+            self.dismiss()
+        }
     }
 
     func showError(_ failure: VoiceCapsuleFailure) {
@@ -309,7 +333,14 @@ private struct VoiceCapsulePanelView: View {
     }
 
     private var currentLabel: LocalizedStringKey {
-        model.phase == .error ? model.failure.label : model.phase.label
+        switch model.phase {
+        case .error:
+            model.failure.label
+        case .learned:
+            "Learned: \(model.learnedTerm)"
+        default:
+            model.phase.label
+        }
     }
 
     private var labelIdentity: String {
@@ -358,6 +389,9 @@ private struct VoiceCapsulePanelView: View {
         case .tooLoud:
             Image(systemName: "waveform.badge.exclamationmark")
                 .foregroundStyle(theme.warning)
+        case .learned:
+            Image(systemName: "sparkles")
+                .foregroundStyle(theme.success)
         case .error:
             Image(systemName: "exclamationmark")
                 .foregroundStyle(theme.recording)

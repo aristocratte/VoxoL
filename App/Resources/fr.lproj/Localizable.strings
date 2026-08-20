@@ -1033,3 +1033,10 @@
 "Off" = "Désactivé";
 "Weak signal — closer to the mic?" = "Signal faible — rapprochez-vous du micro ?";
 "Input too loud — lower the gain" = "Entrée saturée — baissez le niveau d'entrée";
+
+/* Apprentissage du dictionnaire */
+"New word learned" = "Nouveau mot appris";
+"Learned: %@" = "Appris : %@";
+"Learned" = "Appris";
+"Corrected once from “%@”" = "Corrigé une fois depuis « %@ »";
+"Ignore" = "Ignorer";

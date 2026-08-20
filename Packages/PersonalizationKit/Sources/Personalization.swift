@@ -24,6 +24,16 @@ public enum WritingProfile: String, Codable, CaseIterable, Identifiable, Sendabl
 
 /// Canonical local term with optional spoken forms and application scope.
 public struct DictionaryEntry: Codable, Equatable, Identifiable, Sendable {
+    /// How an entry came to exist — typed in, or earned from corrections.
+    ///
+    /// Displayed, not just stored: an entry that appeared on its own is only
+    /// trustworthy if the user can see that it did, what it does, and turn it
+    /// off. Invisible automation is how a bad rule rewrites a year of text.
+    public enum Origin: String, Codable, Sendable {
+        case manual
+        case learned
+    }
+
     /// Stable entry identifier.
     public var id: UUID
     /// Exact form emitted into the transcript.
@@ -36,6 +46,8 @@ public struct DictionaryEntry: Codable, Equatable, Identifiable, Sendable {
     public var bundleIdentifiers: [String]
     /// Whether matching is active.
     public var isEnabled: Bool
+    /// Where this entry came from.
+    public var origin: Origin
 
     /// Creates a local dictionary entry.
     public init(
@@ -44,7 +56,8 @@ public struct DictionaryEntry: Codable, Equatable, Identifiable, Sendable {
         spokenForms: [String] = [],
         language: PersonalizationLanguage = .any,
         bundleIdentifiers: [String] = [],
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        origin: Origin = .manual
     ) {
         self.id = id
         self.canonical = canonical
@@ -52,6 +65,22 @@ public struct DictionaryEntry: Codable, Equatable, Identifiable, Sendable {
         self.language = language
         self.bundleIdentifiers = bundleIdentifiers
         self.isEnabled = isEnabled
+        self.origin = origin
+    }
+
+    /// Decodes an entry, tolerating dictionaries written before `origin`
+    /// existed — the synthesized decoder fails on the missing key even with a
+    /// default, and a personalization file that stops decoding reads as the
+    /// user's vocabulary being erased by an update.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        canonical = try container.decode(String.self, forKey: .canonical)
+        spokenForms = try container.decode([String].self, forKey: .spokenForms)
+        language = try container.decode(PersonalizationLanguage.self, forKey: .language)
+        bundleIdentifiers = try container.decode([String].self, forKey: .bundleIdentifiers)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        origin = try container.decodeIfPresent(Origin.self, forKey: .origin) ?? .manual
     }
 
     /// Returns whether this enabled entry applies to an application.

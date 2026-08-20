@@ -13,6 +13,21 @@ final class PersonalizationStore {
 
     @ObservationIgnored private let repository: PersonalizationRepository
 
+    /// Called after the dictionary changes, however it changes.
+    ///
+    /// The decoder boosts dictionary terms through a prebuilt trie, and that
+    /// trie used to be rebuilt only at configuration time — so a word learned
+    /// mid-session was substituted in post-processing but not *recognised*
+    /// until the next launch. The coordinator installs itself here so the
+    /// boost follows the dictionary immediately.
+    @ObservationIgnored var dictionaryDidChange: (() -> Void)?
+
+    /// Called with the entries an automatic promotion just created, so the
+    /// interface can say "learned: chipset" while the correction that earned
+    /// it is still on the user's mind. Silence here is what made the feature
+    /// invisible: it had been learning since 0.1.2 and nobody could tell.
+    @ObservationIgnored var dictionaryDidLearn: (([DictionaryEntry]) -> Void)?
+
     init(repository: PersonalizationRepository = PersonalizationRepository()) {
         self.repository = repository
     }
@@ -31,11 +46,18 @@ final class PersonalizationStore {
             lastError = error.localizedDescription
         }
         isLoaded = true
+        // The store loads in parallel with the speech runtime's configuration,
+        // and whichever finishes second must not leave the decoder biased on
+        // an empty dictionary.
+        if !snapshot.dictionary.isEmpty {
+            dictionaryDidChange?()
+        }
     }
 
     func addDictionaryEntry(_ entry: DictionaryEntry) async {
         snapshot.dictionary.append(entry)
         await persist()
+        dictionaryDidChange?()
     }
 
     func updateDictionaryEntry(_ entry: DictionaryEntry) async {
@@ -44,11 +66,13 @@ final class PersonalizationStore {
         }
         snapshot.dictionary[index] = entry
         await persist()
+        dictionaryDidChange?()
     }
 
     func removeDictionaryEntry(id: UUID) async {
         snapshot.dictionary.removeAll { $0.id == id }
         await persist()
+        dictionaryDidChange?()
     }
 
     func addSnippet(_ snippet: VoiceSnippet) async {
@@ -119,6 +143,8 @@ final class PersonalizationStore {
         guard !learned.isEmpty else { return }
         snapshot.dictionary.append(contentsOf: learned)
         await persist()
+        dictionaryDidChange?()
+        dictionaryDidLearn?(learned)
     }
 
     func removeAllCorrections() async {

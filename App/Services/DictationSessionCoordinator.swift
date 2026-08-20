@@ -334,6 +334,13 @@ final class DictationSessionCoordinator {
         personalizationStore: PersonalizationStore
     ) {
         self.personalizationStore = personalizationStore
+        personalizationStore.dictionaryDidChange = { [weak self] in
+            self?.refreshDecodingBias()
+        }
+        personalizationStore.dictionaryDidLearn = { entries in
+            guard let first = entries.first else { return }
+            VoiceCapsuleController.shared.showLearnedWord(first.canonical)
+        }
         refreshDecodingBias()
         guard configuredPolisherRoot != modelRoot else {
             return
@@ -592,6 +599,16 @@ private extension DictationSessionCoordinator {
             destinationInsertionTarget = rehearsalIsActive ? nil : (try? injector.captureTarget())
             if setting("voxol.contextEnabled", default: true) {
                 destinationContext = contextProvider.capture()
+                // The words on screen are the best available predictor of the
+                // rare words about to be spoken. Applied now, they are in the
+                // decoder's trie well before this capture reaches it — the
+                // runtime serialises both on the same actor.
+                if let destinationContext {
+                    let contextTerms = ContextVocabulary.terms(from: destinationContext)
+                    if !contextTerms.isEmpty {
+                        applyDecodingBias(contextTerms: contextTerms)
+                    }
+                }
             } else {
                 destinationContext = ContextSnapshot(
                     bundleIdentifier: destinationBundleIdentifier,
@@ -1111,10 +1128,22 @@ private extension DictationSessionCoordinator {
     /// English function words, so guessing French on English speech would strip
     /// the transcript.
     func refreshDecodingBias() {
+        applyDecodingBias(contextTerms: [])
+    }
+
+    /// Boosts the dictionary plus, when provided, the words visible in the
+    /// destination — the window title, the selection, the text around the
+    /// cursor. Context terms ride on each dictation and are replaced by the
+    /// next one; the dictionary is permanent.
+    private func applyDecodingBias(contextTerms: [String]) {
         guard let speechRuntime else { return }
-        let terms = (personalizationStore?.snapshot.dictionary ?? [])
+        var terms = (personalizationStore?.snapshot.dictionary ?? [])
             .map(\.canonical)
             .filter { !$0.isEmpty }
+        var known = Set(terms.map { $0.lowercased() })
+        for term in contextTerms where known.insert(term.lowercased()).inserted {
+            terms.append(term)
+        }
         let languageCode: String? =
             switch dictationLanguagePreference {
             case .french: "fr"

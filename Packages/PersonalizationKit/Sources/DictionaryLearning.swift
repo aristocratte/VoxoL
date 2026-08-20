@@ -28,6 +28,33 @@ public enum DictionaryLearning {
         from corrections: [CorrectionPair],
         existing: [DictionaryEntry]
     ) -> [DictionaryEntry] {
+        entries(from: corrections, existing: existing, occurrences: requiredOccurrences...)
+    }
+
+    /// Candidates seen exactly once — enough to propose, not enough to act.
+    ///
+    /// The two-occurrence rule protects the dictionary from typos and changed
+    /// minds, but it also means the first correction does nothing visible,
+    /// which reads as the app not learning. These are shown to the user with
+    /// an add button: one click supplies the confidence a second occurrence
+    /// would have.
+    public static func pendingSuggestions(
+        from corrections: [CorrectionPair],
+        existing: [DictionaryEntry]
+    ) -> [DictionaryEntry] {
+        entries(from: corrections, existing: existing, occurrences: 1..<requiredOccurrences)
+    }
+
+    /// A stable identity for ignoring a suggestion without storing the entry.
+    public static func suggestionKey(_ entry: DictionaryEntry) -> String {
+        fold(entry.spokenForms.first ?? "") + "→" + fold(entry.canonical)
+    }
+
+    private static func entries(
+        from corrections: [CorrectionPair],
+        existing: [DictionaryEntry],
+        occurrences occurrenceRange: some RangeExpression<Int>
+    ) -> [DictionaryEntry] {
         var occurrences: [Pair: Int] = [:]
         var surfaces: [Pair: (heard: String, meant: String)] = [:]
         var languages: [Pair: PersonalizationLanguage] = [:]
@@ -63,7 +90,7 @@ public enum DictionaryLearning {
 
         return
             occurrences
-            .filter { $0.value >= requiredOccurrences && !known.contains($0.key) }
+            .filter { occurrenceRange.contains($0.value) && !known.contains($0.key) }
             .compactMap { key, _ -> DictionaryEntry? in
                 guard let surface = surfaces[key] else { return nil }
                 // Spaces are exactly what a split error adds, so they are
@@ -76,7 +103,8 @@ public enum DictionaryLearning {
                 return DictionaryEntry(
                     canonical: surface.meant,
                     spokenForms: [surface.heard],
-                    language: languages[key] ?? .any
+                    language: languages[key] ?? .any,
+                    origin: .learned
                 )
             }
             .sorted { $0.canonical < $1.canonical }

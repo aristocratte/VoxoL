@@ -88,6 +88,61 @@ final class DictionaryLearningTests: XCTestCase {
         XCTAssertEqual(suggestions.first?.canonical.lowercased(), "edite")
     }
 
+    func testOneCorrectionBecomesAPendingSuggestionNotAnEntry() {
+        let corrections = [correction("le chip set gère le slot", "le chipset gère le slot")]
+
+        let pending = DictionaryLearning.pendingSuggestions(from: corrections, existing: [])
+        XCTAssertEqual(pending.map(\.canonical), ["chipset"])
+        XCTAssertEqual(pending.first?.origin, .learned)
+        // The same evidence must not auto-promote.
+        XCTAssertTrue(DictionaryLearning.suggestions(from: corrections, existing: []).isEmpty)
+    }
+
+    func testAPromotedPairStopsBeingPending() {
+        let corrections = [
+            correction("le chip set gère le slot", "le chipset gère le slot"),
+            correction("ce chip set est récent", "ce chipset est récent"),
+        ]
+
+        XCTAssertTrue(
+            DictionaryLearning.pendingSuggestions(from: corrections, existing: []).isEmpty
+        )
+    }
+
+    func testTheSuggestionKeyIsStableAcrossCaseAndAccents() {
+        let a = DictionaryEntry(canonical: "Edite", spokenForms: ["Élite"], origin: .learned)
+        let b = DictionaryEntry(canonical: "edite", spokenForms: ["élite"], origin: .learned)
+
+        XCTAssertEqual(
+            DictionaryLearning.suggestionKey(a),
+            DictionaryLearning.suggestionKey(b)
+        )
+    }
+
+    func testAnEntrySavedBeforeOriginExistedStillLoads() throws {
+        // Same failure mode as transcript history: the synthesized decoder
+        // rejects a missing key even when the property has a default, and a
+        // personalization file that stops decoding reads as the user's
+        // vocabulary being erased by an update.
+        let legacy = """
+            {
+              "id": "8C1B6E1E-5F2B-4E9A-9B3E-2E4F6A1C7D90",
+              "canonical": "chipset",
+              "spokenForms": ["chip set"],
+              "language": "french",
+              "bundleIdentifiers": [],
+              "isEnabled": true
+            }
+            """
+        let entry = try JSONDecoder().decode(
+            DictionaryEntry.self,
+            from: XCTUnwrap(legacy.data(using: .utf8))
+        )
+
+        XCTAssertEqual(entry.origin, .manual)
+        XCTAssertEqual(entry.canonical, "chipset")
+    }
+
     func testAnUnchangedCorrectionYieldsNothing() {
         let suggestions = DictionaryLearning.suggestions(
             from: [
