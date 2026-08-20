@@ -74,10 +74,10 @@ final class UpdateNotifier {
         }
     }
 
-    /// Opens the release page for the pending update.
-    func openDownloadPage() {
+    /// Installs the pending update in place, panel and relaunch included.
+    func installAvailableUpdate() {
         guard let available else { return }
-        NSWorkspace.shared.open(available.url)
+        Task { await UpdateInstaller.shared.install(available) }
     }
 
     private func present(_ update: UpdateCheck.Release) {
@@ -85,12 +85,12 @@ final class UpdateNotifier {
         let alert = NSAlert()
         alert.messageText = "VoxoL \(update.version) est disponible"
         alert.informativeText =
-            "Une nouvelle version est prête. Elle s'installe en glissant VoxoL "
-            + "dans Applications, comme la première fois."
-        alert.addButton(withTitle: "Télécharger")
+            "La mise à jour se télécharge et s'installe toute seule, "
+            + "puis VoxoL redémarre."
+        alert.addButton(withTitle: "Installer maintenant")
         alert.addButton(withTitle: "Plus tard")
         if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(update.url)
+            Task { await UpdateInstaller.shared.install(update) }
         }
     }
 }

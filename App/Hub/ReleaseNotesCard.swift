@@ -33,8 +33,8 @@ enum ReleaseNotes {
                         detail: "Settings → Preparation → Rewrite: crutches like “du coup”, “en fait” and false starts are dropped, and the sentence is punctuated like written text. Faithful stays the default."
                     ),
                     Item(
-                        title: "The built-in mic gets Apple's cleanup",
-                        detail: "Noise reduction tuned for MacBook microphones, on automatically when no external mic is used. A short hint tells you when a take was too far away or too loud."
+                        title: "Updates install themselves",
+                        detail: "One click downloads the new version, verifies its signature, installs it and relaunches — no more browser and Finder round-trip."
                     ),
                     Item(
                         title: "The dictionary shows what it learns",

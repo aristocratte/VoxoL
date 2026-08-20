@@ -3300,7 +3300,7 @@ struct EditorialSettingsView: View {
         DictationLanguagePreference.preferred
     @AppStorage("voxol.cleanupMode") private var cleanup = DictationCleanupMode.faithful
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
-    @AppStorage("voxol.voiceProcessingMode") private var voiceProcessingMode = "automatic"
+    @AppStorage("voxol.voiceProcessingMode") private var voiceProcessingMode = "disabled"
     @AppStorage("voxol.privateMode") private var privateMode = false
     @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
@@ -3617,7 +3617,7 @@ struct EditorialSettingsView: View {
             settingsDivider
             settingsRow(
                 title: "Microphone cleanup",
-                detail: "Apple's noise reduction, made for the built-in mic",
+                detail: "Apple's noise reduction — experimental, off by default",
                 metrics: metrics
             ) {
                 Menu(voiceProcessingModeTitle) {
@@ -3880,7 +3880,7 @@ struct EditorialSettingsView: View {
         await UpdateNotifier.shared.check(announce: false)
         availableUpdate = UpdateNotifier.shared.available
         if availableUpdate != nil {
-            UpdateNotifier.shared.openDownloadPage()
+            UpdateNotifier.shared.installAvailableUpdate()
         }
     }
 

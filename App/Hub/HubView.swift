@@ -197,7 +197,7 @@ struct HubView: View {
             // than until it is acknowledged.
             if let update = UpdateNotifier.shared.available {
                 Button {
-                    UpdateNotifier.shared.openDownloadPage()
+                    UpdateNotifier.shared.installAvailableUpdate()
                 } label: {
                     HStack(spacing: 8) {
                         // Cobalt rather than coral: an update is news, not a

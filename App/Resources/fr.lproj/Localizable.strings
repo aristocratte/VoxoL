@@ -1055,3 +1055,8 @@
 "A toast names each learned word, one correction is enough to get a suggestion, and a learned word is recognized immediately — not at the next launch." = "Chaque mot appris est annoncé, une seule correction suffit pour obtenir une suggestion, et un mot appris est reconnu immédiatement — pas au prochain lancement.";
 "Words on screen are heard better" = "Les mots à l'écran sont mieux entendus";
 "Names and terms visible in the target app guide the recognizer for that dictation." = "Les noms et termes visibles dans l'application cible guident la reconnaissance pour cette dictée.";
+
+/* Mise à jour intégrée + VP expérimental */
+"Apple's noise reduction — experimental, off by default" = "La réduction de bruit d'Apple — expérimental, désactivé par défaut";
+"Updates install themselves" = "Les mises à jour s'installent toutes seules";
+"One click downloads the new version, verifies its signature, installs it and relaunches — no more browser and Finder round-trip." = "Un clic télécharge la nouvelle version, vérifie sa signature, l'installe et relance — fini l'aller-retour navigateur et Finder.";

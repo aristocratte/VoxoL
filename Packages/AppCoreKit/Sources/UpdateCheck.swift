@@ -16,11 +16,17 @@ public enum UpdateCheck {
         public let version: String
         /// Page a user opens to download it.
         public let url: URL
+        /// Direct link to the installable disk image, when the release has
+        /// one. The built-in installer needs the file, not the page: sending
+        /// someone to a web page to update an app they are already inside is
+        /// the browser's job leaking into the product.
+        public let diskImageURL: URL?
 
         /// Creates a release, stripping any leading `v` from the tag.
-        public init(version: String, url: URL) {
+        public init(version: String, url: URL, diskImageURL: URL? = nil) {
             self.version = Self.normalized(version)
             self.url = url
+            self.diskImageURL = diskImageURL
         }
 
         static func normalized(_ raw: String) -> String {
@@ -88,7 +94,19 @@ public enum UpdateCheck {
             else {
                 return nil
             }
-            return Release(version: tag, url: url)
+            let diskImage = (entry["assets"] as? [[String: Any]])?
+                .compactMap { asset -> URL? in
+                    guard
+                        let name = asset["name"] as? String,
+                        name.lowercased().hasSuffix(".dmg"),
+                        let link = asset["browser_download_url"] as? String
+                    else {
+                        return nil
+                    }
+                    return URL(string: link)
+                }
+                .first
+            return Release(version: tag, url: url, diskImageURL: diskImage)
         }
     }
 }
