@@ -9,8 +9,19 @@ public enum TextLanguage: String, Codable, Equatable, Sendable {
 
 /// Amount of cleanup applied to a raw transcript.
 public enum CleanupMode: String, Codable, Equatable, Sendable {
+    /// Cleanup that never deletes content words: the default contract.
     case faithful
+    /// No processing at all beyond insertion.
     case raw
+    /// Cleanup that may drop spoken scaffolding — "genre", "en fait", false
+    /// starts — and restructure within a wider edit budget.
+    ///
+    /// A separate mode rather than a loosened default, because the two make
+    /// different promises. Faithful promises nothing you said is missing;
+    /// rewrite promises text that reads as written, at the cost of trusting
+    /// the model's judgment about which words were scaffolding. The fidelity
+    /// validator enforces whichever promise was chosen.
+    case rewrite
 }
 
 /// User-controlled cleanup preferences for one dictation.
@@ -158,6 +169,8 @@ public struct DeterministicPreparation: Equatable, Sendable {
     public let context: TextProcessingContext
     /// Whether automatic list formatting is enabled.
     public let automaticLists: Bool
+    /// The cleanup contract in force, which the fidelity validator enforces.
+    public let cleanupMode: CleanupMode
 
     /// Creates a deterministic preparation result.
     public init(
@@ -171,7 +184,8 @@ public struct DeterministicPreparation: Equatable, Sendable {
         usedSnippet: Bool,
         dictionaryTerms: [String],
         context: TextProcessingContext,
-        automaticLists: Bool
+        automaticLists: Bool,
+        cleanupMode: CleanupMode = .faithful
     ) {
         self.rawTranscript = rawTranscript
         self.normalizedText = normalizedText
@@ -184,6 +198,7 @@ public struct DeterministicPreparation: Equatable, Sendable {
         self.dictionaryTerms = dictionaryTerms
         self.context = context
         self.automaticLists = automaticLists
+        self.cleanupMode = cleanupMode
     }
 
     /// Restores every known placeholder in generated text.
@@ -265,7 +280,7 @@ public enum DeterministicTextProcessor {
         // letters, with no token boundary.
         var allProtectedTokens = protected.tokens
         promptText = protectFreshDigits(in: promptText, tokens: &allProtectedTokens)
-        if request.preferences.cleanupMode == .faithful, request.preferences.removeFillers {
+        if request.preferences.cleanupMode != .raw, request.preferences.removeFillers {
             let previousText = promptText
             promptText = removeFillers(from: promptText, language: language)
             promptText = collapseImmediateWordRepetitions(in: promptText)
@@ -321,7 +336,7 @@ public enum DeterministicTextProcessor {
             request.preferences.fastPathEnabled
             && !needsPolisher
         let shouldPolish =
-            request.preferences.cleanupMode == .faithful
+            request.preferences.cleanupMode != .raw
             && profile != .raw
             && snippet == nil
             && !fastPath
@@ -337,7 +352,8 @@ public enum DeterministicTextProcessor {
             usedSnippet: snippet != nil,
             dictionaryTerms: entries.map(\.canonical),
             context: request.context,
-            automaticLists: request.preferences.automaticLists
+            automaticLists: request.preferences.automaticLists,
+            cleanupMode: request.preferences.cleanupMode
         )
     }
 }

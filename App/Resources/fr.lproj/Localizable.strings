@@ -1040,3 +1040,7 @@
 "Learned" = "Appris";
 "Corrected once from “%@”" = "Corrigé une fois depuis « %@ »";
 "Ignore" = "Ignorer";
+
+/* Mode Réécriture */
+"Rewrite" = "Réécriture";
+"Rewritten to read like written text" = "Réécrit pour se lire comme un texte rédigé";

@@ -127,11 +127,18 @@ public enum FidelityValidator {
             sourceWords,
             candidateWords: candidateWords,
             language: preparation.language,
+            mode: preparation.cleanupMode,
             allowListFraming: preparation.automaticLists && containsStructuredList(candidate)
         ) {
             return reject(.missingContent, preparation)
         }
-        let maximumWordEdits = max(3, Int(ceil(Double(sourceWords.count) * 0.05)))
+        // The edit budget is the mode's promise in numbers. Faithful allows
+        // touch-ups; rewrite allows restructuring a spoken sentence into a
+        // written one, which routinely moves a fifth of the words.
+        let maximumWordEdits =
+            preparation.cleanupMode == .rewrite
+            ? max(8, Int(ceil(Double(sourceWords.count) * 0.20)))
+            : max(3, Int(ceil(Double(sourceWords.count) * 0.05)))
         let isStructuredList =
             preparation.automaticLists && containsStructuredList(candidate)
         if !isStructuredList,
@@ -241,11 +248,12 @@ private extension FidelityValidator {
         _ sourceWords: [String],
         candidateWords: [String],
         language: TextLanguage,
+        mode: CleanupMode = .faithful,
         allowListFraming: Bool
     ) -> Bool {
         var remainingCandidate = candidateWords
         let removableWords = grammarInsertionWords(for: language)
-            .union(removableDiscourseWords(for: language))
+            .union(removableDiscourseWords(for: language, mode: mode))
         let removableListWords = allowListFraming ? listFramingWords(for: language) : []
 
         for source in sourceWords {
@@ -410,12 +418,39 @@ private extension FidelityValidator {
         }
     }
 
-    static func removableDiscourseWords(for language: TextLanguage) -> Set<String> {
-        switch language {
-        case .english:
+    static func removableDiscourseWords(
+        for language: TextLanguage,
+        mode: CleanupMode
+    ) -> Set<String> {
+        switch (language, mode) {
+        case (.english, .faithful), (.english, .raw):
             ["so"]
-        case .french:
+        case (.french, .faithful), (.french, .raw):
+            // Faithful promises nothing you said is missing. The empty set is
+            // that promise, and it is also why faithful output reads like a
+            // transcript: the model is forbidden to drop "genre" or "en fait"
+            // even when they are plainly scaffolding.
             []
+        case (.english, .rewrite):
+            [
+                "so", "um", "uh", "erm", "like", "basically", "actually",
+                "well", "anyway", "okay", "right", "kind", "sort", "know",
+                "mean", "just", "really",
+            ]
+        case (.french, .rewrite):
+            // The spoken-French crutch inventory, accent-folded to match
+            // `normalizeWord`. Being here does not delete a word — it only
+            // stops the validator from vetoing a deletion the model already
+            // judged safe in context. Real negations never appear: they are
+            // placeholder-protected upstream and their removal fails the
+            // token audit before this list is consulted.
+            [
+                "euh", "heu", "hum", "bah", "ben", "hein", "voila", "quoi",
+                "genre", "enfin", "bref", "alors", "bon", "donc", "coup",
+                "fait", "gros", "attends", "attendez", "carrement",
+                "franchement", "ouais", "fin", "ecoute", "ecoutez", "tiens",
+                "dis", "dites", "comment", "dire", "veux", "voulais",
+            ]
         }
     }
 

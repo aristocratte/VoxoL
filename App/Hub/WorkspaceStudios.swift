@@ -25,6 +25,7 @@ import SwiftUI
 enum DictationCleanupMode: String, CaseIterable, Identifiable {
     case faithful
     case raw
+    case rewrite
 
     var id: String { rawValue }
 
@@ -34,6 +35,8 @@ enum DictationCleanupMode: String, CaseIterable, Identifiable {
             "Faithful"
         case .raw:
             "Raw"
+        case .rewrite:
+            "Rewrite"
         }
     }
 }

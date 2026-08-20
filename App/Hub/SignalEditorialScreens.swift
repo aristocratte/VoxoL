@@ -1203,12 +1203,17 @@ struct EditorialDictationView: View {
             .buttonStyle(SignalPressButtonStyle())
 
             Button {
-                cleanup = cleanup == .faithful ? .raw : .faithful
+                cleanup =
+                    switch cleanup {
+                    case .faithful: .rewrite
+                    case .rewrite: .raw
+                    case .raw: .faithful
+                    }
             } label: {
                 settingTile(
                     icon: "text-aa",
                     label: "Preparation",
-                    value: cleanup == .faithful ? "Faithful" : "Raw",
+                    value: cleanup.title,
                     compact: metrics.compact
                 )
             }
@@ -1287,7 +1292,9 @@ struct EditorialDictationView: View {
     }
 
     private var finalText: String {
-        guard cleanup == .faithful else { return rawText }
+        // Raw shows the transcript untouched; both cleanup modes show the
+        // processed result — rewrite is more processing, not less.
+        guard cleanup != .raw else { return rawText }
         return latestTrace?.finalText ?? String(localized: "Send it Wednesday morning.")
     }
 
@@ -3652,18 +3659,25 @@ struct EditorialSettingsView: View {
             settingsDivider
             settingsRow(
                 title: "Preparation",
-                detail: cleanup == .faithful
-                    ? "Faithful cleanup of what you said"
-                    : "Raw transcript, untouched",
+                detail: preparationDetail,
                 metrics: metrics
             ) {
                 Menu("Change") {
                     Button("Faithful") { cleanup = .faithful }
+                    Button("Rewrite") { cleanup = .rewrite }
                     Button("Raw") { cleanup = .raw }
                 }
                 .menuStyle(.borderlessButton)
                 .buttonStyle(EditorialSettingsButtonStyle())
             }
+        }
+    }
+
+    private var preparationDetail: LocalizedStringKey {
+        switch cleanup {
+        case .faithful: "Faithful cleanup of what you said"
+        case .rewrite: "Rewritten to read like written text"
+        case .raw: "Raw transcript, untouched"
         }
     }
 

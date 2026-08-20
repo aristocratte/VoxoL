@@ -432,3 +432,88 @@ final class FidelityValidatorTests: XCTestCase {
         )
     }
 }
+
+/// The two cleanup contracts, side by side on the same sentence.
+///
+/// These began as a live investigation into why "non, attends. Genre," was
+/// surviving cleanup: the model never tried, and if it had tried, faithful
+/// mode would have vetoed the deletions. The pair below pins both halves so
+/// neither regresses silently — faithful must keep refusing, rewrite must
+/// keep allowing.
+final class RewriteModeFidelityTests: XCTestCase {
+    private let dictated =
+        "les points doivent être francs par contre non attends genre "
+        + "ton problème de qualité avec un badge"
+
+    private func prepared(mode: CleanupMode) -> DeterministicPreparation {
+        DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: dictated,
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(
+                    cleanupMode: mode,
+                    fastPathEnabled: false
+                )
+            )
+        )
+    }
+
+    func testFaithfulStillVetoesDroppingDiscourseWords() {
+        let preparation = prepared(mode: .faithful)
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: " attends genre", with: "")
+
+        let decision = FidelityValidator.validate(candidate: candidate, against: preparation)
+
+        XCTAssertEqual(decision.rejectionReason, .missingContent)
+        XCTAssertFalse(decision.usedModelOutput)
+    }
+
+    func testRewriteAcceptsDroppingTheSameDiscourseWords() {
+        let preparation = prepared(mode: .rewrite)
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: " attends genre", with: "")
+
+        let decision = FidelityValidator.validate(candidate: candidate, against: preparation)
+
+        XCTAssertNil(decision.rejectionReason)
+        XCTAssertTrue(decision.usedModelOutput)
+        XCTAssertFalse(decision.text.contains("genre"))
+    }
+
+    func testRewriteStillCannotDropAProtectedNegation() {
+        // "non" reaches the model as a placeholder, and deleting it fails the
+        // token audit before any allow-list is consulted. Rewrite loosens
+        // which *words* may go; it does not loosen meaning-bearing tokens.
+        let preparation = prepared(mode: .rewrite)
+        guard let negation = preparation.protectedTokens.first(where: { $0.value == "non" })
+        else {
+            return XCTFail("expected the negation to be token-protected")
+        }
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: " \(negation.placeholder) attends genre", with: ".")
+
+        let decision = FidelityValidator.validate(candidate: candidate, against: preparation)
+
+        XCTAssertEqual(decision.rejectionReason, .missingProtectedToken)
+        XCTAssertFalse(decision.usedModelOutput)
+    }
+
+    func testRewriteIsWiderButStillBounded() {
+        // Dropping a content phrase is not scaffolding removal in any mode.
+        let preparation = prepared(mode: .rewrite)
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: " ton problème de qualité avec un badge", with: "")
+
+        let decision = FidelityValidator.validate(candidate: candidate, against: preparation)
+
+        XCTAssertEqual(decision.rejectionReason, .missingContent)
+        XCTAssertFalse(decision.usedModelOutput)
+    }
+
+    func testThePreparationCarriesItsMode() {
+        XCTAssertEqual(prepared(mode: .rewrite).cleanupMode, .rewrite)
+        XCTAssertEqual(prepared(mode: .faithful).cleanupMode, .faithful)
+        XCTAssertTrue(prepared(mode: .rewrite).shouldUsePolisher)
+    }
+}
