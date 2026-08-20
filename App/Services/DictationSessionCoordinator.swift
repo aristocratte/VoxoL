@@ -157,6 +157,8 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private lazy var correctionWatcher = InsertionCorrectionWatcher(
         injector: injector
     )
+    /// Mechanical verdict on the last finished capture, for the one-line hints.
+    @ObservationIgnored private var lastTakeQuality = CaptureTakeQuality.good
     @ObservationIgnored private var transcriptStore: TranscriptStore?
     @ObservationIgnored private var shortcutHeld = false
     @ObservationIgnored private var toggleSessionIsActive = false
@@ -373,6 +375,18 @@ final class DictationSessionCoordinator {
         audioCapture.preferredInputUID = resolved
         logger.notice(
             "Input device preference set selected=\(resolved != nil, privacy: .public)"
+        )
+    }
+
+    /// Applies the user's voice-processing preference to the next capture.
+    func configureVoiceProcessing(rawMode: String) {
+        let mode = VoiceProcessingMode(rawValue: rawMode) ?? .automatic
+        guard audioCapture.voiceProcessingMode != mode else {
+            return
+        }
+        audioCapture.voiceProcessingMode = mode
+        logger.notice(
+            "Voice processing preference set mode=\(mode.rawValue, privacy: .public)"
         )
     }
 
@@ -697,8 +711,9 @@ private extension DictationSessionCoordinator {
             outcome: .captured
         )
         logger.notice(
-            "Capture completed duration_ms=\(Int(capturedAudio.durationSeconds * 1_000), privacy: .public) samples=\(capturedAudio.samples.count, privacy: .public) peak_millirms=\(Int(capturedAudio.maximumRootMeanSquare * 1_000), privacy: .public) detector=\(capturedAudio.speechDetected, privacy: .public)"
+            "Capture completed duration_ms=\(Int(capturedAudio.durationSeconds * 1_000), privacy: .public) samples=\(capturedAudio.samples.count, privacy: .public) peak_millirms=\(Int(capturedAudio.maximumRootMeanSquare * 1_000), privacy: .public) detector=\(capturedAudio.speechDetected, privacy: .public) vp=\(self.audioCapture.voiceProcessingActive, privacy: .public) clipped=\(capturedAudio.clippedSampleCount, privacy: .public)"
         )
+        lastTakeQuality = CaptureTakeQuality.assess(capturedAudio)
 
         let insertionTarget = destinationInsertionTarget
         destinationInsertionTarget = nil
@@ -958,7 +973,7 @@ private extension DictationSessionCoordinator {
 
                 state = .insertionSucceeded(method)
                 VoiceCapsuleController.shared.show(.success)
-                dismissCapsule(after: .milliseconds(900))
+                concludeCapsuleAfterInsertion()
 
                 if let insertionTarget {
                     // rawText, not textForInsertion: the pair the dictionary
@@ -1239,6 +1254,38 @@ private extension DictationSessionCoordinator {
         }
     }
 
+    /// Dismisses the success capsule, via a one-line take hint when the capture
+    /// itself was the weak link.
+    ///
+    /// Shown after success, not instead of it: the insertion did work, and the
+    /// user needs that confirmation before any advice. The hint only appears
+    /// for the two conditions with a one-gesture fix — too far from the mic,
+    /// input gain too hot — because a capsule that second-guesses good takes
+    /// teaches people to stop reading it.
+    private func concludeCapsuleAfterInsertion() {
+        let hint: VoiceCapsulePhase? =
+            switch lastTakeQuality {
+            case .good: nil
+            case .tooQuiet: .tooQuiet
+            case .clipped: .tooLoud
+            }
+        guard let hint else {
+            dismissCapsule(after: .milliseconds(900))
+            return
+        }
+        capsuleDismissalTask?.cancel()
+        capsuleDismissalTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            VoiceCapsuleController.shared.show(hint)
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            VoiceCapsuleController.shared.dismiss()
+            self?.capsuleDismissalTask = nil
+            self?.settleAfterOutcome()
+        }
+    }
+
     /// Returns the runtime to rest once an outcome has been shown.
     ///
     /// Without this the last outcome is also the current status: one failed insertion left the
@@ -1262,7 +1309,11 @@ private extension DictationSessionCoordinator {
             report.outcome = .noSpeech
         }
         state = .noSpeech
-        VoiceCapsuleController.shared.show(.noSpeech)
+        // "No speech heard" states a fact; "closer to the mic" states the fix.
+        // When the level says the person probably did speak, show the fix.
+        VoiceCapsuleController.shared.show(
+            lastTakeQuality == .tooQuiet ? .tooQuiet : .noSpeech
+        )
         dismissCapsule(after: .milliseconds(1_200))
     }
 

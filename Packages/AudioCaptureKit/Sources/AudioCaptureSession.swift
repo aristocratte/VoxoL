@@ -18,6 +18,8 @@ public struct AudioCaptureStatus: Equatable, Sendable {
     public let currentRootMeanSquare: Float
     /// Highest root-mean-square level measured during this capture.
     public let maximumRootMeanSquare: Float
+    /// Converted samples that arrived at or above the converter's ceiling.
+    public let clippedSampleCount: Int
 
     /// Creates a content-free capture snapshot.
     public init(
@@ -25,13 +27,15 @@ public struct AudioCaptureStatus: Equatable, Sendable {
         droppedSampleCount: Int,
         speechDetected: Bool,
         currentRootMeanSquare: Float = 0,
-        maximumRootMeanSquare: Float = 0
+        maximumRootMeanSquare: Float = 0,
+        clippedSampleCount: Int = 0
     ) {
         self.retainedSampleCount = retainedSampleCount
         self.droppedSampleCount = droppedSampleCount
         self.speechDetected = speechDetected
         self.currentRootMeanSquare = currentRootMeanSquare
         self.maximumRootMeanSquare = maximumRootMeanSquare
+        self.clippedSampleCount = clippedSampleCount
     }
 
     /// Duration represented by retained 16 kHz samples.
@@ -52,6 +56,8 @@ public struct CapturedAudio: Sendable {
     public let droppedSampleCount: Int
     /// Highest root-mean-square level measured during this capture.
     public let maximumRootMeanSquare: Float
+    /// Samples that arrived at or above the converter's ceiling.
+    public let clippedSampleCount: Int
 
     /// Creates a completed capture result.
     public init(
@@ -59,13 +65,15 @@ public struct CapturedAudio: Sendable {
         sampleRate: Double = 16_000,
         speechDetected: Bool,
         droppedSampleCount: Int,
-        maximumRootMeanSquare: Float = 0
+        maximumRootMeanSquare: Float = 0,
+        clippedSampleCount: Int = 0
     ) {
         self.samples = samples
         self.sampleRate = sampleRate
         self.speechDetected = speechDetected
         self.droppedSampleCount = droppedSampleCount
         self.maximumRootMeanSquare = maximumRootMeanSquare
+        self.clippedSampleCount = clippedSampleCount
     }
 
     /// Duration represented by the returned samples.
@@ -114,6 +122,13 @@ public final class AudioCaptureSession {
     /// so instead of guessing.
     public private(set) var activeInputUID: String?
 
+    /// How Apple's voice processing should be applied to the next capture.
+    public var voiceProcessingMode: VoiceProcessingMode = .automatic
+
+    /// Whether the last `start()` actually engaged voice processing, so
+    /// diagnostics can tell a processed take from a raw one.
+    public private(set) var voiceProcessingActive = false
+
     /// Creates a capture session with bounded in-memory retention.
     public init(maximumDurationSeconds: Int = 180) {
         self.maximumDurationSeconds = maximumDurationSeconds
@@ -154,6 +169,32 @@ public final class AudioCaptureSession {
         {
             if (try? inputNode.auAudioUnit.setDeviceID(deviceID)) != nil {
                 activeInputUID = preferredInputUID
+            }
+        }
+
+        // Voice processing is decided per capture, against the microphone that
+        // will actually record, and applied before the format is read — the
+        // processed IO unit reports a different stream format than the raw
+        // device, and a converter built against the wrong one starves the tap.
+        voiceProcessingActive = false
+        let wantsProcessing = voiceProcessingMode.shouldEnable(
+            forBuiltInMicrophone: AudioInputDevices.isBuiltIn(uid: activeInputUID)
+        )
+        if wantsProcessing {
+            do {
+                try inputNode.setVoiceProcessingEnabled(true)
+                voiceProcessingActive = true
+                // Dictation plays nothing back, so there is no echo to manage
+                // and no reason to dim whatever the user is listening to.
+                inputNode.voiceProcessingOtherAudioDuckingConfiguration =
+                    AVAudioVoiceProcessingOtherAudioDuckingConfiguration(
+                        enableAdvancedDucking: false,
+                        duckingLevel: .min
+                    )
+            } catch {
+                // A raw capture is strictly better than no capture. The take
+                // is marked unprocessed and dictation proceeds.
+                voiceProcessingActive = false
             }
         }
 
@@ -207,7 +248,8 @@ public final class AudioCaptureSession {
             samples: processor.drainSamples(),
             speechDetected: status.speechDetected,
             droppedSampleCount: status.droppedSampleCount,
-            maximumRootMeanSquare: status.maximumRootMeanSquare
+            maximumRootMeanSquare: status.maximumRootMeanSquare,
+            clippedSampleCount: status.clippedSampleCount
         )
     }
 
@@ -236,6 +278,7 @@ private final class AudioTapProcessor: @unchecked Sendable {
     private let detectedSpeech = Atomic<Bool>(false)
     private let currentRootMeanSquareBits = Atomic<UInt32>(0)
     private let maximumRootMeanSquareBits = Atomic<UInt32>(0)
+    private let clippedSampleCount = Atomic<Int>(0)
 
     private var endpointDetector = DeterministicEndpointDetector()
     private var endpointFrame = [Float](repeating: 0, count: frameSampleCount)
@@ -276,7 +319,8 @@ private final class AudioTapProcessor: @unchecked Sendable {
             ),
             maximumRootMeanSquare: Float(
                 bitPattern: maximumRootMeanSquareBits.load(ordering: .relaxed)
-            )
+            ),
+            clippedSampleCount: clippedSampleCount.load(ordering: .relaxed)
         )
     }
 
@@ -310,12 +354,22 @@ private final class AudioTapProcessor: @unchecked Sendable {
 
         let count = Int(conversionBuffer.frameLength)
         var squareSum: Float = 0
+        var clippedInBuffer = 0
         for index in 0..<count {
             let input = channel[index]
+            // Measured on the raw converted sample, before this pipeline's own
+            // gain and clamp: clipping happens at the device, and the clamp
+            // below would otherwise hide exactly the evidence being counted.
+            if abs(input) >= 0.985 {
+                clippedInBuffer += 1
+            }
             dcEstimate = dcEstimate * 0.995 + input * 0.005
             let sample = min(0.98, max(-0.98, (input - dcEstimate) * 1.15))
             channel[index] = sample
             squareSum += sample * sample
+        }
+        if clippedInBuffer > 0 {
+            _ = clippedSampleCount.wrappingAdd(clippedInBuffer, ordering: .relaxed)
         }
 
         let rootMeanSquare = sqrt(squareSum / Float(count))
@@ -400,6 +454,33 @@ public enum AudioInputDevices {
             if lhs.isDefault != rhs.isDefault { return lhs.isDefault }
             return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
+    }
+
+    /// Whether the microphone a capture will use is built into the machine.
+    ///
+    /// `nil` means "whatever the system default is", the same convention as
+    /// `preferredInputUID`. The transport type is the honest signal: the
+    /// built-in array is the one microphone whose acoustics Apple's voice
+    /// processing was tuned against, and the one users cannot move closer to
+    /// their mouth.
+    public static func isBuiltIn(uid: String?) -> Bool {
+        let resolvedID = uid.flatMap { Self.deviceID(forUID: $0) } ?? defaultInputDeviceID()
+        guard resolvedID != AudioDeviceID(kAudioObjectUnknown) else {
+            return false
+        }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard
+            AudioObjectGetPropertyData(resolvedID, &address, 0, nil, &size, &transport) == noErr
+        else {
+            return false
+        }
+        return transport == kAudioDeviceTransportTypeBuiltIn
     }
 
     /// Resolves a stored UID back to the live device, or nil when it is no longer connected.

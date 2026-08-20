@@ -13,6 +13,7 @@ struct MainRootView: View {
         DictationLanguagePreference.preferred.rawValue
     /// Empty means "follow the system default input", which is the shipping behaviour.
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
+    @AppStorage("voxol.voiceProcessingMode") private var voiceProcessingMode = "automatic"
     /// The version that ran last, so an update can be told from a first launch.
     @AppStorage("voxol.lastLaunchedVersion") private var lastLaunchedVersion = ""
     @State private var releaseNotes: ReleaseNotes.Entry?
@@ -91,6 +92,9 @@ struct MainRootView: View {
         }
         .task(id: inputDeviceUID) {
             dictationSession.configureInputDevice(uid: inputDeviceUID)
+        }
+        .task(id: voiceProcessingMode) {
+            dictationSession.configureVoiceProcessing(rawMode: voiceProcessingMode)
         }
         .task {
             await permissions.monitorChanges()

@@ -3224,10 +3224,19 @@ struct EditorialSettingsView: View {
         DictationLanguagePreference.preferred
     @AppStorage("voxol.cleanupMode") private var cleanup = DictationCleanupMode.faithful
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
+    @AppStorage("voxol.voiceProcessingMode") private var voiceProcessingMode = "automatic"
     @AppStorage("voxol.privateMode") private var privateMode = false
     @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
     @AppStorage("voxol.learningEnabled") private var learningEnabled = true
+
+    private var voiceProcessingModeTitle: LocalizedStringKey {
+        switch voiceProcessingMode {
+        case "enabled": "Always on"
+        case "disabled": "Off"
+        default: "Automatic"
+        }
+    }
 
     @State private var visible = false
     @State private var showsAppearanceNote = false
@@ -3528,6 +3537,22 @@ struct EditorialSettingsView: View {
                 metrics: metrics
             ) {
                 AudioInputPicker(selectedUID: $inputDeviceUID)
+            }
+            settingsDivider
+            settingsRow(
+                title: "Microphone cleanup",
+                detail: "Apple's noise reduction, made for the built-in mic",
+                metrics: metrics
+            ) {
+                Menu(voiceProcessingModeTitle) {
+                    Button("Automatic — on for the built-in mic") {
+                        voiceProcessingMode = "automatic"
+                    }
+                    Button("Always on") { voiceProcessingMode = "enabled" }
+                    Button("Off") { voiceProcessingMode = "disabled" }
+                }
+                .menuStyle(.borderlessButton)
+                .buttonStyle(EditorialSettingsButtonStyle())
             }
             settingsDivider
             settingsRow(

@@ -12,6 +12,8 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
     case success
     case copiedFallback
     case noSpeech
+    case tooQuiet
+    case tooLoud
     case error
 
     var id: String { rawValue }
@@ -34,6 +36,10 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             "Copied · press ⌘V"
         case .noSpeech:
             "No speech heard"
+        case .tooQuiet:
+            "Weak signal — closer to the mic?"
+        case .tooLoud:
+            "Input too loud — lower the gain"
         case .error:
             "Something went wrong"
         }
@@ -59,6 +65,10 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             NSSize(width: 216, height: 48)
         case .noSpeech:
             NSSize(width: 212, height: 48)
+        case .tooQuiet:
+            NSSize(width: 292, height: 48)
+        case .tooLoud:
+            NSSize(width: 300, height: 48)
         case .error:
             NSSize(width: 244, height: 48)
         }
@@ -341,6 +351,12 @@ private struct VoiceCapsulePanelView: View {
             EmptyView()
         case .copiedFallback:
             Image(systemName: "doc.on.clipboard")
+                .foregroundStyle(theme.warning)
+        case .tooQuiet:
+            Image(systemName: "mic.badge.xmark")
+                .foregroundStyle(theme.warning)
+        case .tooLoud:
+            Image(systemName: "waveform.badge.exclamationmark")
                 .foregroundStyle(theme.warning)
         case .error:
             Image(systemName: "exclamationmark")

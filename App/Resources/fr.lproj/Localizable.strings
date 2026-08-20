@@ -1023,3 +1023,13 @@
 "Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them." = "Restaurer le texte brut détruisait définitivement la version corrigée. Vous pouvez maintenant naviguer dans les deux sens et les comparer.";
 "Updates find you" = "Les mises à jour viennent à vous";
 "VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings." = "VoxoL vérifie seul les nouvelles versions et les signale dans la barre latérale, au lieu d'attendre que vous ouvriez les réglages.";
+
+/* Traitement micro + qualité de prise */
+"Microphone cleanup" = "Nettoyage du micro";
+"Apple's noise reduction, made for the built-in mic" = "La réduction de bruit d'Apple, conçue pour le micro intégré";
+"Automatic — on for the built-in mic" = "Automatique — actif sur le micro intégré";
+"Automatic" = "Automatique";
+"Always on" = "Toujours actif";
+"Off" = "Désactivé";
+"Weak signal — closer to the mic?" = "Signal faible — rapprochez-vous du micro ?";
+"Input too loud — lower the gain" = "Entrée saturée — baissez le niveau d'entrée";

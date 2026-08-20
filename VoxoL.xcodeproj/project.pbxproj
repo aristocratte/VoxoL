@@ -37,6 +37,7 @@
 		00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000055 /* DeterministicEndpointDetector.swift */; };
 		000000000000000000000050 /* AudioRingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000056 /* AudioRingBuffer.swift */; };
 		000000000000000000000051 /* AudioCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000057 /* AudioCaptureSession.swift */; };
+		000000000000000000000FA9 /* VoiceProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FAA /* VoiceProcessing.swift */; };
 		000000000000000000000052 /* TextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000058 /* TextInjector.swift */; };
 		000000000000000000000053 /* GlobalHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000059 /* GlobalHotkeyMonitor.swift */; };
 		000000000000000000000054 /* DictationSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000005A /* DictationSessionCoordinator.swift */; };
@@ -114,6 +115,7 @@
 		000000000000000000000055 /* DeterministicEndpointDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/EndpointingKit/Sources/DeterministicEndpointDetector.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000056 /* AudioRingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AudioCaptureKit/Sources/AudioRingBuffer.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000057 /* AudioCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AudioCaptureKit/Sources/AudioCaptureSession.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000000FAA /* VoiceProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AudioCaptureKit/Sources/VoiceProcessing.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000058 /* TextInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/InjectionKit/Sources/TextInjector.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000059 /* GlobalHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyMonitor.swift; sourceTree = "<group>"; };
 		00000000000000000000005A /* DictationSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationSessionCoordinator.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 				000000000000000000000055 /* DeterministicEndpointDetector.swift */,
 				000000000000000000000056 /* AudioRingBuffer.swift */,
 				000000000000000000000057 /* AudioCaptureSession.swift */,
+				000000000000000000000FAA /* VoiceProcessing.swift */,
 				000000000000000000000058 /* TextInjector.swift */,
 			);
 			name = "Shared Sources";
@@ -445,6 +448,7 @@
 				00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */,
 				000000000000000000000050 /* AudioRingBuffer.swift in Sources */,
 				000000000000000000000051 /* AudioCaptureSession.swift in Sources */,
+				000000000000000000000FA9 /* VoiceProcessing.swift in Sources */,
 				000000000000000000000052 /* TextInjector.swift in Sources */,
 				000000000000000000000053 /* GlobalHotkeyMonitor.swift in Sources */,
 				000000000000000000000054 /* DictationSessionCoordinator.swift in Sources */,
