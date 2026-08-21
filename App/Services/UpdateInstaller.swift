@@ -98,12 +98,24 @@ final class UpdateInstaller {
         }
         let mounted = URL(fileURLWithPath: mountPoint).appendingPathComponent(appName)
 
-        // The one check that makes self-replacement safe: what is about to be
-        // installed must be this bundle, validly signed. `codesign --verify`
-        // walks the whole bundle, so a truncated download also fails here.
-        let identifier = try codesignIdentifier(of: mounted)
+        // The checks that make self-replacement safe: what is about to be
+        // installed must be this bundle, validly signed, by the same team.
+        // `codesign --verify` walks the whole bundle, so a truncated download
+        // also fails here. The team anchor matters most: a valid signature
+        // plus the right bundle identifier proves integrity, not identity —
+        // anyone can sign a bundle named com.voxol.VoxoL. The running app's
+        // own team is the trust root, so the check needs no hardcoded value
+        // and survives a future move to a Developer ID certificate.
+        let identifier = try codesignField(of: mounted, field: "Identifier")
         guard identifier == Bundle.main.bundleIdentifier else {
             throw InstallError.wrongApplication(identifier)
+        }
+        let candidateTeam = try codesignField(of: mounted, field: "TeamIdentifier")
+        let currentTeam = try? codesignField(of: Bundle.main.bundleURL, field: "TeamIdentifier")
+        if let currentTeam, currentTeam != "not set" {
+            guard candidateTeam == currentTeam else {
+                throw InstallError.wrongTeam(candidateTeam)
+            }
         }
 
         let destination = URL(fileURLWithPath: "/Applications/VoxoL.app")
@@ -163,15 +175,18 @@ final class UpdateInstaller {
         _ = try? runCapturing("/usr/bin/hdiutil", ["detach", mountPoint, "-quiet"])
     }
 
-    private nonisolated static func codesignIdentifier(of bundle: URL) throws -> String {
+    private nonisolated static func codesignField(
+        of bundle: URL,
+        field: String
+    ) throws -> String {
         try run("/usr/bin/codesign", ["--verify", "--deep", bundle.path])
         let details = try runCapturing(
             "/usr/bin/codesign", ["-d", "--verbose=2", bundle.path],
             mergeStandardError: true
         )
         for line in details.split(whereSeparator: \.isNewline)
-        where line.hasPrefix("Identifier=") {
-            return String(line.dropFirst("Identifier=".count))
+        where line.hasPrefix("\(field)=") {
+            return String(line.dropFirst(field.count + 1))
         }
         throw InstallError.unreadableSignature
     }
@@ -251,6 +266,7 @@ final class UpdateInstaller {
     enum InstallError: LocalizedError {
         case noApplicationInImage
         case wrongApplication(String)
+        case wrongTeam(String)
         case mountFailed
         case unreadableSignature
         case toolFailed(String, Int32)
@@ -261,6 +277,8 @@ final class UpdateInstaller {
                 "Le téléchargement ne contient pas d'application."
             case .wrongApplication(let identifier):
                 "L'image contient « \(identifier) », pas VoxoL."
+            case .wrongTeam(let team):
+                "Le téléchargement est signé par une autre équipe (\(team))."
             case .mountFailed:
                 "L'image disque n'a pas pu être ouverte."
             case .unreadableSignature:
