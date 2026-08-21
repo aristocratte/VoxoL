@@ -1060,3 +1060,12 @@
 "Apple's noise reduction — experimental, off by default" = "La réduction de bruit d'Apple — expérimental, désactivé par défaut";
 "Updates install themselves" = "Les mises à jour s'installent toutes seules";
 "One click downloads the new version, verifies its signature, installs it and relaunches — no more browser and Finder round-trip." = "Un clic télécharge la nouvelle version, vérifie sa signature, l'installe et relance — fini l'aller-retour navigateur et Finder.";
+
+/* Notes de version 0.1.4 */
+"One bad sentence no longer costs the good ones." = "Une phrase ratée ne coûte plus les bonnes.";
+"Sentence-level repair" = "Réparation phrase par phrase";
+"When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded." = "Quand le modèle de correction abîme une phrase, seule cette phrase revient à ce que vous avez dit — le reste de ses améliorations est conservé au lieu d'être jeté.";
+"Meaning is guarded harder" = "Le sens est mieux gardé";
+"Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases." = "Quantificateurs, obligations, conditions et exceptions — « aucun », « doit », « sauf » — survivent désormais mot pour mot à chaque correction, dans les deux modes, vérifié par des centaines de cas d'attaque générés.";
+"Learning that can back down" = "Un apprentissage qui sait reculer";
+"A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself." = "Un mot appris que vous corrigez est mis en pause immédiatement : une mauvaise déduction ne peut jamais s'auto-renforcer.";

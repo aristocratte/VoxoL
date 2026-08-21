@@ -25,6 +25,24 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.4",
+                headline: "One bad sentence no longer costs the good ones.",
+                items: [
+                    Item(
+                        title: "Sentence-level repair",
+                        detail: "When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded."
+                    ),
+                    Item(
+                        title: "Meaning is guarded harder",
+                        detail: "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases."
+                    ),
+                    Item(
+                        title: "Learning that can back down",
+                        detail: "A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself."
+                    ),
+                ]
+            ),
+            Entry(
                 version: "0.1.3",
                 headline: "Spoken French in, written French out.",
                 items: [
