@@ -1,0 +1,27 @@
+# Registre de provenance des modèles — VoxoL
+# Règle de lignée : base exacte + données manifestées -> candidat. Aucun
+# descendant du champion hérité (campagne teacher Wispr) ne peut être un
+# artefact de release ni le parent d'un entraînement.
+
+polisher_base:
+  local_path: Models/polisher/2fc06364715b967f1860aea9cf38778875588b17
+  model_type: qwen3_5            # config.json: Qwen3_5ForConditionalGeneration
+  weights_sha256: f5a0d9dd3efa73510542a8023d610ff26be2b4b020d181cfc4bedaa1fcc5dd9e
+  config_sha256: ba7770da23eae5ebd6827571f086e331956b33f4442a9e876fb4aa10969a6772
+  tokenizer_sha256: 87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4
+  license: Apache-2.0 (présumé famille Qwen3.5 — dépôt/commit HF exact NON épinglé localement, à épingler avant commercialisation)
+  status: BASE_PRISTINE — seul parent autorisé pour R1/R2
+
+polisher_adapter_champion:
+  local_path: Models/polisher/voxol-adapter
+  weights_sha256: 9df7372a3560ddd0f13cf48cf7126aab763eee3db097cdc9994b54c53cbe3185
+  provenance: campagne v8, teacher Wispr Flow
+  status: LEGACY_WISPR_DIAGNOSTIC_ONLY — jamais parent d'un entraînement, jamais dans une build externe ; les candidats v2/v3/v4 (resume depuis lui) héritent de ce statut
+
+asr:
+  local_path: Models/asr/7c35754d166cca382ad1e53e68b01e7c575f3a1d
+  model: NVIDIA Parakeet TDT 0.6B v3 (conversion Core ML INT8)
+  encoder_sha256: 3c2c87adbb8732f920516220cabea83f4c5c044e01eeaf83ca837c821e928196
+  decoder_sha256: 8e77d01e47a9babb05df35627ea3e1cdf5395c39a2bdebdbcf3de8c54abba11c
+  joint_sha256: d5e8d5e1aefa40e33a3427ceca011705e7fc985ba8a7dc993c4e4b25ff5c72d1
+  license: CC-BY-4.0 selon la carte NVIDIA (à confirmer + obligation d'attribution ; la conversion Core ML est la nôtre)
