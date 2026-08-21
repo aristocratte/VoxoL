@@ -110,6 +110,9 @@ public final class AudioCaptureSession {
     private let maximumDurationSeconds: Int
     private var engine: AVAudioEngine?
     private var processor: AudioTapProcessor?
+    /// Feeds the render side of the voice-processing unit without ever
+    /// playing a sample.
+    private let silenceSource = AVAudioPlayerNode()
 
     /// The input the next capture should use, as a CoreAudio device UID.
     ///
@@ -124,6 +127,16 @@ public final class AudioCaptureSession {
 
     /// How Apple's voice processing should be applied to the next capture.
     public var voiceProcessingMode: VoiceProcessingMode = .automatic
+
+    /// Escape hatch for the capture probe only.
+    ///
+    /// Voice processing is clamped off in production: with it enabled, the
+    /// full-duplex unit delivers all-zero samples on real hardware — measured,
+    /// not suspected — and neither a muted render path nor a silent player
+    /// source restored the input. Until the cause is found, no stored setting
+    /// may reach the code path that kills dictation silently. The probe sets
+    /// this to keep experimenting; nothing else should.
+    public var allowsExperimentalVoiceProcessing = false
 
     /// Whether the last `start()` actually engaged voice processing, so
     /// diagnostics can tell a processed take from a raw one.
@@ -177,9 +190,11 @@ public final class AudioCaptureSession {
         // processed IO unit reports a different stream format than the raw
         // device, and a converter built against the wrong one starves the tap.
         voiceProcessingActive = false
-        let wantsProcessing = voiceProcessingMode.shouldEnable(
-            forBuiltInMicrophone: AudioInputDevices.isBuiltIn(uid: activeInputUID)
-        )
+        let wantsProcessing =
+            allowsExperimentalVoiceProcessing
+            && voiceProcessingMode.shouldEnable(
+                forBuiltInMicrophone: AudioInputDevices.isBuiltIn(uid: activeInputUID)
+            )
         if wantsProcessing {
             do {
                 try inputNode.setVoiceProcessingEnabled(true)
@@ -191,6 +206,19 @@ public final class AudioCaptureSession {
                         enableAdvancedDucking: false,
                         duckingLevel: .min
                     )
+                // The processed IO unit is full-duplex: without a live render
+                // path the input side delivers silence — confirmed in the
+                // field as "no speech detected" from ten centimetres, and by
+                // the capture probe reading all-zero samples. The render side
+                // is fed by a player node that never plays anything: routing
+                // the microphone itself into the output — even muted — would
+                // hand the echo canceller a far-end reference equal to the
+                // near-end signal, which is a recipe for cancelling the voice
+                // it exists to keep.
+                engine.mainMixerNode.outputVolume = 0
+                engine.attach(silenceSource)
+                engine.connect(silenceSource, to: engine.mainMixerNode, format: nil)
+                inputNode.isVoiceProcessingInputMuted = false
             } catch {
                 // A raw capture is strictly better than no capture. The take
                 // is marked unprocessed and dictation proceeds.

@@ -14,6 +14,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DefaultSettings.register()
 
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains(CaptureProbeRunner.argument) {
+            NSApplication.shared.setActivationPolicy(.prohibited)
+            Task {
+                await CaptureProbeRunner.runAndExit(arguments: arguments)
+            }
+            return
+        }
         if arguments.contains(DictionaryImportRunner.argument) {
             NSApplication.shared.setActivationPolicy(.prohibited)
             Task {

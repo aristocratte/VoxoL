@@ -3616,22 +3616,6 @@ struct EditorialSettingsView: View {
             }
             settingsDivider
             settingsRow(
-                title: "Microphone cleanup",
-                detail: "Apple's noise reduction — experimental, off by default",
-                metrics: metrics
-            ) {
-                Menu(voiceProcessingModeTitle) {
-                    Button("Automatic — on for the built-in mic") {
-                        voiceProcessingMode = "automatic"
-                    }
-                    Button("Always on") { voiceProcessingMode = "enabled" }
-                    Button("Off") { voiceProcessingMode = "disabled" }
-                }
-                .menuStyle(.borderlessButton)
-                .buttonStyle(EditorialSettingsButtonStyle())
-            }
-            settingsDivider
-            settingsRow(
                 title: "Dictation language",
                 detail: language.title,
                 metrics: metrics
