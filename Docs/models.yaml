@@ -25,3 +25,19 @@ asr:
   decoder_sha256: 8e77d01e47a9babb05df35627ea3e1cdf5395c39a2bdebdbcf3de8c54abba11c
   joint_sha256: d5e8d5e1aefa40e33a3427ceca011705e7fc985ba8a7dc993c4e4b25ff5c72d1
   license: CC-BY-4.0 selon la carte NVIDIA (à confirmer + obligation d'attribution ; la conversion Core ML est la nôtre)
+
+clean_candidates_20260821:
+  # Lignée : base pristine qwen3_5 + Data/corpus/manifest.json, zéro Wispr.
+  # Décision d'architecture (R1 68 vs R2 56 acceptations fidèle sur la même
+  # donnée) : le conflit inter-contrats est confirmé — deux adaptateurs
+  # séparés, un seul résident à la fois, collant au mode.
+  faithful_r1:
+    local_path: Models/polisher/candidates/adapter-r1-clean-20260821
+    weights_sha256: ce225f814802b74ba376e51d2f3ed3e5520a2873614bb61331c73209662487d7
+    suite: 68/101 acceptés (champion 74), distance 0,1360 identique — écart à combler par volume de données, pas par un run de plus
+    status: CLEAN_CANDIDATE
+  rewrite_r3:
+    local_path: Models/polisher/candidates/adapter-r3-clean-20260821
+    weights_sha256: f921a3489d9053046541ca177caf4deac08a724a18e55c71e249616d523e0d74
+    smokes: meilleure réécriture mesurée à ce jour, négations correctement bloquées par le validateur
+    status: CLEAN_CANDIDATE — servira le mode Réécriture quand le runtime saura charger un adaptateur par mode
