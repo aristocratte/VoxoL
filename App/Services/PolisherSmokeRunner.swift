@@ -141,7 +141,7 @@ private extension PolisherSmokeRunner {
         )
         try await runtime.warmUp()
         let generated = try await runtime.polish(preparation, timeout: .seconds(8))
-        let decision = FidelityValidator.validate(candidate: generated.text, against: preparation)
+        let decision = FidelityValidator.validateWithRepair(candidate: generated.text, against: preparation)
         let payload: [String: Any] = [
             "candidate": generated.text,
             "accepted": decision.usedModelOutput,
@@ -191,7 +191,7 @@ private extension PolisherSmokeRunner {
             do {
                 let timeout = testCase.timeoutMilliseconds.map(Duration.milliseconds) ?? .seconds(8)
                 let generated = try await runtime.polish(preparation, timeout: timeout)
-                let decision = FidelityValidator.validate(
+                let decision = FidelityValidator.validateWithRepair(
                     candidate: generated.text,
                     against: preparation
                 )

@@ -73,7 +73,7 @@ actor DictationTextProcessor {
                 preparation,
                 timeout: timeout ?? generationTimeout(for: preparation)
             )
-            let decision = FidelityValidator.validate(
+            let decision = FidelityValidator.validateWithRepair(
                 candidate: generated.text,
                 against: preparation
             )

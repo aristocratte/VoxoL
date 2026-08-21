@@ -517,3 +517,83 @@ final class RewriteModeFidelityTests: XCTestCase {
         XCTAssertTrue(prepared(mode: .rewrite).shouldUsePolisher)
     }
 }
+
+/// Sentence-level repair: one bad span no longer costs the whole output.
+final class SpanRepairTests: XCTestCase {
+    private func prepared(_ text: String, mode: CleanupMode = .rewrite) -> DeterministicPreparation {
+        DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: text,
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(
+                    cleanupMode: mode,
+                    fastPathEnabled: false
+                )
+            )
+        )
+    }
+
+    func testOneDamagedSentenceIsRestoredAndTheRestKept() {
+        // Two sentences: the model cleans the first legitimately and drops a
+        // protected negation from the second — the live failure that motivated
+        // the repair. Whole-text validation rejects; repair must keep the
+        // clean-up and restore the damaged sentence.
+        let preparation = prepared(
+            "alors en gros le client il veut genre une démonstration vendredi quoi. "
+                + "le déploiement s'est bien passé sans aucun incident."
+        )
+        let sentences = SpanRepair.sentences(in: preparation.promptText)
+        XCTAssertEqual(sentences.count, 2)
+        let candidate =
+            "Alors le client veut une démonstration vendredi. "
+            + "Le déploiement s'est bien passé, incident."
+
+        let whole = FidelityValidator.validate(candidate: candidate, against: preparation)
+        XCTAssertNotNil(whole.rejectionReason)
+
+        let repaired = FidelityValidator.validateWithRepair(
+            candidate: candidate,
+            against: preparation
+        )
+        XCTAssertTrue(repaired.usedModelOutput)
+        XCTAssertEqual(repaired.repairedSentenceCount, 1)
+        XCTAssertTrue(repaired.text.contains("Alors le client veut une démonstration"))
+        XCTAssertTrue(repaired.text.contains("sans"))
+    }
+
+    func testAWhollyBadCandidateStillFallsBack() {
+        let preparation = prepared(
+            "le rapport doit partir avant vendredi. la facture doit être réglée."
+        )
+        let candidate = "Le rapport peut partir. La facture attendra."
+
+        let decision = FidelityValidator.validateWithRepair(
+            candidate: candidate,
+            against: preparation
+        )
+        XCTAssertFalse(decision.usedModelOutput)
+        XCTAssertEqual(decision.text, preparation.normalizedText)
+    }
+
+    func testACriticalWordCannotPassAsAMinorCorrection() {
+        // "doit" → "peut" flips an obligation into a permission; whatever the
+        // edit distance says, criticals survive exactly or not at all.
+        let preparation = prepared("le rapport doit partir avant vendredi soir sans faute")
+        let candidate = "Le rapport peut partir avant vendredi soir sans faute."
+
+        let decision = FidelityValidator.validateWithRepair(
+            candidate: candidate,
+            against: preparation
+        )
+        XCTAssertFalse(decision.usedModelOutput)
+    }
+
+    func testAlignmentSurvivesAMergedSentence() {
+        let source = ["Bon alors voilà.", "Le rapport est prêt."]
+        let candidate = ["Le rapport est prêt."]
+
+        let pairs = SpanRepair.align(source: source, candidate: candidate)
+        XCTAssertEqual(pairs?.count, 1)
+        XCTAssertEqual(pairs?.first?.candidate, "Le rapport est prêt.")
+    }
+}

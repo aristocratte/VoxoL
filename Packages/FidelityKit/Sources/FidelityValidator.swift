@@ -26,16 +26,21 @@ public struct FidelityDecision: Equatable, Sendable {
     public let usedModelOutput: Bool
     /// Rejection reason when deterministic fallback was selected.
     public let rejectionReason: FidelityRejectionReason?
+    /// Sentences restored from the source by span repair, zero when the
+    /// candidate passed whole.
+    public let repairedSentenceCount: Int
 
     /// Creates a fidelity decision.
     public init(
         text: String,
         usedModelOutput: Bool,
-        rejectionReason: FidelityRejectionReason?
+        rejectionReason: FidelityRejectionReason?,
+        repairedSentenceCount: Int = 0
     ) {
         self.text = text
         self.usedModelOutput = usedModelOutput
         self.rejectionReason = rejectionReason
+        self.repairedSentenceCount = repairedSentenceCount
     }
 }
 
@@ -150,6 +155,37 @@ public enum FidelityValidator {
         return FidelityDecision(text: restored, usedModelOutput: true, rejectionReason: nil)
     }
 
+    /// Validates a candidate, salvaging it sentence by sentence if the whole
+    /// fails for a content reason.
+    ///
+    /// Whole-output problems — a preamble, leaked thinking, a language flip —
+    /// are not repairable by splicing and fall straight back. Content
+    /// violations are local, so the failing sentences are restored from the
+    /// source and the splice is re-judged by the unmodified full validator:
+    /// the repair proposes, the original rules dispose.
+    public static func validateWithRepair(
+        candidate: String,
+        against preparation: DeterministicPreparation
+    ) -> FidelityDecision {
+        let whole = validate(candidate: candidate, against: preparation)
+        guard let reason = whole.rejectionReason, isRepairable(reason) else {
+            return whole
+        }
+        guard let repair = repairedCandidate(candidate, against: preparation) else {
+            return whole
+        }
+        let spliced = validate(candidate: repair.text, against: preparation)
+        guard spliced.usedModelOutput else {
+            return whole
+        }
+        return FidelityDecision(
+            text: spliced.text,
+            usedModelOutput: true,
+            rejectionReason: nil,
+            repairedSentenceCount: repair.revertedCount
+        )
+    }
+
     /// Returns deterministic normalized text for a rejected or unavailable generation.
     public static func fallback(
         for preparation: DeterministicPreparation,
@@ -164,6 +200,94 @@ public enum FidelityValidator {
 }
 
 private extension FidelityValidator {
+    static func isRepairable(_ reason: FidelityRejectionReason) -> Bool {
+        switch reason {
+        case .missingContent, .unexpectedContent, .editScopeTooLarge,
+            .missingProtectedToken, .duplicatedProtectedToken,
+            .reorderedProtectedToken:
+            true
+        case .emptyOutput, .outputTooLong, .modelPreamble, .thinkingLeak,
+            .unexpectedMarkdown, .languageChanged, .unknownPlaceholder:
+            false
+        }
+    }
+
+    static func repairedCandidate(
+        _ candidate: String,
+        against preparation: DeterministicPreparation
+    ) -> (text: String, revertedCount: Int)? {
+        let sourceSentences = SpanRepair.sentences(in: preparation.promptText)
+        let candidateSentences = SpanRepair.sentences(in: candidate)
+        guard sourceSentences.count > 1 || candidateSentences.count > 1,
+            let pairs = SpanRepair.align(
+                source: sourceSentences,
+                candidate: candidateSentences
+            )
+        else {
+            return nil
+        }
+        var pieces: [String] = []
+        var revertedCount = 0
+        for pair in pairs {
+            if pairIsAcceptable(pair, preparation: preparation) {
+                pieces.append(pair.candidate)
+            } else {
+                pieces.append(pair.source)
+                revertedCount += 1
+            }
+        }
+        guard revertedCount > 0, revertedCount < pairs.count else {
+            // Nothing reverted means the whole-text failure was cross-sentence
+            // and splicing cannot help; everything reverted is the fallback by
+            // another name.
+            return nil
+        }
+        return (pieces.joined(separator: " "), revertedCount)
+    }
+
+    /// The whole-text rules, applied to one aligned sentence pair.
+    static func pairIsAcceptable(
+        _ pair: SpanRepair.AlignedPair,
+        preparation: DeterministicPreparation
+    ) -> Bool {
+        // Placeholders present in this source slice must survive exactly once,
+        // and the candidate may not borrow placeholders from elsewhere.
+        let sourcePlaceholders = matches(#"\bVOXOLP\d+\b"#, in: pair.source)
+        let candidatePlaceholders = matches(#"\bVOXOLP\d+\b"#, in: pair.candidate)
+        guard candidatePlaceholders == sourcePlaceholders else {
+            return false
+        }
+
+        let sourceWords = words(in: pair.source)
+        let candidateWords = words(in: pair.candidate)
+        if containsUnsupportedContent(
+            candidateWords,
+            sourceWords: sourceWords,
+            language: preparation.language
+        ) {
+            return false
+        }
+        if containsMissingContent(
+            sourceWords,
+            candidateWords: candidateWords,
+            language: preparation.language,
+            mode: preparation.cleanupMode,
+            allowListFraming: false
+        ) {
+            return false
+        }
+        // Critical words survive verbatim, per occurrence.
+        let critical = SpanRepair.criticalWords(for: preparation.language)
+        var remaining = candidateWords
+        for word in sourceWords where critical.contains(word) {
+            guard let index = remaining.firstIndex(of: word) else {
+                return false
+            }
+            remaining.remove(at: index)
+        }
+        return true
+    }
+
     static func reject(
         _ reason: FidelityRejectionReason,
         _ preparation: DeterministicPreparation
@@ -308,7 +432,12 @@ private extension FidelityValidator {
             !source.contains(where: \.isNumber),
             !candidate.contains(where: \.isNumber),
             !negationWords(for: language).contains(source),
-            !negationWords(for: language).contains(candidate)
+            !negationWords(for: language).contains(candidate),
+            // A critical word never satisfies the check by resembling another
+            // word: "peut" mapped to "peu" is one letter and a different
+            // sentence. Criticals survive exactly or the edit is refused.
+            !SpanRepair.criticalWords(for: language).contains(source),
+            !SpanRepair.criticalWords(for: language).contains(candidate)
         else {
             return nil
         }
