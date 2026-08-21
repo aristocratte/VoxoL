@@ -27,6 +27,8 @@ final class UpdateInstaller {
 
     private(set) var phase = Phase.idle
     private(set) var version = ""
+    /// Download completion in [0, 1], nil while the size is unknown.
+    private(set) var downloadProgress: Double?
 
     private var panel: NSPanel?
 
@@ -51,11 +53,11 @@ final class UpdateInstaller {
         presentPanel()
         do {
             phase = .downloading
-            let (downloaded, _) = try await URLSession.shared.download(from: diskImageURL)
+            downloadProgress = nil
             // The download lands with a random name; hdiutil wants a .dmg.
             let staged = FileManager.default.temporaryDirectory
                 .appendingPathComponent("VoxoL-\(update.version)-\(UUID().uuidString).dmg")
-            try FileManager.default.moveItem(at: downloaded, to: staged)
+            try await downloadReportingProgress(from: diskImageURL, to: staged)
             defer { try? FileManager.default.removeItem(at: staged) }
 
             phase = .installing
@@ -83,6 +85,83 @@ final class UpdateInstaller {
         panel = nil
         if case .failed = phase {
             phase = .idle
+        }
+    }
+
+    /// Downloads with byte-level progress into `destination`.
+    ///
+    /// `URLSession.download(from:)` is one line but reports nothing until it
+    /// is done; a silent ten-megabyte wait reads as a hang, and a user who
+    /// thinks the updater hung force-quits it mid-replace. The delegate path
+    /// costs the boilerplate below and buys the one thing a progress bar is
+    /// for: proof of life.
+    private func downloadReportingProgress(from url: URL, to destination: URL) async throws {
+        let delegate = DownloadDelegate(destination: destination) { [weak self] progress in
+            Task { @MainActor in self?.downloadProgress = progress }
+        }
+        let session = URLSession(
+            configuration: .ephemeral,
+            delegate: delegate,
+            delegateQueue: nil
+        )
+        defer { session.finishTasksAndInvalidate() }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            delegate.continuation = continuation
+            session.downloadTask(with: url).resume()
+        }
+    }
+
+    private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+        private let destination: URL
+        private let onProgress: @Sendable (Double?) -> Void
+        var continuation: CheckedContinuation<Void, Error>?
+
+        init(destination: URL, onProgress: @escaping @Sendable (Double?) -> Void) {
+            self.destination = destination
+            self.onProgress = onProgress
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            downloadTask: URLSessionDownloadTask,
+            didWriteData bytesWritten: Int64,
+            totalBytesWritten: Int64,
+            totalBytesExpectedToWrite: Int64
+        ) {
+            guard totalBytesExpectedToWrite > 0 else {
+                onProgress(nil)
+                return
+            }
+            onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            downloadTask: URLSessionDownloadTask,
+            didFinishDownloadingTo location: URL
+        ) {
+            // The file at `location` is deleted the moment this returns, so
+            // the move happens here or not at all.
+            do {
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.moveItem(at: location, to: destination)
+            } catch {
+                continuation?.resume(throwing: error)
+                continuation = nil
+            }
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            didCompleteWithError error: Error?
+        ) {
+            if let error {
+                continuation?.resume(throwing: error)
+            } else {
+                continuation?.resume()
+            }
+            continuation = nil
         }
     }
 
@@ -304,7 +383,15 @@ private struct UpdateInstallerPanelView: View {
             case .idle:
                 EmptyView()
             case .downloading:
-                progressRow("Téléchargement…")
+                VStack(alignment: .leading, spacing: 6) {
+                    if let progress = installer.downloadProgress {
+                        ProgressView(value: progress)
+                        Text(verbatim: "Téléchargement… \(Int(progress * 100)) %")
+                            .font(.system(size: 12))
+                    } else {
+                        progressRow("Téléchargement…")
+                    }
+                }
             case .installing:
                 progressRow("Installation dans Applications…")
             case .relaunching:
