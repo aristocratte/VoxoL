@@ -3306,14 +3306,6 @@ struct EditorialSettingsView: View {
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
     @AppStorage("voxol.learningEnabled") private var learningEnabled = true
 
-    private var voiceProcessingModeTitle: LocalizedStringKey {
-        switch voiceProcessingMode {
-        case "enabled": "Always on"
-        case "disabled": "Off"
-        default: "Automatic"
-        }
-    }
-
     @State private var visible = false
     @State private var showsAppearanceNote = false
     @State private var updateCheckInFlight = false
@@ -3348,6 +3340,7 @@ struct EditorialSettingsView: View {
             .padding(metrics.pagePadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .editorialDropdownHost()
         .onAppear { reveal() }
         .onDisappear { visible = false }
         .onChange(of: privateMode) { _, enabled in
@@ -3506,26 +3499,13 @@ struct EditorialSettingsView: View {
                 detail: languageCode == AppLanguage.french.rawValue ? "Français" : "English",
                 metrics: metrics
             ) {
-                Menu(String(localized: "Change")) {
-                    ForEach(AppLanguage.allCases) { option in
-                        Button {
-                            languageCode = option.rawValue
-                        } label: {
-                            if languageCode == option.rawValue {
-                                Label {
-                                    Text(verbatim: option.displayName)
-                                } icon: {
-                                    Image(systemName: "checkmark")
-                                }
-                            } else {
-                                Text(verbatim: option.displayName)
-                            }
-                        }
-                    }
-                }
-                .menuStyle(.button)
-                .menuIndicator(.hidden)
-                .buttonStyle(EditorialSettingsButtonStyle())
+                EditorialDropdown(
+                    options: AppLanguage.allCases.map {
+                        EditorialDropdownOption(id: $0.rawValue, verbatim: $0.displayName)
+                    },
+                    selectedID: languageCode,
+                    select: { languageCode = $0 }
+                )
                 .fixedSize()
             }
             settingsDivider
@@ -3598,13 +3578,13 @@ struct EditorialSettingsView: View {
                 detail: activationMode == .hold ? "Hold to speak" : "Press to toggle",
                 metrics: metrics
             ) {
-                Menu("Change") {
-                    ForEach(ActivationMode.allCases) { mode in
-                        Button(mode.title) { activationMode = mode }
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .buttonStyle(EditorialSettingsButtonStyle())
+                EditorialDropdown(
+                    options: ActivationMode.allCases.map {
+                        EditorialDropdownOption(id: $0.rawValue, $0.title)
+                    },
+                    selectedID: activationMode.rawValue,
+                    select: { activationMode = ActivationMode(rawValue: $0) ?? .hold }
+                )
             }
             settingsDivider
             settingsRow(
@@ -3620,25 +3600,13 @@ struct EditorialSettingsView: View {
                 detail: language.title,
                 metrics: metrics
             ) {
-                Menu("Change") {
-                    ForEach(DictationLanguagePreference.allCases) { option in
-                        Button {
-                            language = option
-                        } label: {
-                            if language == option {
-                                Label {
-                                    Text(option.title)
-                                } icon: {
-                                    Image(systemName: "checkmark")
-                                }
-                            } else {
-                                Text(option.title)
-                            }
-                        }
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .buttonStyle(EditorialSettingsButtonStyle())
+                EditorialDropdown(
+                    options: DictationLanguagePreference.allCases.map {
+                        EditorialDropdownOption(id: $0.rawValue, $0.title)
+                    },
+                    selectedID: language.rawValue,
+                    select: { language = DictationLanguagePreference(rawValue: $0) ?? .preferred }
+                )
             }
             settingsDivider
             settingsRow(
@@ -3646,13 +3614,13 @@ struct EditorialSettingsView: View {
                 detail: preparationDetail,
                 metrics: metrics
             ) {
-                Menu("Change") {
-                    Button("Faithful") { cleanup = .faithful }
-                    Button("Rewrite") { cleanup = .rewrite }
-                    Button("Raw") { cleanup = .raw }
-                }
-                .menuStyle(.borderlessButton)
-                .buttonStyle(EditorialSettingsButtonStyle())
+                EditorialDropdown(
+                    options: DictationCleanupMode.allCases.map {
+                        EditorialDropdownOption(id: $0.rawValue, $0.title)
+                    },
+                    selectedID: cleanup.rawValue,
+                    select: { cleanup = DictationCleanupMode(rawValue: $0) ?? .faithful }
+                )
             }
         }
     }
@@ -3666,25 +3634,13 @@ struct EditorialSettingsView: View {
     }
 
     private var shortcutMenu: some View {
-        Menu("Change") {
-            ForEach(DictationShortcut.allCases) { option in
-                Button {
-                    shortcut = option
-                } label: {
-                    if shortcut == option {
-                        Label {
-                            Text(option.localizedTitle)
-                        } icon: {
-                            Image(systemName: "checkmark")
-                        }
-                    } else {
-                        Text(option.localizedTitle)
-                    }
-                }
-            }
-        }
-        .menuStyle(.borderlessButton)
-        .buttonStyle(EditorialSettingsButtonStyle())
+        EditorialDropdown(
+            options: DictationShortcut.allCases.map {
+                EditorialDropdownOption(id: $0.rawValue, verbatim: String(localized: $0.localizedTitle))
+            },
+            selectedID: shortcut.rawValue,
+            select: { shortcut = DictationShortcut(rawValue: $0) ?? .optionSpace }
+        )
     }
 
     @ViewBuilder

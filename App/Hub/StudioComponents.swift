@@ -638,49 +638,32 @@ struct AudioInputPicker: View {
     var compact = false
 
     var body: some View {
-        Menu {
-            Button {
-                selectedUID = ""
-            } label: {
-                menuLabel(String(localized: "System default"), selected: selectedUID.isEmpty)
-            }
-
-            let devices = AudioInputDevices.available()
-            if !devices.isEmpty {
-                Divider()
-                ForEach(devices) { device in
-                    Button {
-                        selectedUID = device.id
-                    } label: {
-                        menuLabel(device.name, selected: device.id == selectedUID)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "mic")
-                    .font(.system(size: 11, weight: .medium))
-                Text(verbatim: title)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(theme.secondaryInk)
-            }
-            .font(VoxoLTypography.font(size: 11.5, weight: .medium, relativeTo: .caption))
-            .foregroundStyle(isMissing ? theme.warning : theme.ink)
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .frame(maxWidth: compact ? 196 : 260, alignment: .leading)
-            .background(theme.selection)
-            .clipShape(Capsule())
+        let devices = AudioInputDevices.available()
+        var options = [
+            EditorialDropdownOption(id: "", "System default")
+        ]
+        options.append(
+            contentsOf: devices.map { EditorialDropdownOption(id: $0.id, verbatim: $0.name) }
+        )
+        // A stored microphone that is no longer plugged in must stay visible
+        // and selected, or the control would silently lie about what the next
+        // capture will use.
+        if isMissing {
+            options.append(
+                EditorialDropdownOption(
+                    id: selectedUID,
+                    verbatim: String(localized: "Microphone disconnected")
+                )
+            )
         }
-        // .borderlessButton replaces the custom label with its own tinted text; .button plus a
-        // plain button style renders the capsule as written.
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        return EditorialDropdown(
+            options: options,
+            selectedID: selectedUID,
+            select: { selectedUID = $0 },
+            systemImage: "mic",
+            maximumLabelWidth: compact ? 196 : 260,
+            warns: isMissing
+        )
         .help(Text("Input device"))
         .accessibilityLabel(Text("Input device"))
     }
@@ -714,6 +697,203 @@ struct AudioInputPicker: View {
             }
         } else {
             Text(verbatim: name)
+        }
+    }
+}
+
+// MARK: - Editorial dropdown
+
+/// One choice a dropdown offers.
+struct EditorialDropdownOption: Identifiable {
+    let id: String
+    let title: Text
+
+    init(id: String, title: Text) {
+        self.id = id
+        self.title = title
+    }
+
+    init(id: String, _ key: LocalizedStringKey) {
+        self.id = id
+        self.title = Text(key)
+    }
+
+    init(id: String, verbatim: String) {
+        self.id = id
+        self.title = Text(verbatim: verbatim)
+    }
+}
+
+/// An open dropdown, described to the screen that will draw its panel.
+struct EditorialDropdownRequest: @unchecked Sendable {
+    let anchor: Anchor<CGRect>
+    let options: [EditorialDropdownOption]
+    let selectedID: String
+    let select: (String) -> Void
+    let dismiss: () -> Void
+}
+
+enum EditorialDropdownPreferenceKey: PreferenceKey {
+    nonisolated(unsafe) static let defaultValue: [EditorialDropdownRequest] = []
+    static func reduce(
+        value: inout [EditorialDropdownRequest],
+        nextValue: () -> [EditorialDropdownRequest]
+    ) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+/// A select control drawn in VoxoL's own language instead of the system menu.
+///
+/// The native `Menu` popup is rendered by AppKit: system font, system
+/// highlight, system chrome — a foreign object inside an interface that
+/// styles everything else. The panel cannot simply be an overlay on the row,
+/// because later rows in the stack would draw over it; instead the control
+/// publishes its open state and anchor through a preference, and the screen
+/// hosting it draws the panel above everything via `editorialDropdownHost()`.
+struct EditorialDropdown: View {
+    let options: [EditorialDropdownOption]
+    let selectedID: String
+    let select: (String) -> Void
+    var systemImage: String?
+    var maximumLabelWidth: CGFloat?
+    var warns = false
+
+    @Environment(VoxoLTheme.self) private var theme
+    @State private var isOpen = false
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.14)) { isOpen.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 11, weight: .medium))
+                }
+                (options.first(where: { $0.id == selectedID })?.title ?? Text(verbatim: "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(theme.secondaryInk)
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .font(VoxoLTypography.font(size: 11.5, weight: .medium, relativeTo: .caption))
+            .foregroundStyle(warns ? theme.warning : theme.ink)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .frame(maxWidth: maximumLabelWidth, alignment: .leading)
+            .background(hovering || isOpen ? theme.selection : theme.surface)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(theme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .onHover { hovering = $0 }
+        .anchorPreference(key: EditorialDropdownPreferenceKey.self, value: .bounds) { anchor in
+            isOpen
+                ? [
+                    EditorialDropdownRequest(
+                        anchor: anchor,
+                        options: options,
+                        selectedID: selectedID,
+                        select: { id in
+                            select(id)
+                            withAnimation(.easeOut(duration: 0.12)) { isOpen = false }
+                        },
+                        dismiss: {
+                            withAnimation(.easeOut(duration: 0.12)) { isOpen = false }
+                        }
+                    )
+                ]
+                : []
+        }
+    }
+}
+
+private struct EditorialDropdownPanel: View {
+    let request: EditorialDropdownRequest
+    @Environment(VoxoLTheme.self) private var theme
+    @State private var hoveredID: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(request.options) { option in
+                Button {
+                    request.select(option.id)
+                } label: {
+                    HStack(spacing: 8) {
+                        option.title
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 12)
+                        if option.id == request.selectedID {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(theme.cobalt)
+                        }
+                    }
+                    .font(
+                        VoxoLTypography.font(
+                            size: 12,
+                            weight: option.id == request.selectedID ? .semibold : .medium,
+                            relativeTo: .caption
+                        )
+                    )
+                    .foregroundStyle(theme.ink)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        hoveredID == option.id ? theme.selection : Color.clear
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .onHover { hoveredID = $0 ? option.id : nil }
+            }
+        }
+        .padding(6)
+        .frame(width: 236)
+        .background(theme.raisedSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(theme.line, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
+    }
+}
+
+extension View {
+    /// Lets this screen draw the panels of any open `EditorialDropdown` it
+    /// contains, above all of its content, with a click-away layer.
+    func editorialDropdownHost() -> some View {
+        overlayPreferenceValue(EditorialDropdownPreferenceKey.self) { requests in
+            GeometryReader { proxy in
+                if let request = requests.first {
+                    let bounds = proxy[request.anchor]
+                    let height = CGFloat(request.options.count) * 32 + 12
+                    let opensUpward = bounds.maxY + 6 + height > proxy.size.height - 8
+                    ZStack(alignment: .topLeading) {
+                        Color.black.opacity(0.001)
+                            .contentShape(Rectangle())
+                            .onTapGesture { request.dismiss() }
+                        EditorialDropdownPanel(request: request)
+                            .offset(
+                                x: min(max(8, bounds.maxX - 236), proxy.size.width - 244),
+                                y: opensUpward
+                                    ? max(8, bounds.minY - height - 6)
+                                    : bounds.maxY + 6
+                            )
+                            .transition(
+                                .opacity.combined(with: .offset(y: opensUpward ? 3 : -3))
+                            )
+                    }
+                }
+            }
         }
     }
 }
