@@ -301,32 +301,45 @@ final class DictationSessionCoordinator {
         target: TextInsertionTarget,
         insertedText: String,
         rawTranscript: String,
-        bundleIdentifier: String?
+        bundleIdentifier: String?,
+        metricsID: UUID
     ) {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "voxol.learningEnabled"),
-            !defaults.bool(forKey: "voxol.privateMode")
-        else {
+        guard !defaults.bool(forKey: "voxol.privateMode") else {
             correctionWatcher.cancel()
             return
         }
+        // Learning consumes the correction's text; metrics only count it.
+        // Turning learning off must not blind the no-retouch measurement.
+        let learningEnabled = defaults.bool(forKey: "voxol.learningEnabled")
         correctionWatcher.watch(
             target: target,
-            insertedText: insertedText
-        ) { [weak self] corrected in
-            guard let personalizationStore = self?.personalizationStore else { return }
-            Task {
-                await personalizationStore.addCorrection(
-                    CorrectionPair(
-                        rawTranscript: rawTranscript,
-                        correctedText: corrected,
-                        bundleIdentifier: bundleIdentifier,
-                        profile: .automatic,
-                        language: .any
+            insertedText: insertedText,
+            onCorrection: { [weak self] corrected in
+                guard learningEnabled,
+                    let personalizationStore = self?.personalizationStore
+                else { return }
+                Task {
+                    await personalizationStore.addCorrection(
+                        CorrectionPair(
+                            rawTranscript: rawTranscript,
+                            correctedText: corrected,
+                            bundleIdentifier: bundleIdentifier,
+                            profile: .automatic,
+                            language: .any
+                        )
                     )
+                }
+            },
+            onOutcome: { outcome in
+                MetricsRecorder.recordOutcome(
+                    id: metricsID,
+                    outcome: outcome,
+                    insertedText: insertedText,
+                    currentSpan: nil
                 )
             }
-        }
+        )
     }
 
     func configureTextProcessing(
@@ -992,6 +1005,20 @@ private extension DictationSessionCoordinator {
                 VoiceCapsuleController.shared.show(.success)
                 concludeCapsuleAfterInsertion()
 
+                let metricsID = UUID()
+                MetricsRecorder.recordDictation(
+                    id: metricsID,
+                    wordCount: textForInsertion
+                        .split(whereSeparator: \.isWhitespace).count,
+                    mode: UserDefaults.standard.string(forKey: "voxol.cleanupMode")
+                        ?? "faithful",
+                    language: dictationLanguagePreference.rawValue,
+                    bundleIdentifier: bundleIdentifier,
+                    route: processed.route.rawValue,
+                    releaseToTextMilliseconds: lastReport?.releaseToPasteDurationSeconds
+                        .map { Int($0 * 1_000) }
+                )
+
                 if let insertionTarget {
                     // rawText, not textForInsertion: the pair the dictionary
                     // learns from must span the recogniser's actual output to
@@ -1002,7 +1029,8 @@ private extension DictationSessionCoordinator {
                         target: insertionTarget,
                         insertedText: textForInsertion,
                         rawTranscript: rawText,
-                        bundleIdentifier: bundleIdentifier
+                        bundleIdentifier: bundleIdentifier,
+                        metricsID: metricsID
                     )
                 }
             } catch is CancellationError {

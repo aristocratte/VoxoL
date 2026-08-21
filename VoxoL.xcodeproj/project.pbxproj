@@ -71,6 +71,7 @@
 		0000000000000000000000D1 /* UpdateFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000D2 /* UpdateFeed.swift */; };
 		000000000000000000000FA1 /* UpdateNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA2 /* UpdateNotifier.swift */; };
 		000000000000000000000FAB /* UpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FAC /* UpdateInstaller.swift */; };
+		000000000000000000000FAD /* MetricsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FAE /* MetricsRecorder.swift */; };
 		000000000000000000000FA7 /* InsertionCorrectionWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */; };
 		000000000000000000000FA3 /* DefaultSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA4 /* DefaultSettings.swift */; };
 		00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000008C /* PolisherSmokeRunner.swift */; };
@@ -145,6 +146,7 @@
 		0000000000000000000000D2 /* UpdateFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateFeed.swift; sourceTree = "<group>"; };
 		000000000000000000000FA2 /* UpdateNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateNotifier.swift; sourceTree = "<group>"; };
 		000000000000000000000FAC /* UpdateInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateInstaller.swift; sourceTree = "<group>"; };
+		000000000000000000000FAE /* MetricsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsRecorder.swift; sourceTree = "<group>"; };
 		000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertionCorrectionWatcher.swift; sourceTree = "<group>"; };
 		000000000000000000000FA4 /* DefaultSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSettings.swift; sourceTree = "<group>"; };
 		00000000000000000000008C /* PolisherSmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolisherSmokeRunner.swift; sourceTree = "<group>"; };
@@ -285,6 +287,7 @@
 				0000000000000000000000D2 /* UpdateFeed.swift */,
 				000000000000000000000FA2 /* UpdateNotifier.swift */,
 				000000000000000000000FAC /* UpdateInstaller.swift */,
+				000000000000000000000FAE /* MetricsRecorder.swift */,
 				000000000000000000000FA8 /* InsertionCorrectionWatcher.swift */,
 				000000000000000000000FA4 /* DefaultSettings.swift */,
 				00000000000000000000008C /* PolisherSmokeRunner.swift */,
@@ -461,6 +464,7 @@
 				0000000000000000000000D1 /* UpdateFeed.swift in Sources */,
 				000000000000000000000FA1 /* UpdateNotifier.swift in Sources */,
 				000000000000000000000FAB /* UpdateInstaller.swift in Sources */,
+				000000000000000000000FAD /* MetricsRecorder.swift in Sources */,
 				000000000000000000000FA7 /* InsertionCorrectionWatcher.swift in Sources */,
 				000000000000000000000FA3 /* DefaultSettings.swift in Sources */,
 				00000000000000000000008B /* PolisherSmokeRunner.swift in Sources */,

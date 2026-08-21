@@ -37,7 +37,8 @@ final class InsertionCorrectionWatcher {
     func watch(
         target: TextInsertionTarget,
         insertedText: String,
-        onCorrection: @escaping @MainActor (String) -> Void
+        onCorrection: @escaping @MainActor (String) -> Void,
+        onOutcome: @escaping @MainActor (InsertionCorrection.Outcome) -> Void = { _ in }
     ) {
         // One dictation at a time: the previous field is no longer where the
         // user is, and its later edits say nothing about this dictation.
@@ -53,20 +54,30 @@ final class InsertionCorrectionWatcher {
         }
 
         task = Task { [injector] in
+            var lastOutcome = InsertionCorrection.Outcome.unchanged
             for checkpoint in Self.checkpoints {
                 try? await Task.sleep(for: checkpoint)
                 if Task.isCancelled { return }
-                guard let current = injector.currentText(of: target) else { return }
-                guard
-                    let corrected = InsertionCorrection.correctedText(
-                        inserted: insertedText,
-                        baseline: baseline,
-                        current: current
-                    )
-                else { continue }
-                onCorrection(corrected)
-                return
+                guard let current = injector.currentText(of: target) else {
+                    onOutcome(lastOutcome)
+                    return
+                }
+                let outcome = InsertionCorrection.classify(
+                    inserted: insertedText,
+                    baseline: baseline,
+                    current: current
+                )
+                lastOutcome = outcome
+                if case .corrected(let corrected) = outcome {
+                    onCorrection(corrected)
+                    onOutcome(outcome)
+                    return
+                }
             }
+            // The window closed without a correction: whatever the field says
+            // now is the dictation's verdict — unchanged is the win condition
+            // the no-retouch rate counts.
+            onOutcome(lastOutcome)
         }
     }
 

@@ -143,6 +143,38 @@ final class DictionaryLearningTests: XCTestCase {
         XCTAssertEqual(entry.canonical, "chipset")
     }
 
+    func testACorrectionAgainstALearnedCanonicalContradictsIt() {
+        // The self-reinforcing failure: "chipset" was learned, the decoder now
+        // boosts it, and the user corrects "chipset" to "chip 7". Their
+        // correction outranks the entry immediately.
+        let learned = DictionaryEntry(
+            canonical: "chipset",
+            spokenForms: ["chip set"],
+            origin: .learned
+        )
+        let manual = DictionaryEntry(canonical: "chipset", spokenForms: ["chip set"])
+
+        let contradicted = DictionaryLearning.contradictedEntries(
+            by: correction("le chipset gère le slot", "le chip7 gère le slot"),
+            in: [learned, manual]
+        )
+
+        XCTAssertEqual(contradicted, [learned.id])
+    }
+
+    func testAnUnrelatedCorrectionContradictsNothing() {
+        let learned = DictionaryEntry(
+            canonical: "chipset",
+            spokenForms: ["chip set"],
+            origin: .learned
+        )
+        let contradicted = DictionaryLearning.contradictedEntries(
+            by: correction("le rapport est prêt", "le rapport est fini"),
+            in: [learned]
+        )
+        XCTAssertTrue(contradicted.isEmpty)
+    }
+
     func testAnUnchangedCorrectionYieldsNothing() {
         let suggestions = DictionaryLearning.suggestions(
             from: [

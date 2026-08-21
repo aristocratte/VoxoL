@@ -50,6 +50,34 @@ public enum DictionaryLearning {
         fold(entry.spokenForms.first ?? "") + "→" + fold(entry.canonical)
     }
 
+    /// Learned entries this correction argues against: their canonical was
+    /// itself just corrected into something else.
+    ///
+    /// This is the loop-breaker for a self-reinforcing failure: a bad
+    /// attribution creates an entry, the entry biases the decoder toward its
+    /// canonical, the bias reproduces the very word the user keeps fixing.
+    /// The user's own correction is the strongest possible evidence the entry
+    /// is wrong, so it wins immediately. Only learned entries are touched —
+    /// a hand-typed entry is a stated preference, and a machine does not
+    /// undecide it.
+    public static func contradictedEntries(
+        by correction: CorrectionPair,
+        in entries: [DictionaryEntry]
+    ) -> [UUID] {
+        let replaced = substitutions(
+            words(correction.rawTranscript),
+            words(correction.correctedText)
+        )
+        let heard = Set(replaced.map { fold($0.0) })
+        guard !heard.isEmpty else { return [] }
+        return entries
+            .filter { entry in
+                entry.origin == .learned && entry.isEnabled
+                    && heard.contains(fold(entry.canonical))
+            }
+            .map(\.id)
+    }
+
     private static func entries(
         from corrections: [CorrectionPair],
         existing: [DictionaryEntry],
@@ -117,7 +145,7 @@ extension DictionaryLearning {
         let meant: String
     }
 
-    static func words(_ text: String) -> [String] {
+    public static func words(_ text: String) -> [String] {
         text.replacingOccurrences(of: "\u{2019}", with: "'")
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" && $0 != "-" }
             .map(String.init)
@@ -125,7 +153,7 @@ extension DictionaryLearning {
 
     /// Case- and accent-insensitive, so one mistake does not split into several
     /// near-identical candidates.
-    static func fold(_ word: String) -> String {
+    public static func fold(_ word: String) -> String {
         word.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
     }
 

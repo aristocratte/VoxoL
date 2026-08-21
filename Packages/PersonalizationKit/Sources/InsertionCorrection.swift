@@ -17,6 +17,57 @@ public enum InsertionCorrection {
     /// rewrite, as a fraction of the dictated length.
     public static let maximumDrift = 0.35
 
+    /// What happened to the dictated span since insertion.
+    ///
+    /// Only `corrected` carries learning signal, but the other outcomes carry
+    /// measurement signal: the no-retouch rate is "how often the answer is
+    /// `unchanged`", and counting a continuation as a correction would make
+    /// every productive user look dissatisfied.
+    public enum Outcome: Equatable, Sendable {
+        /// The span is exactly as inserted.
+        case unchanged
+        /// The span was repaired; the payload is its new form.
+        case corrected(String)
+        /// The user kept writing after the span.
+        case continued
+        /// The text before the span changed: the user is editing elsewhere.
+        case editedElsewhere
+        /// The span was replaced beyond any plausible repair.
+        case rewritten
+    }
+
+    /// Classifies the destination field's current text against the insertion.
+    public static func classify(
+        inserted: String,
+        baseline: String,
+        current: String
+    ) -> Outcome {
+        let trimmedInserted = inserted.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedInserted.isEmpty, current != baseline else { return .unchanged }
+        guard let span = baseline.range(of: trimmedInserted, options: .backwards) else {
+            return .editedElsewhere
+        }
+        let prefix = String(baseline[baseline.startIndex..<span.lowerBound])
+        let suffix = String(baseline[span.upperBound...])
+        guard current.hasPrefix(prefix) else { return .editedElsewhere }
+        var middle = String(current.dropFirst(prefix.count))
+        if !suffix.isEmpty, middle.hasSuffix(suffix) {
+            middle = String(middle.dropLast(suffix.count))
+        }
+        middle = middle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !middle.isEmpty else { return .rewritten }
+        guard middle != trimmedInserted else { return .unchanged }
+        // Growth beyond the repair envelope with the span intact at the front
+        // is someone carrying on, not someone correcting.
+        if middle.hasPrefix(trimmedInserted), middle.count > trimmedInserted.count {
+            return .continued
+        }
+        guard isPlausibleRepair(of: trimmedInserted, into: middle) else {
+            return .rewritten
+        }
+        return .corrected(middle)
+    }
+
     /// Returns the edited form of the dictated span, or nil when the change
     /// does not look like a correction of it.
     public static func correctedText(
@@ -24,29 +75,14 @@ public enum InsertionCorrection {
         baseline: String,
         current: String
     ) -> String? {
-        let inserted = inserted.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !inserted.isEmpty, current != baseline else { return nil }
-
-        // Searched from the end: dictating into a long document puts the new
-        // text last, and an earlier coincidental match would anchor the whole
-        // comparison to the wrong place.
-        guard let span = baseline.range(of: inserted, options: .backwards) else { return nil }
-        let prefix = String(baseline[baseline.startIndex..<span.lowerBound])
-        let suffix = String(baseline[span.upperBound...])
-
-        // Text before the dictation must still be intact. If it is not, the
-        // user is editing somewhere else entirely and nothing here refers to
-        // what VoxoL wrote.
-        guard current.hasPrefix(prefix) else { return nil }
-        var middle = String(current.dropFirst(prefix.count))
-        if !suffix.isEmpty, middle.hasSuffix(suffix) {
-            middle = String(middle.dropLast(suffix.count))
+        if case .corrected(let text) = classify(
+            inserted: inserted,
+            baseline: baseline,
+            current: current
+        ) {
+            return text
         }
-        middle = middle.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !middle.isEmpty, middle != inserted else { return nil }
-        guard isPlausibleRepair(of: inserted, into: middle) else { return nil }
-        return middle
+        return nil
     }
 
     /// Whether the change is small enough to be a repair of the same sentence.

@@ -1,0 +1,24 @@
+{
+  "frozenAt": "2026-08-21",
+  "purpose": "Ancrage du champion : toute comparaison future se fait contre ces empreintes exactes.",
+  "baseModel": {
+    "path": "2fc06364715b967f1860aea9cf38778875588b17",
+    "weightsSHA256": "f5a0d9dd3efa73510542a8023d610ff26be2b4b020d181cfc4bedaa1fcc5dd9e",
+    "configSHA256": "ba7770da23eae5ebd6827571f086e331956b33f4442a9e876fb4aa10969a6772"
+  },
+  "adapter": {
+    "path": "voxol-adapter",
+    "weightsSHA256": "9df7372a3560ddd0f13cf48cf7126aab763eee3db097cdc9994b54c53cbe3185",
+    "configSHA256": "bfa7f8778fb85017298b71b7d2be9dbbfcd77912cc2fac8a5088d4c4a06ffc1c",
+    "provenance": "campagne v8 (teacher Wispr) — remplacement planifié par corpus humain, décision utilisateur en cours"
+  },
+  "promptVersion": "voxol-cleanup-v5 (fidèle) + instruction Réécriture distincte",
+  "validator": "v2 — réparation par spans + lexique critique (commit 4e5be50)",
+  "baselineSuite": {
+    "cases": 101,
+    "accepted": 74,
+    "meanNormalizedDistance": 0.3426,
+    "medianNormalizedDistance": 0.0658,
+    "note": "distance à une référence Wispr : diagnostic historique, plus jamais un gold de sélection"
+  }
+}

@@ -121,10 +121,30 @@ final class PersonalizationStore {
             try await repository.addCorrection(correction)
             corrections.insert(correction, at: 0)
             lastError = nil
+            await demoteContradictedEntries(by: correction)
             await promoteRepeatedCorrections()
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    /// Pauses learned entries the user just corrected away — the loop-breaker
+    /// for bias reinforcing its own mistake. The entry stays visible in the
+    /// Library as paused rather than vanishing: an automation that undoes
+    /// itself silently is as opaque as one that acts silently.
+    private func demoteContradictedEntries(by correction: CorrectionPair) async {
+        let contradicted = DictionaryLearning.contradictedEntries(
+            by: correction,
+            in: snapshot.dictionary
+        )
+        guard !contradicted.isEmpty else { return }
+        for id in contradicted {
+            if let index = snapshot.dictionary.firstIndex(where: { $0.id == id }) {
+                snapshot.dictionary[index].isEnabled = false
+            }
+        }
+        await persist()
+        dictionaryDidChange?()
     }
 
     /// Adds dictionary entries for mistakes the user has now corrected more
