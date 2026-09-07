@@ -286,8 +286,18 @@ public final class TextInjector {
 }
 
 private extension TextInjector {
+    /// Every accessibility read in this process is a synchronous IPC into whichever application
+    /// is in front, made from the main thread. The system default lets one call block for
+    /// several seconds when that application is busy — an Electron window redrawing, a page
+    /// loading — and the insertion path makes a dozen of them in a row. Half a second a call is
+    /// an order of magnitude above a healthy answer and keeps the worst case in human scale.
+    static func boundAccessibilityWaits() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
+    }
+
     func focusedUIElement(for preferredProcessIdentifier: pid_t? = nil) throws -> AXUIElement {
         let systemWideElement = AXUIElementCreateSystemWide()
+        Self.boundAccessibilityWaits()
         var value: CFTypeRef?
         var result = AXUIElementCopyAttributeValue(
             systemWideElement,

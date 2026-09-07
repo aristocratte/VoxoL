@@ -7,11 +7,37 @@ derived_data="$repository_root/.build/DerivedData"
 
 cd "$repository_root"
 
+# `--fast` stops after the checks that need no Xcode build, no signing identity and no GUI:
+# policy, notebooks, formatting, every Swift and Python unit test. It is what CI runs and what a
+# change confined to a package should run before a commit. The full run adds the benchmark,
+# the Debug app build, the localization diff, the signature check and the launch smoke.
+fast_only=false
+for argument in "$@"; do
+    case "$argument" in
+        --fast) fast_only=true ;;
+        *)
+            printf '%s
+' "Unknown option: $argument (expected --fast)" >&2
+            exit 2
+            ;;
+    esac
+done
+
 ./Scripts/check-repository-policy.sh
 python3 Scripts/build-parakeet-colab-notebook.py --check
 python3 Scripts/build-parakeet-gpu-runner.py --check
 xcrun swift-format lint --strict --parallel --recursive Package.swift App Packages Tools Tests
 swift test
+python3 -m unittest discover -s Scripts -p 'test_*.py'
+if [ -n "$(find Tools/benchmarks -name 'test_*.py' -print -quit)" ]; then
+    python3 -m unittest discover -s Tools/benchmarks -p 'test_*.py'
+fi
+
+if [ "$fast_only" = true ]; then
+    printf '%s\n' "VoxoL fast verification passed."
+    exit 0
+fi
+
 swift run voxol-benchmark --iterations 5 >/dev/null
 
 development_identity=$(

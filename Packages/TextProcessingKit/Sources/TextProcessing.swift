@@ -53,6 +53,38 @@ public struct TextProcessingPreferences: Equatable, Sendable {
     }
 }
 
+/// Experimental text-quality switches. Every switch is off unless the caller opts in.
+public struct TextQualityFeatureFlags: Equatable, Sendable {
+    /// Runs the v3 validator beside v2 without changing inserted text.
+    public var textQualityV3Shadow: Bool
+    /// Enables edit-gate diagnostics; v2 still owns visible output.
+    public var editGateV3: Bool
+    /// Reserves the isolated code-dictation path for later promotion.
+    public var codeDictationV1: Bool
+    /// Reserves patch-style Qwen generation for later promotion.
+    public var qwenPatchMode: Bool
+    /// Lets v3 justify dictionary substitutions with calibrated ASR evidence.
+    public var selectiveASRRescue: Bool
+
+    /// Creates an explicit set of experimental switches.
+    public init(
+        textQualityV3Shadow: Bool = false,
+        editGateV3: Bool = false,
+        codeDictationV1: Bool = false,
+        qwenPatchMode: Bool = false,
+        selectiveASRRescue: Bool = false
+    ) {
+        self.textQualityV3Shadow = textQualityV3Shadow
+        self.editGateV3 = editGateV3
+        self.codeDictationV1 = codeDictationV1
+        self.qwenPatchMode = qwenPatchMode
+        self.selectiveASRRescue = selectiveASRRescue
+    }
+
+    /// Shipping behavior: every experimental switch is disabled.
+    public static let disabled = TextQualityFeatureFlags()
+}
+
 /// Minimal, bounded destination context passed to local cleanup.
 public struct TextProcessingContext: Equatable, Sendable {
     /// Destination application bundle identifier.
@@ -92,26 +124,40 @@ public struct TextProcessingRequest: Equatable, Sendable {
     public var rawTranscript: String
     /// Explicit language override when known.
     public var preferredLanguage: TextLanguage?
+    /// The language assumed when the transcript carries no lexical evidence either way —
+    /// a two-word French fragment used to be routed as English and then rejected for
+    /// "changing" language.
+    public var fallbackLanguage: TextLanguage
     /// Ephemeral destination context.
     public var context: TextProcessingContext
     /// Cleanup preferences.
     public var preferences: TextProcessingPreferences
     /// Local dictionary, snippet and profile snapshot.
     public var personalization: PersonalizationSnapshot
+    /// Word-level decoder evidence, or unknown evidence for engines that do not expose it.
+    public var transcriptEvidence: TranscriptEvidence?
+    /// Explicitly opt-in experimental paths. Defaults preserve the shipping pipeline.
+    public var featureFlags: TextQualityFeatureFlags
 
     /// Creates one text-processing request.
     public init(
         rawTranscript: String,
         preferredLanguage: TextLanguage? = nil,
+        fallbackLanguage: TextLanguage = .english,
         context: TextProcessingContext = TextProcessingContext(),
         preferences: TextProcessingPreferences = TextProcessingPreferences(),
-        personalization: PersonalizationSnapshot = PersonalizationSnapshot()
+        personalization: PersonalizationSnapshot = PersonalizationSnapshot(),
+        transcriptEvidence: TranscriptEvidence? = nil,
+        featureFlags: TextQualityFeatureFlags = .disabled
     ) {
         self.rawTranscript = rawTranscript
+        self.fallbackLanguage = fallbackLanguage
         self.preferredLanguage = preferredLanguage
         self.context = context
         self.preferences = preferences
         self.personalization = personalization
+        self.transcriptEvidence = transcriptEvidence
+        self.featureFlags = featureFlags
     }
 }
 
@@ -171,6 +217,10 @@ public struct DeterministicPreparation: Equatable, Sendable {
     public let automaticLists: Bool
     /// The cleanup contract in force, which the fidelity validator enforces.
     public let cleanupMode: CleanupMode
+    /// Decoder evidence re-aligned to `promptText`, including placeholders.
+    public let transcriptEvidence: TranscriptEvidence?
+    /// Feature switches copied from the request for downstream shadow evaluation.
+    public let featureFlags: TextQualityFeatureFlags
 
     /// Creates a deterministic preparation result.
     public init(
@@ -185,7 +235,9 @@ public struct DeterministicPreparation: Equatable, Sendable {
         dictionaryTerms: [String],
         context: TextProcessingContext,
         automaticLists: Bool,
-        cleanupMode: CleanupMode = .faithful
+        cleanupMode: CleanupMode = .faithful,
+        transcriptEvidence: TranscriptEvidence? = nil,
+        featureFlags: TextQualityFeatureFlags = .disabled
     ) {
         self.rawTranscript = rawTranscript
         self.normalizedText = normalizedText
@@ -199,13 +251,13 @@ public struct DeterministicPreparation: Equatable, Sendable {
         self.context = context
         self.automaticLists = automaticLists
         self.cleanupMode = cleanupMode
+        self.transcriptEvidence = transcriptEvidence
+        self.featureFlags = featureFlags
     }
 
     /// Restores every known placeholder in generated text.
     public func restorePlaceholders(in text: String) -> String {
-        protectedTokens.reduce(text) { partial, token in
-            partial.replacingOccurrences(of: token.placeholder, with: token.value)
-        }
+        restoreProtectedTokens(protectedTokens, in: text)
     }
 }
 
@@ -213,7 +265,9 @@ public struct DeterministicPreparation: Equatable, Sendable {
 public enum DeterministicTextProcessor {
     /// Prepares a deterministic fallback and optional Qwen request.
     public static func prepare(_ request: TextProcessingRequest) -> DeterministicPreparation {
-        let language = request.preferredLanguage ?? LanguageDetector.detect(request.rawTranscript)
+        let language =
+            request.preferredLanguage
+            ?? LanguageDetector.detect(request.rawTranscript, fallback: request.fallbackLanguage)
         let profile = ProfileResolver.resolve(
             requested: request.preferences.profile,
             context: request.context,
@@ -249,7 +303,9 @@ public enum DeterministicTextProcessor {
                 usedSnippet: snippet != nil,
                 dictionaryTerms: entries.map(\.canonical),
                 context: request.context,
-                automaticLists: request.preferences.automaticLists
+                automaticLists: request.preferences.automaticLists,
+                transcriptEvidence: request.transcriptEvidence?.rebased(to: text),
+                featureFlags: request.featureFlags
             )
         }
 
@@ -301,9 +357,7 @@ public enum DeterministicTextProcessor {
             promptText += "."
         }
 
-        let normalizedText = allProtectedTokens.reduce(promptText) { partial, token in
-            partial.replacingOccurrences(of: token.placeholder, with: token.value)
-        }
+        let normalizedText = restoreProtectedTokens(allProtectedTokens, in: promptText)
         // Deliberately measured on the cleaned text: the name says *unresolved*,
         // and a hesitation the deterministic layer already removed needs no
         // model. Reading it before the removal looked like a fix and broke the
@@ -353,16 +407,52 @@ public enum DeterministicTextProcessor {
             dictionaryTerms: entries.map(\.canonical),
             context: request.context,
             automaticLists: request.preferences.automaticLists,
-            cleanupMode: request.preferences.cleanupMode
+            cleanupMode: request.preferences.cleanupMode,
+            transcriptEvidence: request.transcriptEvidence?.rebased(to: promptText),
+            featureFlags: request.featureFlags
         )
     }
 }
 
+/// Restores longer placeholders first because `VOXOLP1` is a prefix of
+/// `VOXOLP10`. Restoring in creation order used to turn the latter into strings
+/// such as `pas0` when token 1 protected the French negation `pas`.
+private func restoreProtectedTokens(_ tokens: [ProtectedToken], in text: String) -> String {
+    tokens
+        .sorted { $0.placeholder.count > $1.placeholder.count }
+        .reduce(text) { partial, token in
+            partial.replacingOccurrences(of: token.placeholder, with: token.value)
+        }
+}
+
 /// Lightweight French and English detector for local routing.
 public enum LanguageDetector {
-    /// Detects the dominant supported language using function words.
-    public static func detect(_ text: String) -> TextLanguage {
-        dominantLanguage(in: text) ?? .english
+    private static let frenchFunctionWords: Set<String> = [
+        "je", "tu", "il", "elle", "nous", "vous", "on", "le", "la", "les", "un", "une",
+        "des", "du", "au", "aux", "ce", "cette", "ces", "et", "est", "sont", "dans",
+        "sur", "avec", "pour", "que", "qui", "pas", "donc", "alors",
+    ]
+    private static let englishFunctionWords: Set<String> = [
+        "i", "you", "he", "she", "we", "they", "the", "a", "an", "and", "is", "are",
+        "was", "were", "in", "on", "at", "with", "for", "that", "this", "not", "so",
+    ]
+    private static let frenchCodeSwitchMarkers = frenchFunctionWords.union([
+        "a", "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses", "ne", "ça", "très",
+        "bien", "plus", "mais", "comme", "quand", "après", "avant", "faut", "voudrais",
+        "aimerais", "faire", "peux", "peut", "maintenant",
+    ])
+    private static let englishCodeSwitchMarkers = englishFunctionWords.union([
+        "my", "your", "our", "their", "it", "to", "from", "of", "as", "if", "but", "then",
+        "now", "when", "what", "how", "can", "could", "should", "would", "will", "need",
+        "want", "think", "because", "please", "just", "really", "maybe", "after", "before",
+        "app", "benchmark", "code", "design", "footer", "header", "laptop", "meeting", "model",
+        "plugin", "prompt", "section", "slide", "switch", "teams", "training", "update", "website",
+    ])
+
+    /// Detects the dominant supported language using function words, or answers `fallback`
+    /// when the text carries no evidence either way.
+    public static func detect(_ text: String, fallback: TextLanguage = .english) -> TextLanguage {
+        dominantLanguage(in: text) ?? fallback
     }
 
     /// Returns a language only when the text contains unambiguous lexical evidence.
@@ -370,27 +460,37 @@ public enum LanguageDetector {
         in text: String,
         minimumEvidence: Int = 1
     ) -> TextLanguage? {
-        let words = Set(
-            text.lowercased()
-                .split { !$0.isLetter }
-                .map(String.init)
-        )
-        let french = [
-            "je", "tu", "il", "elle", "nous", "vous", "on", "le", "la", "les", "un", "une",
-            "des", "du", "au", "aux", "ce", "cette", "ces", "et", "est", "sont", "dans",
-            "sur", "avec", "pour", "que", "qui", "pas", "donc", "alors",
-        ]
-        let english = [
-            "i", "you", "he", "she", "we", "they", "the", "a", "an", "and", "is", "are",
-            "was", "were", "in", "on", "at", "with", "for", "that", "this", "not", "so",
-        ]
-        let frenchScore = french.reduce(0) { $0 + (words.contains($1) ? 1 : 0) }
-        let englishScore = english.reduce(0) { $0 + (words.contains($1) ? 1 : 0) }
+        let words = lexicalWords(in: text)
+        let frenchScore = words.intersection(frenchFunctionWords).count
+        let englishScore = words.intersection(englishFunctionWords).count
         let strongestScore = max(frenchScore, englishScore)
         guard strongestScore >= max(1, minimumEvidence), frenchScore != englishScore else {
             return nil
         }
         return frenchScore > englishScore ? .french : .english
+    }
+
+    /// Detects explicit French/English mixing without forcing one language to
+    /// own the whole sentence. Two distinct markers are required on each side:
+    /// a lone borrowed word such as "slide" or "meeting" is ordinary French
+    /// technical vocabulary and must not change the prompt contract.
+    public static func containsCodeSwitching(in text: String) -> Bool {
+        let words = lexicalWords(in: text)
+        let frenchScore = words.intersection(
+            frenchCodeSwitchMarkers.subtracting(englishCodeSwitchMarkers)
+        ).count
+        let englishScore = words.intersection(
+            englishCodeSwitchMarkers.subtracting(frenchCodeSwitchMarkers)
+        ).count
+        return frenchScore >= 2 && englishScore >= 2
+    }
+
+    private static func lexicalWords(in text: String) -> Set<String> {
+        Set(
+            text.lowercased()
+                .split { !$0.isLetter }
+                .map(String.init)
+        )
     }
 }
 
@@ -503,7 +603,7 @@ public enum SpeechContextVocabulary {
 /// Versioned, bounded prompt sent to the local Qwen runtime.
 public struct PolishingPrompt: Equatable, Sendable {
     /// Prompt contract version recorded in diagnostics and datasets.
-    public static let version = "voxol-cleanup-v5"
+    public static let version = "voxol-cleanup-v7"
 
     /// Immutable system instruction.
     public let system: String
@@ -602,6 +702,9 @@ public enum PolishingPromptBuilder {
             "\(labels.language): \(preparation.language.rawValue)",
             "\(labels.style): \(preparation.profile.rawValue)",
         ]
+        if LanguageDetector.containsCodeSwitching(in: preparation.rawTranscript) {
+            fields.append(labels.codeSwitching)
+        }
         if !preparation.protectedTokens.isEmpty {
             fields.append(
                 "\(labels.keepExactly): "
@@ -638,6 +741,7 @@ public enum PolishingPromptBuilder {
 private struct PromptLabels {
     let language: String
     let style: String
+    let codeSwitching: String
     let keepExactly: String
     let dictionary: String
     let contextBefore: String
@@ -648,6 +752,8 @@ private struct PromptLabels {
     static let french = PromptLabels(
         language: "LANGUE",
         style: "STYLE",
+        codeSwitching:
+            "FRANÇAIS + ANGLAIS : conserve chaque passage dans sa langue d'origine ; ne traduis rien.",
         keepExactly: "CONSERVER EXACTEMENT",
         dictionary: "DICTIONNAIRE",
         contextBefore: "CONTEXTE AVANT",
@@ -659,6 +765,8 @@ private struct PromptLabels {
     static let english = PromptLabels(
         language: "LANGUAGE",
         style: "STYLE",
+        codeSwitching:
+            "FRENCH + ENGLISH: keep each passage in its original language; translate nothing.",
         keepExactly: "KEEP EXACTLY",
         dictionary: "DICTIONARY",
         contextBefore: "CONTEXT BEFORE",

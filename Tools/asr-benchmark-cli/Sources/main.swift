@@ -256,7 +256,7 @@ private extension ASRBenchmarkCLI {
                     in: arguments
                 )
                 .flatMap(Float.init)
-                ?? ParakeetContextualBias.defaultContinuationBoost
+                    ?? ParakeetContextualBias.defaultContinuationBoost
             )
             print("vocabulary: \(terms.count) terms")
         }

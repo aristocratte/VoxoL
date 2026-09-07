@@ -37,6 +37,7 @@ public enum RepairShadow {
         /// Edit distance between the two, normalised by the candidate's length.
         public let distance: Double
 
+        /// Creates one proposal, as the shadow loop found it.
         public init(
             heard: String,
             candidate: String,
@@ -108,12 +109,12 @@ public enum RepairShadow {
                 // text-only distance was never able to make safely — `Ro` for
                 // `raw` needs acoustic evidence, not spelling.
                 guard candidate.first == heard.first else { continue }
-                let distance = Double(editDistance(heard, candidate))
+                let distance =
+                    Double(editDistance(heard, candidate))
                     / Double(max(candidate.count, 1))
                 guard distance <= distanceThreshold else { continue }
-                if best == nil || distance < best!.distance {
-                    best = (term, distance)
-                }
+                if let current = best, current.distance <= distance { continue }
+                best = (term, distance)
             }
             guard let best else { continue }
             result.append(

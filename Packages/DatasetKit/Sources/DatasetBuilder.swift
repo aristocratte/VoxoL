@@ -244,7 +244,11 @@ public enum DatasetBuilder {
         var contentKeys = Set<String>()
         var splitsByGroup: [String: Set<String>] = [:]
         for example in examples {
-            guard let group = example.splitGroup, let split = example.split else {
+            guard
+                let group = example.splitGroup,
+                let split = example.split,
+                ["train", "validation", "test"].contains(split)
+            else {
                 continue
             }
             splitsByGroup[group, default: []].insert(split)
@@ -254,6 +258,9 @@ public enum DatasetBuilder {
                 splits.count > 1 ? group : nil
             }
         )
+        let explicitSplitByGroup = splitsByGroup.compactMapValues { splits in
+            splits.count == 1 ? splits.first : nil
+        }
 
         for example in examples.sorted(by: { $0.id < $1.id }) {
             guard isValid(example),
@@ -270,7 +277,7 @@ public enum DatasetBuilder {
                 continue
             }
             let record = trainingRecord(for: example)
-            switch assignedSplit(for: example) {
+            switch assignedSplit(for: example, explicitSplitByGroup: explicitSplitByGroup) {
             case "train":
                 train.append(record)
             case "validation":
@@ -411,11 +418,24 @@ private extension DatasetBuilder {
         return String(result)
     }
 
-    static func assignedSplit(for example: CleanupDatasetExample) -> String {
+    static func assignedSplit(
+        for example: CleanupDatasetExample,
+        explicitSplitByGroup: [String: String]
+    ) -> String {
+        if let group = example.splitGroup {
+            if let split = explicitSplitByGroup[group] {
+                return split
+            }
+            return split(for: group)
+        }
         if let split = example.split {
             return split
         }
-        switch bucket(for: example.id) {
+        return split(for: example.id)
+    }
+
+    static func split(for identifier: String) -> String {
+        switch bucket(for: identifier) {
         case 0..<80:
             return "train"
         case 80..<90:

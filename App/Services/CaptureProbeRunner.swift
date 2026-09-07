@@ -24,9 +24,11 @@ enum CaptureProbeRunner {
     @MainActor
     private static func run(arguments: [String]) async -> Int32 {
         guard let index = arguments.firstIndex(of: argument) else { return 2 }
-        let seconds = arguments.indices.contains(index + 1)
+        let seconds =
+            arguments.indices.contains(index + 1)
             ? (Double(arguments[index + 1]) ?? 3) : 3
-        let mode = arguments.indices.contains(index + 2)
+        let mode =
+            arguments.indices.contains(index + 2)
             ? (VoiceProcessingMode(rawValue: arguments[index + 2]) ?? .disabled)
             : .disabled
 

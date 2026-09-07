@@ -93,11 +93,18 @@ struct DictationPipelineTrace: Equatable, Identifiable {
     let id: UUID
     let createdAt: Date
     let rawTranscript: String
+    let qwenCandidate: String?
+    let polisherOutcome: PolisherOutcome
+    let v2RejectionReason: String?
+    let v3Status: String?
+    let v3RejectionReason: String?
     let finalText: String
     let speechRecognitionEngine: SpeechRecognitionEngine
     let processingRoute: TextProcessingRoute
     let asrDurationSeconds: TimeInterval
     let polishingDurationSeconds: TimeInterval
+    var userOutcome: String?
+    var userCorrectedText: String?
 }
 
 private struct LocalSpeechResult {
@@ -111,6 +118,7 @@ private struct LocalSpeechResult {
     let attemptCount: Int
     let usedFallbackSegmentation: Bool
     let confidence: TranscriptionConfidence?
+    let transcriptEvidence: TranscriptEvidence
     /// Per-word decoder confidence, Parakeet only. Feeds the shadow repair
     /// log; the Apple path has no equivalent signal.
     let repairShadowWords: [(word: String, margin: Float)]?
@@ -151,6 +159,7 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private var speechRuntime: ParakeetRuntime?
     @ObservationIgnored private let appleSpeechRuntime = AppleDictationRuntime()
     @ObservationIgnored private var configuredModelRoot: URL?
+    @ObservationIgnored private var wordRiskCalibration: ASRWordRiskCalibration?
     @ObservationIgnored private var configuredPolisherRoot: URL?
     @ObservationIgnored private var textProcessor = DictationTextProcessor(modelRoot: nil)
     @ObservationIgnored private var personalizationStore: PersonalizationStore?
@@ -173,6 +182,10 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private var languagePreparationTask: Task<Void, Never>?
     @ObservationIgnored private var levelPollingTask: Task<Void, Never>?
     @ObservationIgnored private var partialTranscriptionTask: Task<Void, Never>?
+    @ObservationIgnored private var textPrefetchTask: Task<Void, Never>?
+    @ObservationIgnored private var prefetchSessionID: UUID?
+    @ObservationIgnored private var prefetchProcessor: DictationTextProcessor?
+    @ObservationIgnored private var prefetchSpeechRuntime: ParakeetRuntime?
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
     @ObservationIgnored private var capsuleDismissalTask: Task<Void, Never>?
 
@@ -273,6 +286,11 @@ final class DictationSessionCoordinator {
         }
 
         configuredModelRoot = modelRoot
+        let calibrationURL = modelRoot.appendingPathComponent("word-risk-calibration.json")
+        wordRiskCalibration = try? JSONDecoder().decode(
+            ASRWordRiskCalibration.self,
+            from: Data(contentsOf: calibrationURL)
+        )
         modelPreparationTask?.cancel()
         let runtime = ParakeetRuntime(modelRoot: modelRoot, computeUnits: .all)
         speechRuntime = runtime
@@ -338,6 +356,7 @@ final class DictationSessionCoordinator {
                     insertedText: insertedText,
                     currentSpan: nil
                 )
+                self.updatePipelineTrace(id: metricsID, outcome: outcome)
             }
         )
     }
@@ -453,6 +472,7 @@ final class DictationSessionCoordinator {
     }
 
     func deactivate() {
+        cancelTextPrefetch()
         availabilityTask?.cancel()
         availabilityTask = nil
         modelPreparationTask?.cancel()
@@ -628,6 +648,24 @@ private extension DictationSessionCoordinator {
                     applicationName: destinationApplicationName
                 )
             }
+            if setting("voxol.prefetchEnabled", default: true),
+                setting("voxol.streamingEnabled", default: true),
+                dictationLanguagePreference == .automatic,
+                !ProcessInfo.processInfo.isLowPowerModeEnabled,
+                ProcessInfo.processInfo.thermalState != .serious,
+                ProcessInfo.processInfo.thermalState != .critical
+            {
+                let id = UUID()
+                prefetchSessionID = id
+                prefetchProcessor = textProcessor
+                prefetchSpeechRuntime = speechRuntime
+                await textProcessor.beginPrefetchSession(id)
+                await speechRuntime?.beginDictationSession(id)
+                guard shortcutHeld else {
+                    cancelTextPrefetch()
+                    return
+                }
+            }
             try audioCapture.start()
             holdToTalk.handle(.captureStarted)
             state = .listening
@@ -636,6 +674,7 @@ private extension DictationSessionCoordinator {
             startPartialTranscription()
         } catch {
             toggleSessionIsActive = false
+            cancelTextPrefetch()
             destinationInsertionTarget = nil
             destinationContext = nil
             abandonRehearsal()
@@ -676,30 +715,91 @@ private extension DictationSessionCoordinator {
         }
         partialTranscriptionTask = Task { @MainActor [weak self, speechRuntime] in
             var tracker = StableTranscriptTracker()
+            var interval: Duration = .milliseconds(1_250)
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(1_250))
+                try? await Task.sleep(for: interval)
                 guard !Task.isCancelled, let self, audioCapture.isRecording else {
                     return
                 }
                 guard await speechRuntime.isReady else {
                     continue
                 }
-                let samples = audioCapture.snapshotSamples(maximumCount: 20 * 16_000)
+                // Full-prefix previews make completed earlier text runs reusable.
+                // Slow the preview cadence on long captures instead of repeatedly
+                // decoding a growing recording at the old 1.25-second interval.
+                let anticipatesCleanup = prefetchSessionID != nil
+                let samples = audioCapture.snapshotSamples(
+                    maximumCount: (anticipatesCleanup ? 180 : 20) * 16_000
+                )
+                interval =
+                    anticipatesCleanup && samples.count >= 20 * 16_000
+                    ? .seconds(4) : .milliseconds(1_250)
                 guard samples.count >= 24_000 else {
                     continue
                 }
                 do {
-                    let partial = try await speechRuntime.transcribe(samples: samples)
+                    let partial = try await speechRuntime.transcribe(
+                        samples: samples, sessionID: prefetchSessionID)
                     try Task.checkCancellation()
                     guard audioCapture.isRecording else {
                         return
                     }
                     livePartialTranscript = tracker.observe(partial.text)
+                    if anticipatesCleanup {
+                        startTextPrefetch(partial.text)
+                    }
                 } catch is CancellationError {
                     return
                 } catch {
                     continue
                 }
+            }
+        }
+    }
+
+    func startTextPrefetch(_ rawTranscript: String) {
+        guard textPrefetchTask == nil, let sessionID = prefetchSessionID,
+            let processor = prefetchProcessor, audioCapture.isRecording,
+            !ProcessInfo.processInfo.isLowPowerModeEnabled,
+            ProcessInfo.processInfo.thermalState != .serious,
+            ProcessInfo.processInfo.thermalState != .critical
+        else { return }
+        let request = TextProcessingRequest(
+            rawTranscript: rawTranscript.trimmingCharacters(in: .whitespacesAndNewlines),
+            preferredLanguage: dictationLanguagePreference.textLanguage,
+            fallbackLanguage: interfaceTextLanguage,
+            context: textProcessingContext(
+                destinationContext,
+                applicationName: destinationApplicationName,
+                bundleIdentifier: destinationBundleIdentifier
+            ),
+            preferences: textProcessingPreferences(),
+            personalization: personalizationStore?.snapshot ?? PersonalizationSnapshot(),
+            featureFlags: textQualityFeatureFlags()
+        )
+        textPrefetchTask = Task { @MainActor [weak self, processor] in
+            let metrics = await processor.prefetch(request, sessionID: sessionID)
+            guard let self, prefetchSessionID == sessionID else { return }
+            textPrefetchTask = nil
+            logger.debug(
+                "Cleanup prefetch duration_ms=\(Int(metrics.durationSeconds * 1_000), privacy: .public) generated_calls=\(metrics.generatedCallCount, privacy: .public) reused_calls=\(metrics.reusedCallCount, privacy: .public) failed_calls=\(metrics.failedCallCount, privacy: .public)"
+            )
+        }
+    }
+
+    func cancelTextPrefetch() {
+        textPrefetchTask?.cancel()
+        textPrefetchTask = nil
+        let sessionID = prefetchSessionID
+        let processor = prefetchProcessor
+        let asr = prefetchSpeechRuntime
+        prefetchSessionID = nil
+        prefetchProcessor = nil
+        prefetchSpeechRuntime = nil
+        if let sessionID {
+            Task {
+                await processor?.endPrefetchSession(sessionID)
+                await asr?.endDictationSession(sessionID)
             }
         }
     }
@@ -716,6 +816,24 @@ private extension DictationSessionCoordinator {
         levelPollingTask = nil
         partialTranscriptionTask?.cancel()
         partialTranscriptionTask = nil
+        let pendingPrefetch = textPrefetchTask
+        pendingPrefetch?.cancel()
+        textPrefetchTask = nil
+        let sessionID = prefetchSessionID
+        let sessionProcessor = prefetchProcessor
+        let sessionASR = prefetchSpeechRuntime
+        prefetchSessionID = nil
+        prefetchProcessor = nil
+        prefetchSpeechRuntime = nil
+        // Early exits before launching final transcription must also discard text.
+        defer {
+            if transcriptionTask == nil, let sessionID {
+                Task {
+                    await sessionProcessor?.endPrefetchSession(sessionID)
+                    await sessionASR?.endDictationSession(sessionID)
+                }
+            }
+        }
         guard let capturedAudio = audioCapture.stop() else {
             return
         }
@@ -806,18 +924,41 @@ private extension DictationSessionCoordinator {
             guard let self else {
                 return
             }
-            defer { transcriptionTask = nil }
+            defer {
+                transcriptionTask = nil
+                if let sessionID {
+                    Task {
+                        await sessionProcessor?.endPrefetchSession(sessionID)
+                        await sessionASR?.endDictationSession(sessionID)
+                    }
+                }
+            }
             var textForRecovery: String?
 
             // The same vocabulary Apple's recognizer gets has to reach Parakeet,
             // and it can only be built now: it depends on which application the
             // text is going into, which is unknown until dictation starts. A
             // term the user says in Cursor is not the one they say in Mail.
+            //
+            // The words read off the screen at the press ride along: this call
+            // replaces the decoder's bias wholesale, so without them here the
+            // screen vocabulary only ever shaped the live preview, never the
+            // transcript that got inserted.
+            var parakeetContextBiasActive = false
             if let speechRuntime {
+                var decodingVocabulary = speechContextualStrings
+                var known = Set(decodingVocabulary.map { $0.lowercased() })
+                if let capturedContext {
+                    for term in ContextVocabulary.terms(from: capturedContext)
+                    where known.insert(term.lowercased()).inserted {
+                        decodingVocabulary.append(term)
+                    }
+                }
                 await speechRuntime.applyDecodingBias(
-                    vocabulary: speechContextualStrings,
+                    vocabulary: decodingVocabulary,
                     languageCode: languagePreference.decodingLanguageCode
                 )
+                parakeetContextBiasActive = !decodingVocabulary.isEmpty
             }
 
             do {
@@ -826,7 +967,9 @@ private extension DictationSessionCoordinator {
                     languagePreference: languagePreference,
                     parakeetRuntime: speechRuntime,
                     appleSpeechRuntime: appleSpeechRuntime,
-                    contextualStrings: speechContextualStrings
+                    contextualStrings: speechContextualStrings,
+                    parakeetContextBiasActive: parakeetContextBiasActive,
+                    sessionID: sessionID
                 )
                 try Task.checkCancellation()
                 if let words = result.repairShadowWords, !words.isEmpty {
@@ -884,15 +1027,17 @@ private extension DictationSessionCoordinator {
                 )
 
                 let normalizationStarted = clock.now
-                let preparation = DeterministicTextProcessor.prepare(
-                    TextProcessingRequest(
-                        rawTranscript: rawText,
-                        preferredLanguage: languagePreference.textLanguage,
-                        context: processingContext,
-                        preferences: processingPreferences,
-                        personalization: personalization
-                    )
+                let processingRequest = TextProcessingRequest(
+                    rawTranscript: rawText,
+                    preferredLanguage: languagePreference.textLanguage,
+                    fallbackLanguage: interfaceTextLanguage,
+                    context: processingContext,
+                    preferences: processingPreferences,
+                    personalization: personalization,
+                    transcriptEvidence: result.transcriptEvidence,
+                    featureFlags: textQualityFeatureFlags()
                 )
+                let preparation = DeterministicTextProcessor.prepare(processingRequest)
                 let normalizationDuration = seconds(
                     normalizationStarted.duration(to: clock.now)
                 )
@@ -902,7 +1047,12 @@ private extension DictationSessionCoordinator {
                     state = .polishing
                     VoiceCapsuleController.shared.show(.polishing)
                 }
-                let processed = await textProcessor.process(preparation)
+                // Cancellation must finish before final cleanup touches the same
+                // MLX runtime. ASR can execute while that producer winds down.
+                await pendingPrefetch?.value
+                try Task.checkCancellation()
+                let processed = await textProcessor.process(
+                    preparation, request: processingRequest, sessionID: sessionID)
                 try Task.checkCancellation()
                 performanceSignposter.emitEvent("TextProcessingCompleted")
                 let text = processed.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -917,7 +1067,8 @@ private extension DictationSessionCoordinator {
                 )
                 textForRecovery = textForInsertion
                 if setting("voxol.correctionCapture", default: false),
-                    !setting("voxol.privateMode", default: false) {
+                    !setting("voxol.privateMode", default: false)
+                {
                     PersonalBenchmarkRecorder.record(
                         samples: capturedAudio.samples,
                         rawText: rawText,
@@ -938,7 +1089,9 @@ private extension DictationSessionCoordinator {
                     report.processingFallback = processed.failure
                     report.fidelityRejectionReason = processed.rejectionReason?.rawValue
                 }
+                let metricsID = UUID()
                 appendPipelineTrace(
+                    id: metricsID,
                     rawTranscript: rawText,
                     finalText: text,
                     result: result,
@@ -966,16 +1119,19 @@ private extension DictationSessionCoordinator {
                         rawText == text
                         ? []
                         : [TranscriptRevision(text: rawText, createdAt: Date())]
-                    await transcriptStore.add(
-                        TranscriptRecord(
-                            createdAt: Date(),
-                            applicationName: applicationName,
-                            applicationBundleIdentifier: bundleIdentifier,
-                            text: text,
-                            durationSeconds: capturedAudio.durationSeconds,
-                            revisions: revisions
-                        )
+                    let record = TranscriptRecord(
+                        createdAt: Date(),
+                        applicationName: applicationName,
+                        applicationBundleIdentifier: bundleIdentifier,
+                        text: text,
+                        durationSeconds: capturedAudio.durationSeconds,
+                        revisions: revisions
                     )
+                    // The record still lands before the insertion is attempted, but
+                    // the rewrite of the whole archive no longer sits between the
+                    // text being ready and the text being on screen — that wait grew
+                    // with every dictation ever kept.
+                    Task { await transcriptStore.add(record) }
                 }
 
                 state = .inserting
@@ -1005,10 +1161,10 @@ private extension DictationSessionCoordinator {
                 VoiceCapsuleController.shared.show(.success)
                 concludeCapsuleAfterInsertion()
 
-                let metricsID = UUID()
                 MetricsRecorder.recordDictation(
                     id: metricsID,
-                    wordCount: textForInsertion
+                    wordCount:
+                        textForInsertion
                         .split(whereSeparator: \.isWhitespace).count,
                     mode: UserDefaults.standard.string(forKey: "voxol.cleanupMode")
                         ?? "faithful",
@@ -1016,7 +1172,14 @@ private extension DictationSessionCoordinator {
                     bundleIdentifier: bundleIdentifier,
                     route: processed.route.rawValue,
                     releaseToTextMilliseconds: lastReport?.releaseToPasteDurationSeconds
-                        .map { Int($0 * 1_000) }
+                        .map { Int($0 * 1_000) },
+                    polishingMilliseconds: Int(processed.polishingDurationSeconds * 1_000),
+                    fallback: processed.failure?.rawValue,
+                    rejection: processed.rejectionReason?.rawValue,
+                    polisherOutcome: processed.polisherOutcome.rawValue,
+                    partialRecoveryCount: processed.repairedSentenceCount,
+                    v3ShadowStatus: processed.v3ShadowDecision?.status.rawValue,
+                    v3ShadowReason: processed.v3ShadowDecision?.rejectionReason?.rawValue
                 )
 
                 if let insertionTarget {
@@ -1079,6 +1242,7 @@ private extension DictationSessionCoordinator {
     }
 
     func cancelDictation() {
+        cancelTextPrefetch()
         abandonRehearsal()
         shortcutHeld = false
         toggleSessionIsActive = false
@@ -1130,6 +1294,12 @@ private extension DictationSessionCoordinator {
             VoiceCapsuleController.shared.showError(.insertionFailed)
             dismissCapsule(after: .seconds(2))
         }
+    }
+
+    /// The interface language as the polisher's language of last resort.
+    var interfaceTextLanguage: TextLanguage {
+        UserDefaults.standard.string(forKey: "voxol.interfaceLanguage") == "fr"
+            ? .french : .english
     }
 
     var insertionTestText: String {
@@ -1198,7 +1368,9 @@ private extension DictationSessionCoordinator {
         languagePreference: DictationLanguagePreference,
         parakeetRuntime: ParakeetRuntime?,
         appleSpeechRuntime: AppleDictationRuntime,
-        contextualStrings: [String]
+        contextualStrings: [String],
+        parakeetContextBiasActive: Bool,
+        sessionID: UUID? = nil
     ) async throws -> LocalSpeechResult {
         if let localeIdentifier = languagePreference.localeIdentifier {
             do {
@@ -1218,6 +1390,7 @@ private extension DictationSessionCoordinator {
                     attemptCount: 1,
                     usedFallbackSegmentation: false,
                     confidence: nil,
+                    transcriptEvidence: .unknown(text: result.text, source: .appleSpeech),
                     repairShadowWords: nil
                 )
             } catch is CancellationError {
@@ -1232,7 +1405,36 @@ private extension DictationSessionCoordinator {
         guard let parakeetRuntime else {
             throw ParakeetError.runtimeUnavailable
         }
-        let result = try await parakeetRuntime.transcribe(samples: samples)
+        let result = try await parakeetRuntime.transcribe(samples: samples, sessionID: sessionID)
+        let decoderWords = await parakeetRuntime.wordEvidence(for: result)
+        let rawEvidence = TranscriptEvidence(
+            sourceText: result.text,
+            source: .parakeet,
+            words: decoderWords.map { word in
+                TranscriptWordEvidence(
+                    surface: word.surface,
+                    sourceRange: word.sourceRange,
+                    tokens: word.tokenIDs.enumerated().map { offset, tokenID in
+                        TranscriptTokenEvidence(
+                            tokenID: tokenID,
+                            tokenIndex: word.tokenIndices[offset],
+                            frameIndex: word.frameIndices.indices.contains(offset)
+                                ? word.frameIndices[offset] : nil,
+                            durationFrames: word.durations.indices.contains(offset)
+                                ? word.durations[offset] : nil,
+                            logitMargin: word.logitMargins.indices.contains(offset)
+                                ? word.logitMargins[offset] : nil
+                        )
+                    },
+                    frameRange: word.frameRange,
+                    minimumLogitMargin: word.minimumLogitMargin,
+                    meanLogitMargin: word.meanLogitMargin,
+                    contextBiasActive: parakeetContextBiasActive,
+                    nearChunkBoundary: word.nearChunkBoundary
+                )
+            }
+        )
+        let evidence = wordRiskCalibration?.applying(to: rawEvidence) ?? rawEvidence
         return LocalSpeechResult(
             text: result.text,
             inferenceDurationSeconds: result.inferenceDurationSeconds,
@@ -1245,7 +1447,8 @@ private extension DictationSessionCoordinator {
             attemptCount: result.inferenceAttemptCount,
             usedFallbackSegmentation: result.usedFallbackSegmentation,
             confidence: result.confidence,
-            repairShadowWords: await parakeetRuntime.wordConfidences(for: result)
+            transcriptEvidence: evidence,
+            repairShadowWords: decoderWords.map { ($0.surface, $0.minimumLogitMargin) }
         )
     }
 
@@ -1296,6 +1499,16 @@ private extension DictationSessionCoordinator {
             return defaultValue
         }
         return UserDefaults.standard.bool(forKey: key)
+    }
+
+    func textQualityFeatureFlags() -> TextQualityFeatureFlags {
+        TextQualityFeatureFlags(
+            textQualityV3Shadow: setting("voxol.textQualityV3Shadow", default: false),
+            editGateV3: setting("voxol.editGateV3", default: false),
+            codeDictationV1: setting("voxol.codeDictationV1", default: false),
+            qwenPatchMode: setting("voxol.qwenPatchMode", default: false),
+            selectiveASRRescue: setting("voxol.selectiveASRRescue", default: false)
+        )
     }
 
     func dismissCapsule(after delay: Duration) {
@@ -1383,6 +1596,7 @@ private extension DictationSessionCoordinator {
     }
 
     func appendPipelineTrace(
+        id: UUID,
         rawTranscript: String,
         finalText: String,
         result: LocalSpeechResult,
@@ -1395,19 +1609,43 @@ private extension DictationSessionCoordinator {
         }
         pipelineTraces.insert(
             DictationPipelineTrace(
-                id: UUID(),
+                id: id,
                 createdAt: Date(),
                 rawTranscript: rawTranscript,
+                qwenCandidate: processed.modelCandidate,
+                polisherOutcome: processed.polisherOutcome,
+                v2RejectionReason: processed.rejectionReason?.rawValue,
+                v3Status: processed.v3ShadowDecision?.status.rawValue,
+                v3RejectionReason: processed.v3ShadowDecision?.rejectionReason?.rawValue,
                 finalText: finalText,
                 speechRecognitionEngine: result.engine,
                 processingRoute: processed.route,
                 asrDurationSeconds: result.inferenceDurationSeconds,
-                polishingDurationSeconds: processed.polishingDurationSeconds
+                polishingDurationSeconds: processed.polishingDurationSeconds,
+                userOutcome: nil,
+                userCorrectedText: nil
             ),
             at: 0
         )
         if pipelineTraces.count > 20 {
             pipelineTraces.removeLast(pipelineTraces.count - 20)
+        }
+    }
+
+    func updatePipelineTrace(id: UUID, outcome: InsertionCorrection.Outcome) {
+        guard let index = pipelineTraces.firstIndex(where: { $0.id == id }) else { return }
+        switch outcome {
+        case .unchanged:
+            pipelineTraces[index].userOutcome = "unchanged"
+        case .corrected(let corrected):
+            pipelineTraces[index].userOutcome = "corrected"
+            pipelineTraces[index].userCorrectedText = corrected
+        case .continued:
+            pipelineTraces[index].userOutcome = "continued"
+        case .editedElsewhere:
+            pipelineTraces[index].userOutcome = "editedElsewhere"
+        case .rewritten:
+            pipelineTraces[index].userOutcome = "rewritten"
         }
     }
 
@@ -1428,14 +1666,21 @@ private struct DictationDiagnosticsExport: Encodable {
 }
 
 private struct DictationPipelineTraceExport: Encodable {
-    let schemaVersion = 1
+    let schemaVersion = 2
     let traces: [Item]
 
     struct Item: Encodable {
         let id: UUID
         let createdAt: Date
         let rawTranscript: String
+        let qwenCandidate: String?
+        let polisherOutcome: String
+        let v2RejectionReason: String?
+        let v3Status: String?
+        let v3RejectionReason: String?
         let finalText: String
+        let userOutcome: String?
+        let userCorrectedText: String?
         let speechRecognitionEngine: String
         let processingRoute: String
         let asrMilliseconds: Int
@@ -1445,7 +1690,14 @@ private struct DictationPipelineTraceExport: Encodable {
             id = trace.id
             createdAt = trace.createdAt
             rawTranscript = trace.rawTranscript
+            qwenCandidate = trace.qwenCandidate
+            polisherOutcome = trace.polisherOutcome.rawValue
+            v2RejectionReason = trace.v2RejectionReason
+            v3Status = trace.v3Status
+            v3RejectionReason = trace.v3RejectionReason
             finalText = trace.finalText
+            userOutcome = trace.userOutcome
+            userCorrectedText = trace.userCorrectedText
             speechRecognitionEngine = trace.speechRecognitionEngine.rawValue
             processingRoute = trace.processingRoute.rawValue
             asrMilliseconds = Int(trace.asrDurationSeconds * 1_000)
@@ -1538,7 +1790,6 @@ private struct DictationDiagnosticSession: Encodable {
     }
 }
 
-
 /// Appends shadow-repair observations to a local diagnostics file.
 ///
 /// The repair feature itself is deliberately not enabled: measurement put the
@@ -1612,16 +1863,15 @@ private enum RepairShadowRecorder {
     }
 }
 
-
 /// Saves each dictation locally so the owner can build a personal benchmark.
 ///
 /// Every public corpus in the suite is someone else's voice reading someone
 /// else's text; the only measurement that predicts this product's quality for
 /// its owner is the owner's own dictation against the text they actually
 /// wanted. Each session stores the audio, the raw recognition, the inserted
-/// text, and a `corrected.txt` pre-filled with the inserted text — reviewing a
-/// session means fixing that file. `build-personal-benchmark.py` turns the
-/// reviewed sessions into a frozen benchmark and scores it.
+/// text, plus the four Training Studio references. They are pre-filled from
+/// the product output and remain untrusted until the owner reviews them.
+/// `build-personal-benchmark.py` turns accepted sessions into a frozen benchmark.
 ///
 /// Strictly opt-in, suppressed in private mode, nothing leaves the machine,
 /// and recording stops at 500 MB rather than rotating away old sessions the
@@ -1694,8 +1944,18 @@ private enum PersonalBenchmarkRecorder {
             try Data(finalText.utf8).write(
                 to: directory.appendingPathComponent("corrected.txt")
             )
+            try Data(rawText.utf8).write(
+                to: directory.appendingPathComponent("verbatim.txt")
+            )
+            try Data(finalText.utf8).write(
+                to: directory.appendingPathComponent("faithful.txt")
+            )
+            try Data(finalText.utf8).write(
+                to: directory.appendingPathComponent("rewrite.txt")
+            )
+            try Data().write(to: directory.appendingPathComponent("code.txt"))
             let meta: [String: Any] = [
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "date": ISO8601DateFormatter().string(from: Date()),
                 "engine": engine,
                 "language": language,

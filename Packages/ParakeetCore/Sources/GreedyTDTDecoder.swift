@@ -45,8 +45,10 @@ enum GreedyTDTDecoder {
         captureParityTrace: Bool = false,
         primingTokenId: Int? = nil,
         logitBias: ParakeetDecodingBias? = nil,
-        contextualBias: ParakeetContextualBias? = nil
+        contextualBias: ParakeetContextualBias? = nil,
+        cancellationCheck: @Sendable () throws -> Void = {}
     ) throws -> Output {
+        try cancellationCheck()
         guard encoderHidden.shape.count == 3 else {
             throw ParakeetError.unexpectedOutputShape(
                 name: "encoder_hidden",
@@ -144,6 +146,7 @@ enum GreedyTDTDecoder {
             var symbols = 0
             var advanced = false
             while symbols < maxSym {
+                try cancellationCheck()
                 if !decoderStateValid {
                     // Scoped so the prediction output (IOSurface-backed on
                     // ANE / GPU) is released before the next iteration.

@@ -2,7 +2,16 @@
 
 All notable changes will be documented here.
 
-## Unreleased
+## 0.1.5 — 2026-09-07
+
+- Prepare completed passages during dictation and reuse correction results only for byte-identical prompts in the same session, with final fidelity validation.
+- Reuse exact Parakeet encoder windows while always rerunning vocabulary-aware decoding.
+- Limit the MLX reusable-buffer pool to 64 MiB and join cancelled inference producers before subsequent requests.
+- Reject token-limited model output instead of accepting a truncated response.
+- Preserve captured screen vocabulary through final recognition.
+- Include the current Hub, Insights and local Training Studio implementation. Experimental text-quality v3 flags and speculative decoding remain disabled by default.
+
+## Earlier development
 
 ### Added
 

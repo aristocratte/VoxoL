@@ -467,6 +467,7 @@
 "Profile" = "Profil";
 "Prompt" = "Prompt";
 "Qwen local" = "Qwen local";
+"Qwen candidate" = "Candidat Qwen";
 "Refining locally" = "Amélioration locale";
 "Safe fallback" = "Repli sûr";
 "Save" = "Enregistrer";
@@ -1069,3 +1070,87 @@
 "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases." = "Quantificateurs, obligations, conditions et exceptions — « aucun », « doit », « sauf » — survivent désormais mot pour mot à chaque correction, dans les deux modes, vérifié par des centaines de cas d'attaque générés.";
 "Learning that can back down" = "Un apprentissage qui sait reculer";
 "A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself." = "Un mot appris que vous corrigez est mis en pause immédiatement : une mauvaise déduction ne peut jamais s'auto-renforcer.";
+
+/* Studio d’entraînement */
+"Training" = "Entraînement";
+"Training Studio" = "Studio d’entraînement";
+"Auditable personal references" = "Références personnelles auditables";
+"accepted" = "acceptées";
+"attention" = "à vérifier";
+"Export training review" = "Exporter la revue d’entraînement";
+"Refresh training review" = "Actualiser la revue d’entraînement";
+"No personal captures yet" = "Aucune capture personnelle pour le moment";
+"Select a capture" = "Sélectionnez une capture";
+"Stop" = "Arrêter";
+"Listen" = "Écouter";
+"Verbatim reference" = "Référence verbatim";
+"What was said, including fillers and false starts." = "Ce qui a été dit, y compris les hésitations et les faux départs.";
+"Clean reference" = "Référence propre";
+"Faithful formatting without changing facts or intent." = "Mise en forme fidèle, sans modifier les faits ni l’intention.";
+"Verbatim gold" = "Référence verbatim de référence";
+"Faithful gold" = "Référence fidèle";
+"Rewrite gold" = "Référence réécrite";
+"Code gold (optional)" = "Référence de code (facultative)";
+"The best written version allowed by rewrite mode." = "La meilleure version écrite autorisée par le mode réécriture.";
+"Exact code dictation reference when this capture contains code." = "Référence exacte de dictée de code lorsque cette capture contient du code.";
+"Teacher evidence" = "Éléments des enseignants";
+"Verbatim candidate" = "Candidat verbatim";
+"Clean candidate" = "Candidat propre";
+"Protected disagreements: %@" = "Désaccords protégés : %@";
+"Decision rationale" = "Justification de la décision";
+"Quarantine" = "Mettre en quarantaine";
+"Save reviewed reference" = "Enregistrer la référence relue";
+"Pending" = "En attente";
+"Accepted" = "Acceptée";
+"Context review" = "Revue contextuelle";
+"Quarantined" = "En quarantaine";
+"Reference saved as human-reviewed" = "Référence enregistrée comme relue par une personne";
+"Capture quarantined" = "Capture mise en quarantaine";
+"Training review exported" = "Revue d’entraînement exportée";
+"Reviewed in Training Studio." = "Relu dans le Studio d’entraînement.";
+
+/* Accueil : scène de dictée et colonne d’activité */
+"Listening. Speak naturally." = "Je t’écoute. Parle naturellement.";
+"Preparing your text." = "Je prépare ton texte.";
+"Finish setup, then speak." = "Finalise la configuration, puis parle.";
+"Release the shortcut when you are done." = "Relâche le raccourci quand tu as fini.";
+"Press the shortcut again to finish." = "Appuie de nouveau sur le raccourci pour terminer.";
+"Nothing leaves this Mac." = "Rien ne quitte ce Mac.";
+"VoxoL needs a few permissions and its local models." = "VoxoL a besoin de quelques autorisations et de ses modèles locaux.";
+
+/* Insights refondus */
+"Busiest on %@." = "Pic d’activité : %@.";
+"the week of %@" = "la semaine du %@";
+"Nothing dictated yet." = "Rien de dicté pour l’instant.";
+"When you dictate" = "Quand tu dictes";
+"Mostly on %@ around %@." = "Surtout le %1$@ vers %2$@.";
+"of dictations cleaned up" = "des dictées nettoyées";
+"Regularity" = "Régularité";
+"active days of %lld" = "jours actifs sur %lld";
+"Longest run %lld" = "Meilleure série : %lld";
+"Dictation log" = "Journal des dictées";
+"%lld dictations" = "%lld dictées";
+"Time" = "Heure";
+"App" = "App";
+"Duration" = "Durée";
+"Pace" = "Débit";
+"Cleanup" = "Nettoyage";
+"Cleaned" = "Nettoyée";
+"As heard" = "Telle quelle";
+"%lld wpm" = "%lld mots/min";
+"And %lld more in Today." = "Et %lld autres dans Aujourd’hui.";
+"Your dictations will appear here." = "Tes dictées apparaîtront ici.";
+"Yesterday" = "Hier";
+
+/* Accueil : recherche dans l’historique, carte de dictée */
+"Search dictations" = "Rechercher une dictée";
+"Clear search" = "Effacer la recherche";
+"No dictation matches “%@”." = "Aucune dictée ne contient « %@ ».";
+"Hold to dictate from any screen" = "Maintiens pour dicter depuis n’importe quel écran";
+"Less waiting after you finish speaking." = "Moins d’attente après avoir fini de parler.";
+"Cleanup starts while you speak" = "La correction commence pendant la dictée";
+"VoxoL prepares completed passages during dictation and checks them again against the final transcript. Long dictations have less work left after you stop." = "VoxoL prépare les passages complets pendant la dictée et les vérifie à nouveau avec la transcription finale. Il reste moins de travail après l’arrêt des longues dictées.";
+"Lower memory use" = "Moins de mémoire utilisée";
+"The cleanup model retains fewer temporary buffers, leaving more memory available for your other applications." = "Le modèle de correction conserve moins de buffers temporaires, laissant davantage de mémoire disponible pour vos autres applications.";
+"Reliable final text" = "Un texte final plus fiable";
+"Cancelled previews stop cleanly, incomplete model responses fall back to the complete transcript, and words captured on screen also guide the final recognition." = "Les aperçus annulés s’arrêtent proprement, une réponse incomplète du modèle laisse place à la transcription complète et les mots capturés à l’écran guident aussi la reconnaissance finale.";

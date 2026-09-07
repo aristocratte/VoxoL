@@ -84,6 +84,9 @@
 		00000000000000000000009C /* Outfit-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009D /* Outfit-Variable.ttf */; };
 		00000000000000000000009E /* SignalIcons in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009F /* SignalIcons */; };
 		0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A1 /* SignalEditorialScreens.swift */; };
+		000000000000000000001001 /* TrainingReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* TrainingReview.swift */; };
+		000000000000000000001002 /* TrainingReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001012 /* TrainingReviewStore.swift */; };
+		000000000000000000001003 /* TrainingStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* TrainingStudioView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -161,6 +164,9 @@
 		00000000000000000000009D /* Outfit-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Docs/ui-redesign/signal-editorial-prototype/assets/fonts/Outfit-Variable.ttf"; sourceTree = SOURCE_ROOT; };
 		00000000000000000000009F /* SignalIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Docs/ui-redesign/signal-editorial-prototype/assets/icons"; sourceTree = SOURCE_ROOT; };
 		0000000000000000000000A1 /* SignalEditorialScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalEditorialScreens.swift; sourceTree = "<group>"; };
+		000000000000000000001011 /* TrainingReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingReview.swift; path = Packages/AppCoreKit/Sources/TrainingReview.swift; sourceTree = SOURCE_ROOT; };
+		000000000000000000001012 /* TrainingReviewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingReviewStore.swift; sourceTree = "<group>"; };
+		000000000000000000001013 /* TrainingStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStudioView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -239,6 +245,7 @@
 				000000000000000000000025 /* HubView.swift */,
 				000000000000000000000FA6 /* ReleaseNotesCard.swift */,
 				0000000000000000000000A1 /* SignalEditorialScreens.swift */,
+				000000000000000000001013 /* TrainingStudioView.swift */,
 				000000000000000000000044 /* HomeDashboardView.swift */,
 				000000000000000000000026 /* StudioComponents.swift */,
 				000000000000000000000027 /* WorkspaceStudios.swift */,
@@ -282,6 +289,7 @@
 			children = (
 				000000000000000000000040 /* TranscriptStore.swift */,
 				000000000000000000000087 /* PersonalizationStore.swift */,
+				000000000000000000001012 /* TrainingReviewStore.swift */,
 				000000000000000000000041 /* PermissionCoordinator.swift */,
 				000000000000000000000042 /* ModelInstallationStore.swift */,
 				00000000000000000000005C /* ResumableFileDownload.swift */,
@@ -311,6 +319,7 @@
 				00000000000000000000007C /* HoldToTalkStateMachine.swift */,
 				00000000000000000000008A /* StableTranscript.swift */,
 				000000000000000000000045 /* TranscriptHistory.swift */,
+				000000000000000000001011 /* TrainingReview.swift */,
 				000000000000000000000046 /* RuntimeModelManifest.swift */,
 				000000000000000000000055 /* DeterministicEndpointDetector.swift */,
 				000000000000000000000056 /* AudioRingBuffer.swift */,
@@ -443,6 +452,7 @@
 				00000000000000000000001A /* HubView.swift in Sources */,
 				000000000000000000000FA5 /* ReleaseNotesCard.swift in Sources */,
 				0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */,
+				000000000000000000001003 /* TrainingStudioView.swift in Sources */,
 				00000000000000000000001B /* StudioComponents.swift in Sources */,
 				00000000000000000000001C /* WorkspaceStudios.swift in Sources */,
 				00000000000000000000001D /* PersonalizationStudios.swift in Sources */,
@@ -450,12 +460,14 @@
 				00000000000000000000001F /* PreflightView.swift in Sources */,
 				000000000000000000000020 /* VoiceCapsule.swift in Sources */,
 				000000000000000000000033 /* TranscriptStore.swift in Sources */,
+				000000000000000000001002 /* TrainingReviewStore.swift in Sources */,
 				000000000000000000000034 /* PermissionCoordinator.swift in Sources */,
 				000000000000000000000035 /* ModelInstallationStore.swift in Sources */,
 				00000000000000000000005B /* ResumableFileDownload.swift in Sources */,
 				000000000000000000000036 /* SetupRows.swift in Sources */,
 				000000000000000000000037 /* HomeDashboardView.swift in Sources */,
 				000000000000000000000038 /* TranscriptHistory.swift in Sources */,
+				000000000000000000001001 /* TrainingReview.swift in Sources */,
 				000000000000000000000039 /* RuntimeModelManifest.swift in Sources */,
 				00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */,
 				000000000000000000000050 /* AudioRingBuffer.swift in Sources */,
@@ -551,7 +563,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = L4452G7VZN;
 				ENABLE_APP_SANDBOX = NO;
@@ -561,7 +573,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
-				MARKETING_VERSION = 0.1.4;
+				MARKETING_VERSION = 0.1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
@@ -581,7 +593,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = L4452G7VZN;
 				ENABLE_APP_SANDBOX = NO;
@@ -591,7 +603,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone only while you choose to dictate.";
-				MARKETING_VERSION = 0.1.4;
+				MARKETING_VERSION = 0.1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;

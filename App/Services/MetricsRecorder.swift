@@ -15,9 +15,11 @@ import TextProcessingKit
 @MainActor
 enum MetricsRecorder {
     static var fileURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first!
-            .appendingPathComponent("VoxoL/Metrics/dictations.jsonl")
+        let support =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first
+            ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support")
+        return support.appendingPathComponent("VoxoL/Metrics/dictations.jsonl")
     }
 
     /// One inserted dictation.
@@ -28,8 +30,18 @@ enum MetricsRecorder {
         language: String,
         bundleIdentifier: String?,
         route: String,
-        releaseToTextMilliseconds: Int?
+        releaseToTextMilliseconds: Int?,
+        polishingMilliseconds: Int? = nil,
+        fallback: String? = nil,
+        rejection: String? = nil,
+        polisherOutcome: String? = nil,
+        partialRecoveryCount: Int = 0,
+        v3ShadowStatus: String? = nil,
+        v3ShadowReason: String? = nil
     ) {
+        // Why a dictation missed the polisher — a timeout or a fidelity rejection —
+        // and how long the polisher took: without them, every threshold in the
+        // pipeline can only be tuned against a fixture, never against real use.
         append([
             "type": "dictation",
             "id": id.uuidString,
@@ -40,6 +52,13 @@ enum MetricsRecorder {
             "app": bundleIdentifier ?? "unknown",
             "route": route,
             "latencyMs": releaseToTextMilliseconds as Any? ?? NSNull(),
+            "polishMs": polishingMilliseconds as Any? ?? NSNull(),
+            "fallback": fallback as Any? ?? NSNull(),
+            "rejection": rejection as Any? ?? NSNull(),
+            "polisherOutcome": polisherOutcome as Any? ?? NSNull(),
+            "partialRecoveryCount": partialRecoveryCount,
+            "v3ShadowStatus": v3ShadowStatus as Any? ?? NSNull(),
+            "v3ShadowReason": v3ShadowReason as Any? ?? NSNull(),
         ])
     }
 
@@ -113,6 +132,10 @@ enum MetricsRecorder {
         return counts(inserted) != counts(corrected)
     }
 
+    /// One serial queue: appends keep their order, and none of the file work runs on the main
+    /// thread the insertion just finished on.
+    private static let writer = DispatchQueue(label: "com.voxol.metrics", qos: .utility)
+
     private static func append(_ payload: [String: Any]) {
         guard !UserDefaults.standard.bool(forKey: "voxol.privateMode") else { return }
         guard
@@ -122,17 +145,19 @@ enum MetricsRecorder {
             )
         else { return }
         let url = fileURL
-        let manager = FileManager.default
-        try? manager.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        if !manager.fileExists(atPath: url.path) {
-            manager.createFile(atPath: url.path, contents: nil)
+        writer.async {
+            let manager = FileManager.default
+            try? manager.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if !manager.fileExists(atPath: url.path) {
+                manager.createFile(atPath: url.path, contents: nil)
+            }
+            guard let handle = try? FileHandle(forWritingTo: url) else { return }
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data + Data("\n".utf8))
         }
-        guard let handle = try? FileHandle(forWritingTo: url) else { return }
-        defer { try? handle.close() }
-        _ = try? handle.seekToEnd()
-        try? handle.write(contentsOf: data + Data("\n".utf8))
     }
 }

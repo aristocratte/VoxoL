@@ -43,6 +43,16 @@ public struct QwenPolisherResult: Equatable, Sendable {
     public let generationDurationSeconds: TimeInterval
     /// Invariant prompt tokens served from the per-language cache.
     public let reusedPromptTokenCount: Int
+    /// Draft tokens proposed by transcript lookup; zero on the standard path.
+    public let proposedDraftTokenCount: Int
+    /// Draft tokens accepted by target-model verification.
+    public let acceptedDraftTokenCount: Int
+    /// Number of speculative verification batches.
+    public let draftVerificationCount: Int
+    /// Accepted input tokens replayed after restoring a hybrid cache checkpoint.
+    public let replayedTokenCount: Int
+    /// Output tokens already generated during this same dictation and reused exactly.
+    public let reusedOutputTokenCount: Int
 
     /// Creates a measured generation result.
     public init(
@@ -52,7 +62,12 @@ public struct QwenPolisherResult: Equatable, Sendable {
         outputTokenCount: Int,
         promptDurationSeconds: TimeInterval,
         generationDurationSeconds: TimeInterval,
-        reusedPromptTokenCount: Int
+        reusedPromptTokenCount: Int,
+        proposedDraftTokenCount: Int = 0,
+        acceptedDraftTokenCount: Int = 0,
+        draftVerificationCount: Int = 0,
+        replayedTokenCount: Int = 0,
+        reusedOutputTokenCount: Int = 0
     ) {
         self.text = text
         self.durationSeconds = durationSeconds
@@ -61,11 +76,19 @@ public struct QwenPolisherResult: Equatable, Sendable {
         self.promptDurationSeconds = promptDurationSeconds
         self.generationDurationSeconds = generationDurationSeconds
         self.reusedPromptTokenCount = reusedPromptTokenCount
+        self.proposedDraftTokenCount = proposedDraftTokenCount
+        self.acceptedDraftTokenCount = acceptedDraftTokenCount
+        self.draftVerificationCount = draftVerificationCount
+        self.replayedTokenCount = replayedTokenCount
+        self.reusedOutputTokenCount = reusedOutputTokenCount
     }
 }
 
 /// Low-level MLX generation knobs kept explicit for repeatable performance testing.
 public struct QwenPolisherGenerationConfiguration: Equatable, Sendable {
+    /// Process-wide MLX reusable-buffer pool ceiling, not an active-model memory cap.
+    /// Nil leaves MLX's device-derived default unchanged.
+    public let maximumBufferCacheBytes: Int?
     /// Rotating cache capacity, or `nil` for the lower-overhead short-prompt cache.
     public let maximumKVCacheSize: Int?
     /// Number of prompt tokens evaluated in one prefill step.
@@ -74,19 +97,38 @@ public struct QwenPolisherGenerationConfiguration: Equatable, Sendable {
     public let usesPromptPrefixCache: Bool
     /// Whether an installed LoRA adapter is fused into the quantized base model.
     public let fusesAdapter: Bool
+    /// Experimental transcript-lookup decoding: nil keeps the production path,
+    /// zero measures direct greedy decoding, and 1...16 verifies draft batches.
+    public let promptLookupTokenCount: Int?
 
     /// Creates a bounded generation configuration.
     public init(
         maximumKVCacheSize: Int? = nil,
         prefillStepSize: Int = 512,
         usesPromptPrefixCache: Bool = true,
-        fusesAdapter: Bool = true
+        fusesAdapter: Bool = true,
+        promptLookupTokenCount: Int? = nil,
+        maximumBufferCacheBytes: Int? = 64 * 1_024 * 1_024
     ) {
         self.maximumKVCacheSize = maximumKVCacheSize
         self.prefillStepSize = max(1, prefillStepSize)
         self.usesPromptPrefixCache = usesPromptPrefixCache
         self.fusesAdapter = fusesAdapter
+        self.promptLookupTokenCount = promptLookupTokenCount.map { min(16, max(0, $0)) }
+        self.maximumBufferCacheBytes = maximumBufferCacheBytes.map { max(0, $0) }
     }
+}
+
+/// MLX allocation statistics, excluding Core ML and the rest of the application.
+public struct QwenPolisherMemorySnapshot: Codable, Sendable {
+    /// Bytes currently owned by live MLX arrays, including weights and model state.
+    public let activeBytes: Int
+    /// Recyclable intermediate-buffer bytes retained by the MLX allocator.
+    public let reusableCacheBytes: Int
+    /// Peak live-array allocation recorded by MLX in this process.
+    public let peakActiveBytes: Int
+    /// Process-wide reusable-buffer ceiling; not a ceiling on active model memory.
+    public let cacheLimitBytes: Int
 }
 
 /// Owns the one text-only Qwen container and serializes bounded local generations.
@@ -97,21 +139,51 @@ public actor QwenPolisherRuntime {
     private var container: ModelContainer?
     private var preparationTask: Task<ModelContainer, Error>?
     private var promptPrefixCaches = [String: PromptPrefixCache]()
+    private var sessionCache = SessionPolishingCache()
 
     /// Creates a runtime for one verified local model directory.
     public init(
         modelRoot: URL,
         adapterRoot: URL? = nil,
+        useInstalledAdapter: Bool = true,
         generationConfiguration: QwenPolisherGenerationConfiguration = .init()
     ) {
         self.modelRoot = modelRoot
-        self.adapterRoot = adapterRoot ?? Self.installedAdapterRoot(in: modelRoot)
+        self.adapterRoot =
+            adapterRoot
+            ?? (useInstalledAdapter ? Self.installedAdapterRoot(in: modelRoot) : nil)
         self.generationConfiguration = generationConfiguration
     }
 
     /// Whether the model container is loaded.
     public var isReady: Bool {
         container != nil
+    }
+
+    /// Enables exact result reuse for this dictation, clearing any previous session.
+    public func beginDictationSession(_ id: UUID) {
+        sessionCache.begin(id)
+    }
+
+    /// Removes all text cached for this session. A stale completion cannot clear a new session.
+    public func endDictationSession(_ id: UUID) {
+        sessionCache.end(id)
+    }
+
+    /// Whether a speculative request still belongs to the active dictation.
+    public func isDictationSessionActive(_ id: UUID) -> Bool {
+        sessionCache.sessionID == id
+    }
+
+    /// Content-free diagnostics for local memory/latency A/B tests.
+    public func memorySnapshot() -> QwenPolisherMemorySnapshot {
+        let snapshot = Memory.snapshot()
+        return QwenPolisherMemorySnapshot(
+            activeBytes: snapshot.activeMemory,
+            reusableCacheBytes: snapshot.cacheMemory,
+            peakActiveBytes: snapshot.peakMemory,
+            cacheLimitBytes: Memory.cacheLimit
+        )
     }
 
     /// Loads the model container once and shares concurrent preparation calls.
@@ -128,7 +200,13 @@ public actor QwenPolisherRuntime {
         let modelRoot = modelRoot
         let adapterRoot = adapterRoot
         let fusesAdapter = generationConfiguration.fusesAdapter
+        let maximumBufferCacheBytes = generationConfiguration.maximumBufferCacheBytes
         let task = Task.detached(priority: .utility) {
+            if let maximumBufferCacheBytes {
+                // VoxoL has one MLX model. Bound only recyclable intermediates;
+                // never evict active weights, recurrent state or prompt caches.
+                Memory.cacheLimit = maximumBufferCacheBytes
+            }
             let configuration = ModelConfiguration(
                 directory: modelRoot,
                 extraEOSTokens: ["<|im_end|>"]
@@ -166,30 +244,66 @@ public actor QwenPolisherRuntime {
         }
     }
 
-    /// Generates one bounded cleanup result.
+    /// Generates one bounded cleanup result. Exact reuse requires the caller's
+    /// explicit active dictation ID; a nil or stale ID never reads another session.
     public func polish(
         _ preparation: DeterministicPreparation,
-        timeout: Duration = .seconds(2)
+        timeout: Duration = .seconds(2),
+        sessionID: UUID? = nil
     ) async throws -> QwenPolisherResult {
+        let requestedAt = ContinuousClock.now
         try Task.checkCancellation()
         try await prepare()
+        try Task.checkCancellation()
         guard let container else {
             throw CancellationError()
         }
         let prompt = PolishingPromptBuilder.build(from: preparation)
-        let generationConfiguration = generationConfiguration
-        let promptPrefixCache = try await promptPrefixCache(
-            for: prompt.system,
-            container: container
-        )
-        return try await Self.withTimeout(timeout) {
-            try await Self.generate(
-                prompt: prompt,
-                container: container,
-                configuration: generationConfiguration,
-                promptPrefixCache: promptPrefixCache
+        let requestKey = PolishingRequestKey(prompt)
+        if let failure = sessionCache.terminalFailure(for: requestKey, session: sessionID) {
+            try Task.checkCancellation()
+            throw failure
+        }
+        if let cached = sessionCache.result(for: requestKey, session: sessionID) {
+            try Task.checkCancellation()
+            return QwenPolisherResult(
+                text: cached.text,
+                durationSeconds: requestedAt.duration(to: .now).timeInterval,
+                promptTokenCount: cached.promptTokenCount,
+                outputTokenCount: cached.outputTokenCount,
+                promptDurationSeconds: 0,
+                generationDurationSeconds: 0,
+                reusedPromptTokenCount: 0,
+                reusedOutputTokenCount: cached.outputTokenCount
             )
         }
+        let generationConfiguration = generationConfiguration
+        // The prefix cache is built inside the budget: a cold system prefix is a full prefill,
+        // and a prefill that ran outside the timeout could take the whole wait and then some
+        // before generation even started to count.
+        let result: QwenPolisherResult
+        do {
+            result = try await Self.withTimeout(timeout) { [self] in
+                let promptPrefixCache = try await self.promptPrefixCache(
+                    for: prompt.system,
+                    container: container
+                )
+                return try await Self.generate(
+                    prompt: prompt,
+                    transcript: preparation.promptText,
+                    container: container,
+                    configuration: generationConfiguration,
+                    promptPrefixCache: promptPrefixCache
+                )
+            }
+        } catch let error as QwenPolisherError {
+            try Task.checkCancellation()
+            sessionCache.storeTerminalFailure(error, for: requestKey, session: sessionID)
+            throw error
+        }
+        try Task.checkCancellation()
+        sessionCache.store(result, for: requestKey, session: sessionID)
+        return result
     }
 
     /// Runs a one-token generation to populate runtime caches.
@@ -199,11 +313,16 @@ public actor QwenPolisherRuntime {
             return
         }
         if generationConfiguration.usesPromptPrefixCache {
+            // Both contracts, both languages: the rewrite instruction is its own prefix, and
+            // warming only the faithful one left the first rewrite dictation of every launch
+            // paying a full prefill that the user experienced as the polisher being slow.
             for language in [TextLanguage.french, .english] {
-                _ = try await promptPrefixCache(
-                    for: PolishingPromptBuilder.systemInstruction(for: language),
-                    container: container
-                )
+                for mode in [CleanupMode.faithful, .rewrite] {
+                    _ = try await promptPrefixCache(
+                        for: PolishingPromptBuilder.systemInstruction(for: language, mode: mode),
+                        container: container
+                    )
+                }
             }
         }
         let input = UserInput(
@@ -226,7 +345,12 @@ public actor QwenPolisherRuntime {
         preparationTask?.cancel()
         preparationTask = nil
         promptPrefixCaches.removeAll()
+        sessionCache.removeAll()
         container = nil
+    }
+
+    static func outputLimitReached(outputTokenCount: Int, maximumOutputTokens: Int) -> Bool {
+        outputTokenCount >= maximumOutputTokens
     }
 
     static func installedAdapterRoot(in modelRoot: URL) -> URL? {
@@ -374,6 +498,7 @@ private extension QwenPolisherRuntime {
 
     static func generate(
         prompt: PolishingPrompt,
+        transcript: String,
         container: ModelContainer,
         configuration: QwenPolisherGenerationConfiguration,
         promptPrefixCache: PromptPrefixCache?
@@ -397,6 +522,19 @@ private extension QwenPolisherRuntime {
             minP: 0,
             prefillStepSize: configuration.prefillStepSize
         )
+        if let draftTokenCount = configuration.promptLookupTokenCount,
+            let result = try await promptLookupGeneration(
+                prepared: LMInput(tokens: prepared.text.tokens),
+                promptPrefixCache: promptPrefixCache,
+                parameters: parameters,
+                container: container,
+                transcript: transcript,
+                maximumDraftTokens: draftTokenCount,
+                startedAt: startedAt
+            )
+        {
+            return result
+        }
         let generation = try await generationStream(
             prepared: prepared,
             promptPrefixCache: promptPrefixCache,
@@ -410,22 +548,42 @@ private extension QwenPolisherRuntime {
         var promptDurationSeconds: TimeInterval = 0
         var generationDurationSeconds: TimeInterval = 0
         var reachedLimit = false
-        for await generation in stream {
-            try Task.checkCancellation()
-            switch generation {
-            case .chunk(let chunk):
-                outputChunks.append(chunk)
-            case .info(let info):
-                promptTokenCount = fullPromptTokenCount
-                outputTokenCount = info.generationTokenCount
-                promptDurationSeconds = info.promptTime
-                generationDurationSeconds = info.generateTime
-                if case .length = info.stopReason {
-                    reachedLimit = true
+        do {
+            for await event in stream {
+                try Task.checkCancellation()
+                switch event {
+                case .chunk(let chunk):
+                    outputChunks.append(chunk)
+                case .info(let info):
+                    promptTokenCount = fullPromptTokenCount
+                    outputTokenCount = info.generationTokenCount
+                    promptDurationSeconds = info.promptTime
+                    generationDurationSeconds = info.generateTime
+                    // MLX 2.31.3 can report .cancelled at maxTokens because
+                    // its for-in loop advances a copy of TokenIterator. Do
+                    // not accept a truncated response as a complete answer.
+                    reachedLimit = Self.outputLimitReached(
+                        outputTokenCount: info.generationTokenCount,
+                        maximumOutputTokens: prompt.maximumOutputTokens
+                    )
+                    if case .length = info.stopReason {
+                        reachedLimit = true
+                    }
+                    if case .cancelled = info.stopReason, !reachedLimit {
+                        throw CancellationError()
+                    }
+                case .toolCall:
+                    continue
                 }
-            case .toolCall:
-                continue
             }
+            // AsyncStream termination is not proof that its MLX producer has
+            // finished. Join it before returning or admitting another request.
+            await generation.task.value
+            try Task.checkCancellation()
+        } catch {
+            generation.task.cancel()
+            await generation.task.value
+            throw error
         }
 
         if reachedLimit {
@@ -446,6 +604,41 @@ private extension QwenPolisherRuntime {
         )
     }
 
+    static func promptLookupGeneration(
+        prepared: consuming LMInput,
+        promptPrefixCache: PromptPrefixCache?,
+        parameters: GenerateParameters,
+        container: ModelContainer,
+        transcript: String,
+        maximumDraftTokens: Int,
+        startedAt: ContinuousClock.Instant
+    ) async throws -> QwenPolisherResult? {
+        let tokenIDs = prepared.text.tokens.asArray(Int.self)
+        let prefix = promptPrefixCache.flatMap { prefix in
+            tokenIDs.count > prefix.tokenIDs.count && tokenIDs.starts(with: prefix.tokenIDs)
+                ? prefix : nil
+        }
+        let reusedCount = prefix?.tokenIDs.count ?? 0
+        let value = CachedGenerationInput(
+            input: LMInput(tokens: prepared.text.tokens[reusedCount...]),
+            cache: prefix?.cache.map { $0.copy() } ?? []
+        )
+        return try await container.perform(nonSendable: value) { context, value in
+            guard QwenPromptLookupDecoder.supports(context.model) else { return nil }
+            return try QwenPromptLookupDecoder.generate(
+                input: value.input,
+                cache: value.cache.isEmpty ? nil : value.cache,
+                context: context,
+                parameters: parameters,
+                transcript: transcript,
+                maximumDraftTokens: maximumDraftTokens,
+                fullPromptTokenCount: tokenIDs.count,
+                reusedPromptTokenCount: reusedCount,
+                startedAt: startedAt
+            )
+        }
+    }
+
     static func generationStream(
         prepared: consuming LMInput,
         promptPrefixCache: PromptPrefixCache?,
@@ -453,15 +646,12 @@ private extension QwenPolisherRuntime {
         container: ModelContainer
     ) async throws -> GenerationStream {
         guard let promptPrefixCache else {
-            let stream = try await container.perform(nonSendable: prepared) {
+            let (stream, task) = try await container.perform(nonSendable: prepared) {
                 context, input in
-                try MLXLMCommon.generate(
-                    input: input,
-                    parameters: parameters,
-                    context: context
-                )
+                try generationTask(
+                    input: input, cache: nil, parameters: parameters, context: context)
             }
-            return GenerationStream(stream: stream, reusedPromptTokenCount: 0)
+            return GenerationStream(stream: stream, task: task, reusedPromptTokenCount: 0)
         }
 
         let tokenIDs = prepared.text.tokens.asArray(Int.self)
@@ -469,23 +659,21 @@ private extension QwenPolisherRuntime {
             tokenIDs.count > promptPrefixCache.tokenIDs.count,
             tokenIDs.starts(with: promptPrefixCache.tokenIDs)
         else {
-            let stream = try await container.perform(nonSendable: prepared) {
+            let (stream, task) = try await container.perform(nonSendable: prepared) {
                 context, input in
-                try MLXLMCommon.generate(
-                    input: input,
-                    parameters: parameters,
-                    context: context
-                )
+                try generationTask(
+                    input: input, cache: nil, parameters: parameters, context: context)
             }
-            return GenerationStream(stream: stream, reusedPromptTokenCount: 0)
+            return GenerationStream(stream: stream, task: task, reusedPromptTokenCount: 0)
         }
         let prefixCount = promptPrefixCache.tokenIDs.count
         let cachedInput = CachedGenerationInput(
             input: LMInput(tokens: prepared.text.tokens[prefixCount...]),
             cache: promptPrefixCache.cache.map { $0.copy() }
         )
-        let stream = try await container.perform(nonSendable: cachedInput) { context, value in
-            try MLXLMCommon.generate(
+        let (stream, task) = try await container.perform(nonSendable: cachedInput) {
+            context, value in
+            try generationTask(
                 input: value.input,
                 cache: value.cache,
                 parameters: parameters,
@@ -494,7 +682,25 @@ private extension QwenPolisherRuntime {
         }
         return GenerationStream(
             stream: stream,
+            task: task,
             reusedPromptTokenCount: prefixCount
+        )
+    }
+
+    static func generationTask(
+        input: LMInput,
+        cache: [KVCache]?,
+        parameters: GenerateParameters,
+        context: ModelContext
+    ) throws -> (AsyncStream<Generation>, Task<Void, Never>) {
+        let iterator = try TokenIterator(
+            input: input, model: context.model, cache: cache, parameters: parameters
+        )
+        return MLXLMCommon.generateTask(
+            promptTokenCount: input.text.tokens.size,
+            modelConfiguration: context.configuration,
+            tokenizer: context.tokenizer,
+            iterator: iterator
         )
     }
 
@@ -503,6 +709,7 @@ private extension QwenPolisherRuntime {
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
+            defer { group.cancelAll() }
             group.addTask(operation: operation)
             group.addTask {
                 try await Task.sleep(for: duration)
@@ -511,7 +718,6 @@ private extension QwenPolisherRuntime {
             guard let result = try await group.next() else {
                 throw CancellationError()
             }
-            group.cancelAll()
             return result
         }
     }
@@ -538,6 +744,7 @@ private struct CachedGenerationInput {
 
 private struct GenerationStream: Sendable {
     let stream: AsyncStream<Generation>
+    let task: Task<Void, Never>
     let reusedPromptTokenCount: Int
 }
 

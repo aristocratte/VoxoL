@@ -4,6 +4,49 @@ import Foundation
 import XCTest
 
 final class ParakeetCoreTests: XCTestCase {
+    func testInferenceCancellationIsStickyAndVisibleAcrossStages() throws {
+        let cancellation = InferenceCancellation()
+        try cancellation.check()
+        let stopped = expectation(description: "cancellation propagated")
+        DispatchQueue.global().async {
+            cancellation.cancel()
+            stopped.fulfill()
+        }
+        wait(for: [stopped], timeout: 2)
+        XCTAssertThrowsError(try cancellation.check()) { error in
+            XCTAssertTrue(error is CancellationError)
+        }
+        cancellation.cancel()
+        XCTAssertThrowsError(try cancellation.check())
+    }
+
+    func testPipelineQueueCloseReleasesBlockedProducerAndDrainsExistingItems() {
+        let queue = BlockingQueue<Int>(capacity: 1)
+        queue.put(1)
+        let released = expectation(description: "producer released")
+        DispatchQueue.global().async {
+            queue.put(2)
+            released.fulfill()
+        }
+        queue.close()
+        wait(for: [released], timeout: 2)
+        XCTAssertEqual(queue.take(), 1)
+        XCTAssertNil(queue.take())
+        queue.close()
+        XCTAssertNil(queue.take())
+    }
+
+    func testPipelineQueueCloseReleasesBlockedConsumer() {
+        let queue = BlockingQueue<Int>(capacity: 1)
+        let released = expectation(description: "consumer released")
+        DispatchQueue.global().async {
+            XCTAssertNil(queue.take())
+            released.fulfill()
+        }
+        queue.close()
+        wait(for: [released], timeout: 2)
+    }
+
     func testEncoderInputContractDetectionSupportsBothRuntimes() throws {
         XCTAssertEqual(
             try ModelRunner.encoderInputKind(

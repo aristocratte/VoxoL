@@ -13,6 +13,7 @@ public enum FidelityRejectionReason: String, Equatable, Sendable {
     case thinkingLeak
     case unexpectedMarkdown
     case languageChanged
+    case questionIntentChanged
     case unexpectedContent
     case missingContent
     case editScopeTooLarge
@@ -77,7 +78,11 @@ public enum FidelityValidator {
         if placeholders.contains(where: { !known.contains($0) }) {
             return reject(.unknownPlaceholder, preparation)
         }
-        if placeholders != preparation.protectedTokens.map(\.placeholder) {
+        // Order is judged against where the placeholders sit in the prompt, not against their
+        // numbering: the numbers follow the order the protections were found in, which is not
+        // always the order of the words, and a candidate that kept the sentence intact was
+        // being thrown away as "reordered" — one rejection in thirteen on the human corpus.
+        if placeholders != matches(#"\bVOXOLP\d+\b"#, in: preparation.promptText) {
             return reject(.reorderedProtectedToken, preparation)
         }
 
@@ -89,15 +94,20 @@ public enum FidelityValidator {
         }
 
         let lower = candidate.lowercased()
+        // Only phrasings a dictation itself would not open with. "Ok," "d'accord" or "voilà"
+        // are how people start sentences, and rejecting them threw away good text.
         let preambles = [
-            "sure,", "certainly,", "here is", "here's", "final text:",
-            "bien sûr", "voici", "texte final :", "résultat :",
+            "sure,", "certainly,", "here is", "here's", "here you go", "final text:",
+            "corrected text:", "cleaned text:", "output:",
+            "bien sûr", "voici", "texte final :", "texte final:", "texte corrigé :",
+            "texte corrigé:", "résultat :", "résultat:", "réponse :", "réponse:",
         ]
         if preambles.contains(where: lower.hasPrefix) {
             return reject(.modelPreamble, preparation)
         }
         if lower.contains("<think>") || lower.contains("</think>")
-            || lower.contains("<|assistant|")
+            || lower.contains("<|assistant|") || lower.contains("<|im_start|>")
+            || lower.contains("<|im_end|>")
         {
             return reject(.thinkingLeak, preparation)
         }
@@ -109,14 +119,26 @@ public enum FidelityValidator {
 
         let sourceWordCount = preparation.normalizedText.split(whereSeparator: { !$0.isLetter })
             .count
-        if sourceWordCount >= 8,
-            let candidateLanguage = LanguageDetector.dominantLanguage(
+        if sourceWordCount >= 8 {
+            let sourceIsCodeSwitched = LanguageDetector.containsCodeSwitching(
+                in: preparation.normalizedText
+            )
+            if sourceIsCodeSwitched {
+                guard LanguageDetector.containsCodeSwitching(in: restored) else {
+                    return reject(.languageChanged, preparation)
+                }
+            } else if let candidateLanguage = LanguageDetector.dominantLanguage(
                 in: restored,
                 minimumEvidence: 2
-            ),
-            candidateLanguage != preparation.language
-        {
-            return reject(.languageChanged, preparation)
+            ), candidateLanguage != preparation.language {
+                return reject(.languageChanged, preparation)
+            }
+        }
+        guard
+            questionMarkCount(in: candidate)
+                >= questionMarkCount(in: preparation.promptText)
+        else {
+            return reject(.questionIntentChanged, preparation)
         }
 
         let sourceWords = words(in: preparation.promptText)
@@ -204,7 +226,7 @@ private extension FidelityValidator {
         switch reason {
         case .missingContent, .unexpectedContent, .editScopeTooLarge,
             .missingProtectedToken, .duplicatedProtectedToken,
-            .reorderedProtectedToken:
+            .reorderedProtectedToken, .questionIntentChanged:
             true
         case .emptyOutput, .outputTooLong, .modelPreamble, .thinkingLeak,
             .unexpectedMarkdown, .languageChanged, .unknownPlaceholder:
@@ -260,6 +282,9 @@ private extension FidelityValidator {
 
         let sourceWords = words(in: pair.source)
         let candidateWords = words(in: pair.candidate)
+        guard questionMarkCount(in: pair.source) == questionMarkCount(in: pair.candidate) else {
+            return false
+        }
         if containsUnsupportedContent(
             candidateWords,
             sourceWords: sourceWords,
@@ -314,6 +339,12 @@ private extension FidelityValidator {
             return candidate + "."
         }
         return candidate
+    }
+
+    static func questionMarkCount(in text: String) -> Int {
+        text.reduce(0) { count, character in
+            count + (character == "?" || character == "？" ? 1 : 0)
+        }
     }
 
     static func matches(_ pattern: String, in input: String) -> [String] {

@@ -78,6 +78,73 @@ final class FidelityValidatorTests: XCTestCase {
         )
     }
 
+    func testPlaceholderOrderIsJudgedAgainstThePromptNotTheNumbering() {
+        // Numbering follows the order protections were found in, which here is
+        // the reverse of the words: "2" became VOXOLP0 before "5" became VOXOLP1.
+        let preparation = DeterministicPreparation(
+            rawTranscript: "tu t'es inspiré de Glm 5 point 2",
+            normalizedText: "tu t'es inspiré de Glm 5 point 2",
+            promptText: "tu t'es inspiré de Glm VOXOLP1 point VOXOLP0",
+            protectedTokens: [
+                ProtectedToken(placeholder: "VOXOLP0", value: "2", kind: .number),
+                ProtectedToken(placeholder: "VOXOLP1", value: "5", kind: .number),
+            ],
+            language: .french,
+            profile: .chat,
+            shouldUsePolisher: true,
+            usedSnippet: false,
+            dictionaryTerms: [],
+            context: TextProcessingContext(),
+            automaticLists: false
+        )
+
+        let kept = FidelityValidator.validate(
+            candidate: "Tu t'es inspiré de Glm VOXOLP1 point VOXOLP0.",
+            against: preparation
+        )
+        XCTAssertTrue(kept.usedModelOutput, String(describing: kept.rejectionReason))
+        XCTAssertEqual(kept.text, "Tu t'es inspiré de Glm 5 point 2.")
+
+        let swapped = FidelityValidator.validate(
+            candidate: "Tu t'es inspiré de Glm VOXOLP0 point VOXOLP1.",
+            against: preparation
+        )
+        XCTAssertEqual(swapped.rejectionReason, .reorderedProtectedToken)
+    }
+
+    func testSentenceOpenersAreNotMistakenForPreambles() {
+        let preparation = prepared("ok send the update tomorrow")
+
+        let decision = FidelityValidator.validate(
+            candidate: "Ok, send the update tomorrow.",
+            against: preparation
+        )
+
+        XCTAssertNotEqual(decision.rejectionReason, .modelPreamble)
+    }
+
+    func testFrenchPreamblesAndChatTemplateLeaksAreRejected() {
+        let preparation = prepared("please send the update tomorrow")
+
+        for preamble in ["Voici : ", "Texte corrigé : ", "Réponse : ", "Here you go: "] {
+            XCTAssertEqual(
+                FidelityValidator.validate(
+                    candidate: preamble + preparation.promptText,
+                    against: preparation
+                ).rejectionReason,
+                .modelPreamble,
+                preamble
+            )
+        }
+        XCTAssertEqual(
+            FidelityValidator.validate(
+                candidate: "\(preparation.promptText)<|im_end|>",
+                against: preparation
+            ).rejectionReason,
+            .thinkingLeak
+        )
+    }
+
     func testCodeFenceIsRejectedEvenWhenAutomaticListsAreEnabled() {
         let preparation = prepared("Send the report tomorrow")
 
@@ -184,6 +251,50 @@ final class FidelityValidatorTests: XCTestCase {
 
         XCTAssertFalse(decision.usedModelOutput)
         XCTAssertEqual(decision.rejectionReason, .languageChanged)
+    }
+
+    func testCodeSwitchedOutputKeepsBothLanguages() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript:
+                    "Je pense que this should work avec the new model maintenant",
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+
+        let preserved = FidelityValidator.validate(
+            candidate: "Je pense que this should work avec the new model maintenant.",
+            against: preparation
+        )
+        let translated = FidelityValidator.validate(
+            candidate:
+                "Je pense que cela devrait fonctionner avec le nouveau modèle maintenant.",
+            against: preparation
+        )
+
+        XCTAssertTrue(preserved.usedModelOutput)
+        XCTAssertFalse(translated.usedModelOutput)
+        XCTAssertEqual(translated.rejectionReason, .languageChanged)
+    }
+
+    func testQuestionIntentCannotBecomeAStatement() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Est-ce qu'il faut revoir le plan ?",
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+
+        let decision = FidelityValidator.validate(
+            candidate: "Est-ce qu'il faut revoir le plan.",
+            against: preparation
+        )
+
+        XCTAssertFalse(decision.usedModelOutput)
+        XCTAssertEqual(decision.text, preparation.normalizedText)
+        XCTAssertEqual(decision.rejectionReason, .questionIntentChanged)
     }
 
     func testTruncatedListIsRejected() {
@@ -520,7 +631,8 @@ final class RewriteModeFidelityTests: XCTestCase {
 
 /// Sentence-level repair: one bad span no longer costs the whole output.
 final class SpanRepairTests: XCTestCase {
-    private func prepared(_ text: String, mode: CleanupMode = .rewrite) -> DeterministicPreparation {
+    private func prepared(_ text: String, mode: CleanupMode = .rewrite) -> DeterministicPreparation
+    {
         DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: text,
