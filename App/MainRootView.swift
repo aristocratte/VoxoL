@@ -6,7 +6,9 @@ struct MainRootView: View {
     @State private var dictationSession = DictationSessionCoordinator.shared
     @State private var modelInstallation = ModelInstallationStore()
     @State private var transcripts = TranscriptStore()
+    @State private var meetings = MeetingsStore()
     @State private var personalization = PersonalizationStore()
+    @State private var trainingReviews = TrainingReviewStore()
     @AppStorage("voxol.hasCompletedPreflight") private var hasCompletedPreflight = false
     @AppStorage("voxol.interfaceLanguage") private var languageCode = AppLanguage.preferred.rawValue
     @AppStorage("voxol.dictationLanguage") private var dictationLanguageCode =
@@ -61,14 +63,20 @@ struct MainRootView: View {
         .environment(dictationSession)
         .environment(modelInstallation)
         .environment(transcripts)
+        .environment(meetings)
         .environment(personalization)
+        .environment(trainingReviews)
         .environment(\.locale, selectedLanguage.locale)
         .tint(theme.ink)
+        .task {
+            await meetings.load()
+        }
         .task {
             async let modelLoad: Void = modelInstallation.load()
             async let transcriptLoad: Void = transcripts.load()
             async let personalizationLoad: Void = personalization.load()
-            _ = await (modelLoad, transcriptLoad, personalizationLoad)
+            async let trainingReviewLoad: Void = trainingReviews.load()
+            _ = await (modelLoad, transcriptLoad, personalizationLoad, trainingReviewLoad)
         }
         .task(id: modelInstallation.installedCount) {
             if let modelRoot = modelInstallation.installedDirectory(for: .asr) {

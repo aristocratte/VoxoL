@@ -45,8 +45,12 @@ enum GreedyTDTDecoder {
         captureParityTrace: Bool = false,
         primingTokenId: Int? = nil,
         logitBias: ParakeetDecodingBias? = nil,
-        contextualBias: ParakeetContextualBias? = nil
+        contextualBias: ParakeetContextualBias? = nil,
+        collectLogitMargins: Bool = true,
+        useOutputBackings: Bool = false,
+        cancellationCheck: @Sendable () throws -> Void = {}
     ) throws -> Output {
+        try cancellationCheck()
         guard encoderHidden.shape.count == 3 else {
             throw ParakeetError.unexpectedOutputShape(
                 name: "encoder_hidden",
@@ -131,6 +135,59 @@ enum GreedyTDTDecoder {
         // subword is boosted only where it continues one.
         var contextState = contextualBias?.initialState()
 
+        typealias JointDecision = (
+            tokenId: Int,
+            tokenMargin: Float?,
+            durationIndex: Int,
+            durationMargin: Float?,
+            tokenTopCandidates: [ParakeetLogitCandidate],
+            durationTopCandidates: [ParakeetLogitCandidate]
+        )
+
+        func stageDecoderOutput(
+            decoderHidden: MLMultiArray,
+            nextHidden: MLMultiArray,
+            nextCell: MLMultiArray
+        ) {
+            let decShape = decoderHidden.shape.map(\.intValue)
+            let decU = decShape.count >= 3 ? decShape[decShape.count - 2] : 1
+            let lastT = decU - 1
+            let outPtr = decoderHidden.dataPointer.bindMemory(
+                to: Float32.self, capacity: decoderHidden.count
+            )
+            memcpy(
+                decStatePtr,
+                outPtr.advanced(by: lastT * hiddenSize),
+                hiddenSize * MemoryLayout<Float32>.size
+            )
+            copyMultiArray(from: nextHidden, to: candidateHidden)
+            copyMultiArray(from: nextCell, to: candidateCell)
+        }
+
+        func makeJointDecision(
+            tokenLogits: MLMultiArray,
+            durationLogits: MLMultiArray
+        ) -> JointDecision {
+            let tokenId = argmax(
+                tokenLogits,
+                staticBias: logitBias,
+                contextualBias: contextualBias,
+                contextState: contextState
+            )
+            let durationIndex = argmax(durationLogits)
+            return (
+                tokenId,
+                !collectLogitMargins || tokenId == blank
+                    ? nil
+                    : logitMargin(tokenLogits, winnerIndex: tokenId),
+                durationIndex,
+                collectLogitMargins
+                    ? logitMargin(durationLogits, winnerIndex: durationIndex) : nil,
+                captureParityTrace ? topCandidates(tokenLogits, count: 3) : [],
+                captureParityTrace ? topCandidates(durationLogits, count: 3) : []
+            )
+        }
+
         let start = Date()
         var t = 0
         while t < validFrames {
@@ -144,78 +201,61 @@ enum GreedyTDTDecoder {
             var symbols = 0
             var advanced = false
             while symbols < maxSym {
+                try cancellationCheck()
+                var prefetchedJointDecision: JointDecision?
                 if !decoderStateValid {
                     // Scoped so the prediction output (IOSurface-backed on
                     // ANE / GPU) is released before the next iteration.
-                    try autoreleasepool {
-                        let out = try worker.runDecoderStep()
-                        let decShape = out.decoderHidden.shape.map(\.intValue)
-                        let decU =
-                            decShape.count >= 3
-                            ? decShape[decShape.count - 2] : 1
-                        let lastT = decU - 1
-                        let outPtr = out.decoderHidden.dataPointer.bindMemory(
-                            to: Float32.self, capacity: out.decoderHidden.count
-                        )
-                        memcpy(
-                            decStatePtr,
-                            outPtr.advanced(by: lastT * hiddenSize),
-                            hiddenSize * MemoryLayout<Float32>.size
-                        )
-                        copyMultiArray(from: out.nextHidden, to: candidateHidden)
-                        copyMultiArray(from: out.nextCell, to: candidateCell)
+                    if worker.hasFusedDecoderJoint {
+                        prefetchedJointDecision = try autoreleasepool {
+                            let out = try worker.runFusedDecoderJoint()
+                            stageDecoderOutput(
+                                decoderHidden: out.decoderHidden,
+                                nextHidden: out.nextHidden,
+                                nextCell: out.nextCell
+                            )
+                            return makeJointDecision(
+                                tokenLogits: out.tokenLogits,
+                                durationLogits: out.durationLogits
+                            )
+                        }
+                    } else {
+                        try autoreleasepool {
+                            let out = try worker.runDecoderStep(
+                                useOutputBackings: useOutputBackings
+                            )
+                            stageDecoderOutput(
+                                decoderHidden: out.decoderHidden,
+                                nextHidden: out.nextHidden,
+                                nextCell: out.nextCell
+                            )
+                        }
                     }
                     decoderStateValid = true
                 }
 
                 // Joint: also autoreleasepool'd so the IOSurface output is
                 // returned to the pool before we loop.
-                let (
-                    tokenId,
-                    tokenMargin,
-                    durIdx,
-                    durationMargin,
-                    tokenTopCandidates,
-                    durationTopCandidates
-                ):
-                    (
-                        Int,
-                        Float?,
-                        Int,
-                        Float,
-                        [ParakeetLogitCandidate],
-                        [ParakeetLogitCandidate]
-                    ) =
-                        try autoreleasepool {
-                            let jointOut = try worker.runJoint()
-                            let tokenId = argmax(
-                                jointOut.tokenLogits,
-                                biasedBy: mergedBias(
-                                    logitBias,
-                                    contextualBias,
-                                    contextState
-                                )
-                            )
-                            let durationIndex = argmax(jointOut.durationLogits)
-                            return (
-                                tokenId,
-                                tokenId == blank
-                                    ? nil
-                                    : logitMargin(
-                                        jointOut.tokenLogits,
-                                        winnerIndex: tokenId
-                                    ),
-                                durationIndex,
-                                logitMargin(
-                                    jointOut.durationLogits,
-                                    winnerIndex: durationIndex
-                                ),
-                                captureParityTrace
-                                    ? topCandidates(jointOut.tokenLogits, count: 3) : [],
-                                captureParityTrace
-                                    ? topCandidates(jointOut.durationLogits, count: 3) : []
-                            )
-                        }
+                let jointDecision: JointDecision
+                if let prefetchedJointDecision {
+                    jointDecision = prefetchedJointDecision
+                } else {
+                    jointDecision = try autoreleasepool {
+                        let jointOut = try worker.runJoint(
+                            useOutputBackings: useOutputBackings
+                        )
+                        return makeJointDecision(
+                            tokenLogits: jointOut.tokenLogits,
+                            durationLogits: jointOut.durationLogits
+                        )
+                    }
+                }
+                let tokenId = jointDecision.tokenId
+                let tokenMargin = jointDecision.tokenMargin
+                let durIdx = jointDecision.durationIndex
+                let durationMargin = jointDecision.durationMargin
+                let tokenTopCandidates = jointDecision.tokenTopCandidates
+                let durationTopCandidates = jointDecision.durationTopCandidates
                 let duration = durations[durIdx]
                 let transition = TDTDecodePolicy.transition(
                     tokenID: tokenId,
@@ -226,7 +266,9 @@ enum GreedyTDTDecoder {
                     for: transition
                 )
                 totalDecisionCount += 1
-                durationLogitMargins.append(durationMargin)
+                if let durationMargin {
+                    durationLogitMargins.append(durationMargin)
+                }
                 if captureParityTrace {
                     parityDecisions.append(
                         ParakeetParityDecision(
@@ -347,22 +389,128 @@ enum GreedyTDTDecoder {
 
     static func argmax(
         _ array: MLMultiArray,
+        staticBias: ParakeetDecodingBias?,
+        contextualBias: ParakeetContextualBias?,
+        contextState: ParakeetContextualBias.State?
+    ) -> Int {
+        guard
+            useDirectContextualBias,
+            let contextualBias,
+            let contextState,
+            !contextualBias.isEmpty
+        else {
+            return argmax(
+                array,
+                biasedBy: mergedBias(staticBias, contextualBias, contextState)
+            )
+        }
+        return argmaxApplyingContextualBias(
+            array,
+            staticBias: staticBias,
+            contextualBias: contextualBias,
+            contextState: contextState
+        )
+    }
+
+    static func argmaxApplyingContextualBias(
+        _ array: MLMultiArray,
+        staticBias: ParakeetDecodingBias?,
+        contextualBias: ParakeetContextualBias,
+        contextState: ParakeetContextualBias.State
+    ) -> Int {
+        let pointer = array.dataPointer.bindMemory(
+            to: Float32.self,
+            capacity: array.count
+        )
+        return withUnsafeTemporaryAllocation(of: Float32.self, capacity: array.count) {
+            adjusted in
+            guard let values = adjusted.baseAddress else { return 0 }
+            values.initialize(from: pointer, count: array.count)
+            if let staticBias {
+                for (index, offset) in staticBias.offsets
+                where index >= 0 && index < array.count {
+                    values[index] += offset
+                }
+            }
+            contextualBias.applyOffsets(
+                to: values,
+                original: pointer,
+                count: array.count,
+                staticBias: staticBias,
+                for: contextState
+            )
+            return argmaxAdjustedBuffer(
+                UnsafePointer(values),
+                count: array.count,
+                accelerated: useAcceleratedBiasedArgmax
+            )
+        }
+    }
+
+    static func argmax(
+        _ array: MLMultiArray,
         biasedBy bias: ParakeetDecodingBias?
     ) -> Int {
         guard let bias, !bias.isEmpty else {
             return argmax(array)
         }
+        if useNonPositiveBiasFastPath,
+           let winner = unchangedWinnerForNonPositiveBias(array, bias: bias) {
+            return winner
+        }
         let pointer = array.dataPointer.bindMemory(
             to: Float32.self,
             capacity: array.count
         )
-        // Scanning the whole row rather than adjusting only the biased ids
-        // keeps the winner correct: a penalised token may still be the argmax,
-        // and a boosted one only wins if it beats every untouched competitor.
+        // Materialize sparse offsets once instead of performing a dictionary
+        // lookup for every vocabulary token on every decoder decision. Scan
+        // the full adjusted row with the same strict comparison: this preserves
+        // first-index ties, NaN handling and penalised acoustic winners.
+        return withUnsafeTemporaryAllocation(of: Float32.self, capacity: array.count) { adjusted in
+            guard let values = adjusted.baseAddress else { return 0 }
+            values.initialize(from: pointer, count: array.count)
+            for (index, offset) in bias.offsets where index >= 0 && index < array.count {
+                values[index] += offset
+            }
+            return argmaxAdjustedBuffer(
+                UnsafePointer(values),
+                count: array.count,
+                accelerated: useAcceleratedBiasedArgmax
+            )
+        }
+    }
+
+    /// Returns the raw acoustic winner when a non-positive bias cannot change
+    /// it. If the winner itself is penalised, the caller must fall back to the
+    /// adjusted-row reference path because another token may overtake it.
+    @inline(__always)
+    static func unchangedWinnerForNonPositiveBias(
+        _ array: MLMultiArray,
+        bias: ParakeetDecodingBias
+    ) -> Int? {
+        guard bias.isNonPositive else { return nil }
+        let winner = argmax(array)
+        guard (bias.offsets[winner] ?? 0) == 0 else { return nil }
+        return winner
+    }
+
+    @inline(__always)
+    static func argmaxAdjustedBuffer(
+        _ values: UnsafePointer<Float32>,
+        count: Int,
+        accelerated: Bool
+    ) -> Int {
+        guard count > 0 else { return 0 }
+        if accelerated {
+            var maximum: Float = 0
+            var index: vDSP_Length = 0
+            vDSP_maxvi(values, 1, &maximum, &index, vDSP_Length(count))
+            return Int(index)
+        }
         var best = 0
         var bestValue = -Float.infinity
-        for index in 0..<array.count {
-            let value = pointer[index] + (bias.offsets[index] ?? 0)
+        for index in 0..<count {
+            let value = values[index]
             if value > bestValue {
                 bestValue = value
                 best = index
@@ -370,6 +518,36 @@ enum GreedyTDTDecoder {
         }
         return best
     }
+
+    /// Accelerate is the production default for the already adjusted biased
+    /// row. The environment override remains for reproducible A/B validation:
+    /// `0` forces the scalar reference path and `1` forces vDSP.
+    static let useAcceleratedBiasedArgmax: Bool = {
+        switch ProcessInfo.processInfo.environment["VOXOL_ASR_ACCELERATED_BIASED_ARGMAX"] {
+        case "0": false
+        case "1": true
+        default: true
+        }
+    }()
+
+    /// The exact non-positive-bias shortcut is enabled in production after
+    /// three real-audio ABBA runs. The override remains for reproducible A/B
+    /// validation: `0` forces the adjusted-row reference and `1` forces the
+    /// shortcut.
+    static let useNonPositiveBiasFastPath: Bool = {
+        switch ProcessInfo.processInfo.environment["VOXOL_ASR_NONPOSITIVE_BIAS_FASTPATH"] {
+        case "0": false
+        case "1": true
+        default: true
+        }
+    }()
+
+    static let useDirectContextualBias: Bool = {
+        switch ProcessInfo.processInfo.environment["VOXOL_ASR_DIRECT_CONTEXTUAL_BIAS"] {
+        case "1": true
+        default: false
+        }
+    }()
 
     /// Benchmark-only override, so the suite can sweep the magnitude without
     /// the product path depending on an environment variable.
@@ -410,6 +588,7 @@ enum GreedyTDTDecoder {
             capacity: array.count
         )
         let winner = pointer[winnerIndex]
+
         var runnerUp = -Float.infinity
         for index in 0..<array.count where index != winnerIndex {
             runnerUp = max(runnerUp, pointer[index])

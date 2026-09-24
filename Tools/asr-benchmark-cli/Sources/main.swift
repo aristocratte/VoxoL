@@ -24,6 +24,8 @@ struct ASRBenchmarkCLI {
             try score(arguments)
         case "run-parakeet":
             try await runParakeet(arguments)
+        case "infer-parakeet":
+            try await inferParakeet(arguments)
         case "capture":
             try await capture(arguments)
         default:
@@ -166,6 +168,32 @@ private extension ASRBenchmarkCLI {
         }
     }
 
+    struct InferenceItem {
+        let id: String
+        let audioPath: String
+        let language: ASRBenchmarkLanguage
+    }
+
+    static func inferParakeet(_ arguments: [String]) async throws {
+        // This path is deliberately audio-only, without benchmark references,
+        // polisher targets, language hints, or a reviewed-reference assertion.
+        guard
+            ["--split", "--polisher-root", "--language-code", "--vocabulary", "--resume"]
+                .allSatisfy({ !arguments.contains($0) })
+        else { throw CLIError.invalidArguments }
+        let input = try JSONDecoder().decode(
+            ASRInferenceManifest.self,
+            from: Data(contentsOf: URL(fileURLWithPath: requiredValue("--manifest", in: arguments)))
+        )
+        let audioRoot = URL(fileURLWithPath: try requiredValue("--audio-root", in: arguments))
+        try input.validate(audioRoot: audioRoot)
+        try await runParakeetItems(
+            input.items.map { InferenceItem(id: $0.id, audioPath: $0.audioPath, language: .mixed) },
+            audioRoot: audioRoot, arguments: arguments
+        )
+        try input.validate(audioRoot: audioRoot)
+    }
+
     static func runParakeet(_ arguments: [String]) async throws {
         let manifest = try loadManifest(requiredValue("--manifest", in: arguments))
         try manifest.validate(requireFrozen: true)
@@ -174,6 +202,21 @@ private extension ASRBenchmarkCLI {
             isDirectory: true
         )
         try verifyAudioFiles(manifest, under: audioRoot)
+        let requestedSplit = value("--split", in: arguments)
+            .flatMap(ASRBenchmarkSplit.init(rawValue:))
+        if value("--split", in: arguments) != nil, requestedSplit == nil {
+            throw CLIError.invalidArguments
+        }
+        let items = manifest.items.filter { requestedSplit == nil || $0.split == requestedSplit }
+        try await runParakeetItems(
+            items.map { InferenceItem(id: $0.id, audioPath: $0.audioPath, language: $0.language) },
+            audioRoot: audioRoot, arguments: arguments
+        )
+    }
+
+    static func runParakeetItems(
+        _ selectedItems: [InferenceItem], audioRoot: URL, arguments: [String]
+    ) async throws {
         let modelRoot = URL(
             fileURLWithPath: try requiredValue("--model-root", in: arguments),
             isDirectory: true
@@ -200,17 +243,12 @@ private extension ASRBenchmarkCLI {
         let existingIDs = Set(existingPredictions.map(\.id))
         guard
             existingIDs.count == existingPredictions.count,
-            existingIDs.isSubset(of: Set(manifest.items.map(\.id)))
+            existingIDs.isSubset(of: Set(selectedItems.map(\.id)))
         else {
             throw CLIError.invalidResumeOutput(output.path)
         }
         let requestedUnits = value("--compute-units", in: arguments) ?? "all"
         guard let computeUnits = ParakeetComputeUnits(rawValue: requestedUnits) else {
-            throw CLIError.invalidArguments
-        }
-        let requestedSplit = value("--split", in: arguments)
-            .flatMap(ASRBenchmarkSplit.init(rawValue:))
-        if value("--split", in: arguments) != nil, requestedSplit == nil {
             throw CLIError.invalidArguments
         }
 
@@ -256,7 +294,7 @@ private extension ASRBenchmarkCLI {
                     in: arguments
                 )
                 .flatMap(Float.init)
-                ?? ParakeetContextualBias.defaultContinuationBoost
+                    ?? ParakeetContextualBias.defaultContinuationBoost
             )
             print("vocabulary: \(terms.count) terms")
         }
@@ -272,9 +310,6 @@ private extension ASRBenchmarkCLI {
             try await polisher?.prepare()
         } else {
             polisher = nil
-        }
-        let selectedItems = manifest.items.filter {
-            requestedSplit == nil || $0.split == requestedSplit
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -539,6 +574,9 @@ private enum CLIError: LocalizedError {
                 --output <json> [--timestamp <iso8601>]
               voxol-asr-benchmark score --manifest <json> --predictions <jsonl> \
                 --output <json> [--per-item <jsonl>]
+              voxol-asr-benchmark infer-parakeet --manifest <audio-only-json> \
+                --audio-root <directory> --model-root <directory> --output <jsonl> \
+                [--compute-units ane|gpu|cpu|all]
               voxol-asr-benchmark run-parakeet --manifest <json> --audio-root <directory> \
                 --model-root <directory> --output <jsonl> \
                 [--polisher-root <directory>] \

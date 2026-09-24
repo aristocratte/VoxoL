@@ -4,6 +4,49 @@ import Foundation
 import XCTest
 
 final class ParakeetCoreTests: XCTestCase {
+    func testInferenceCancellationIsStickyAndVisibleAcrossStages() throws {
+        let cancellation = InferenceCancellation()
+        try cancellation.check()
+        let stopped = expectation(description: "cancellation propagated")
+        DispatchQueue.global().async {
+            cancellation.cancel()
+            stopped.fulfill()
+        }
+        wait(for: [stopped], timeout: 2)
+        XCTAssertThrowsError(try cancellation.check()) { error in
+            XCTAssertTrue(error is CancellationError)
+        }
+        cancellation.cancel()
+        XCTAssertThrowsError(try cancellation.check())
+    }
+
+    func testPipelineQueueCloseReleasesBlockedProducerAndDrainsExistingItems() {
+        let queue = BlockingQueue<Int>(capacity: 1)
+        queue.put(1)
+        let released = expectation(description: "producer released")
+        DispatchQueue.global().async {
+            queue.put(2)
+            released.fulfill()
+        }
+        queue.close()
+        wait(for: [released], timeout: 2)
+        XCTAssertEqual(queue.take(), 1)
+        XCTAssertNil(queue.take())
+        queue.close()
+        XCTAssertNil(queue.take())
+    }
+
+    func testPipelineQueueCloseReleasesBlockedConsumer() {
+        let queue = BlockingQueue<Int>(capacity: 1)
+        let released = expectation(description: "consumer released")
+        DispatchQueue.global().async {
+            XCTAssertNil(queue.take())
+            released.fulfill()
+        }
+        queue.close()
+        wait(for: [released], timeout: 2)
+    }
+
     func testEncoderInputContractDetectionSupportsBothRuntimes() throws {
         XCTAssertEqual(
             try ModelRunner.encoderInputKind(
@@ -38,6 +81,33 @@ final class ParakeetCoreTests: XCTestCase {
                 hopLength: 160
             ),
             479_840
+        )
+    }
+
+    func testWaveformRuntimeUsesShorterModelCapacity() {
+        XCTAssertEqual(
+            AudioSegmenter.modelWindowSampleCount(
+                maximumWaveformSampleCount: 320_000,
+                chunkMelFrames: 3_000,
+                hopLength: 160
+            ),
+            320_000
+        )
+        XCTAssertEqual(
+            AudioSegmenter.singlePassSampleCount(
+                inputSampleCount: 320_160,
+                maximumSampleCount: 320_000,
+                overflowToleranceSampleCount: 160
+            ),
+            320_000
+        )
+        XCTAssertEqual(
+            AudioSegmenter.singlePassSampleCount(
+                inputSampleCount: 320_161,
+                maximumSampleCount: 320_000,
+                overflowToleranceSampleCount: 160
+            ),
+            320_161
         )
     }
 
@@ -534,6 +604,26 @@ final class ParakeetCoreTests: XCTestCase {
         XCTAssertEqual(GreedyTDTDecoder.argmax(row, biasedBy: ParakeetDecodingBias()), 1)
     }
 
+    func testVectorizedLogitMarginMatchesScalarReference() throws {
+        var values = (0..<8_193).map { index in
+            Float((index * 37) % 997) / 13 - 20
+        }
+        values[4_321] = 91.25
+        values[7_777] = 88.5
+        let row = try logits(values)
+
+        var runnerUp = -Float.infinity
+        for index in values.indices where index != 4_321 {
+            runnerUp = max(runnerUp, values[index])
+        }
+
+        XCTAssertEqual(
+            GreedyTDTDecoder.logitMargin(row, winnerIndex: 4_321),
+            max(0, values[4_321] - runnerUp),
+            accuracy: 0.000_001
+        )
+    }
+
     func testABoostWinsOnlyWhenItClearsEveryCompetitor() throws {
         let row = try logits([0.0, 3.0, 2.0])
 
@@ -586,6 +676,162 @@ final class ParakeetCoreTests: XCTestCase {
         // out rather than one side silently winning.
         XCTAssertEqual(merged.offsets[2], 4 - 12)
         XCTAssertEqual(merged.offsets[3], -12)
+    }
+
+    func testSparseBiasMatchesOriginalSelectionAndPreservesInputBits() throws {
+        var seed: UInt64 = 20260914
+        func random() -> UInt64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            return seed
+        }
+        func check(_ values: [Float], offsets: [Int: Float]) throws {
+            let row = try logits(values)
+            var expected = 0
+            var maximum = -Float.infinity
+            var adjusted = values
+            for index in values.indices {
+                let adjusted = values[index] + (offsets[index] ?? 0)
+                if adjusted > maximum {
+                    expected = index
+                    maximum = adjusted
+                }
+            }
+            for (index, offset) in offsets where index >= 0 && index < adjusted.count {
+                adjusted[index] += offset
+            }
+            XCTAssertEqual(
+                GreedyTDTDecoder.argmax(row, biasedBy: .init(offsets: offsets)), expected)
+            XCTAssertEqual(
+                adjusted.withUnsafeBufferPointer {
+                    GreedyTDTDecoder.argmaxAdjustedBuffer(
+                        $0.baseAddress!, count: $0.count, accelerated: true)
+                },
+                expected
+            )
+            let pointer = row.dataPointer.bindMemory(to: Float.self, capacity: values.count)
+            XCTAssertEqual(
+                values.indices.map { pointer[$0].bitPattern }, values.map(\.bitPattern))
+        }
+        for count in [3, 127, 8_193] {
+            for biasedCount in [1, 8, 80, count] {
+                for _ in 0..<8 {
+                    let values = (0..<count).map { _ in Float(Int(random() % 201) - 100) / 8 }
+                    var offsets = [Int: Float]()
+                    for _ in 0..<biasedCount {
+                        offsets[Int(random() % UInt64(count))] =
+                            Float(Int(random() % 101) - 50) / 8
+                    }
+                    offsets[-1] = 1_000
+                    offsets[count] = 1_000
+                    try check(values, offsets: offsets)
+                }
+            }
+        }
+        try check([.nan, 1, 3], offsets: [1: 3, 2: 1])
+        try check([.infinity, .infinity, 5], offsets: [0: -.infinity])
+        try check([-.infinity, -.infinity], offsets: [1: 0])
+        try check([0, -0.0, 1], offsets: [2: -1])
+        try check([1, 2, 3], offsets: [-1: 999, 3: 999])
+    }
+
+    func testNonPositiveBiasFastPathReturnsUnpenalisedWinner() throws {
+        let row = try logits([1, 9, 5])
+        let bias = ParakeetDecodingBias(offsets: [0: -12, 2: -3])
+
+        XCTAssertTrue(bias.isNonPositive)
+        XCTAssertEqual(
+            GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(row, bias: bias),
+            1
+        )
+        XCTAssertEqual(GreedyTDTDecoder.argmax(row, biasedBy: bias), 1)
+    }
+
+    func testNonPositiveBiasFastPathFallsBackWhenWinnerIsPenalised() throws {
+        let row = try logits([1, 9, 8])
+        let bias = ParakeetDecodingBias(offsets: [1: -12])
+
+        XCTAssertNil(GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(row, bias: bias))
+        XCTAssertEqual(GreedyTDTDecoder.argmax(row, biasedBy: bias), 2)
+    }
+
+    func testNonPositiveBiasFastPathRejectsPositiveOffsets() throws {
+        let row = try logits([1, 9, 8])
+        let bias = ParakeetDecodingBias(offsets: [2: 4])
+
+        XCTAssertFalse(bias.isNonPositive)
+        XCTAssertNil(GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(row, bias: bias))
+    }
+
+    func testNonPositiveBiasFastPathPreservesFirstIndexTie() throws {
+        let row = try logits([9, 9, 8])
+        let bias = ParakeetDecodingBias(offsets: [2: -12])
+
+        XCTAssertEqual(
+            GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(row, bias: bias),
+            0
+        )
+    }
+
+    func testNonPositiveBiasFastPathMatchesAdjustedReferenceWhenItReturnsWinner() throws {
+        var seed: UInt64 = 20260924
+        func random() -> UInt64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            return seed
+        }
+
+        for count in [3, 127, 8_193] {
+            for _ in 0..<24 {
+                let values = (0..<count).map { _ in
+                    Float(Int(random() % 401) - 200) / 8
+                }
+                var offsets = [Int: Float]()
+                for _ in 0..<min(count, 136) {
+                    offsets[Int(random() % UInt64(count))] =
+                        -Float(random() % 97) / 8
+                }
+                let row = try logits(values)
+                let bias = ParakeetDecodingBias(offsets: offsets)
+                guard let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
+                    row,
+                    bias: bias
+                ) else { continue }
+
+                var adjusted = values
+                for (index, offset) in offsets where index >= 0 && index < count {
+                    adjusted[index] += offset
+                }
+                let reference = adjusted.withUnsafeBufferPointer {
+                    GreedyTDTDecoder.argmaxAdjustedBuffer(
+                        $0.baseAddress!, count: $0.count, accelerated: true
+                    )
+                }
+                XCTAssertEqual(fastWinner, reference)
+            }
+        }
+
+        for (values, offsets) in [
+            ([Float.nan, 4, 3], [2: Float(-12)]),
+            ([Float.infinity, 5, 4], [2: Float(-12)]),
+            ([Float.infinity, Float.infinity, 4], [2: Float(-12)]),
+            ([Float(0), -Float.zero, -1], [2: Float(-12)]),
+        ] {
+            let row = try logits(values)
+            let bias = ParakeetDecodingBias(offsets: offsets)
+            guard let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
+                row,
+                bias: bias
+            ) else { continue }
+            var adjusted = values
+            for (index, offset) in offsets where index >= 0 && index < adjusted.count {
+                adjusted[index] += offset
+            }
+            let reference = adjusted.withUnsafeBufferPointer {
+                GreedyTDTDecoder.argmaxAdjustedBuffer(
+                    $0.baseAddress!, count: $0.count, accelerated: true
+                )
+            }
+            XCTAssertEqual(fastWinner, reference)
+        }
     }
 
     func testDecodingBiasIsEmptyWhenNothingApplies() {

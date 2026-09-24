@@ -105,7 +105,8 @@ final class UpdateInstaller {
             delegateQueue: nil
         )
         defer { session.finishTasksAndInvalidate() }
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Void, Error>) in
             delegate.continuation = continuation
             session.downloadTask(with: url).resume()
         }

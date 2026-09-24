@@ -171,18 +171,22 @@ public struct TranscriptionTiming: Sendable {
     public var decoderLoop: Double  // decoder + joint + argmax combined
     /// Seconds spent decoding token pieces into text.
     public var detokenize: Double
+    /// Encoder predictions avoided by exact sample-byte reuse in the same recording.
+    public var reusedEncoderChunks: Int
 
     /// Creates a timing breakdown.
     public init(
         melExtract: Double = 0,
         encoder: Double = 0,
         decoderLoop: Double = 0,
-        detokenize: Double = 0
+        detokenize: Double = 0,
+        reusedEncoderChunks: Int = 0
     ) {
         self.melExtract = melExtract
         self.encoder = encoder
         self.decoderLoop = decoderLoop
         self.detokenize = detokenize
+        self.reusedEncoderChunks = reusedEncoderChunks
     }
 
     /// Total measured inference seconds.
@@ -211,6 +215,59 @@ public struct TranscriptionConfidence: Codable, Sendable {
     public let meanOverlapTokenAgreement: Double?
 }
 
+/// Token-derived word evidence exported without exposing tokenizer internals to the app.
+public struct ParakeetWordEvidence: Equatable, Sendable {
+    /// Exact lexical surface in the final detokenized transcript.
+    public let surface: String
+    /// UTF-16 range in `Transcription.text`.
+    public let sourceRange: Range<Int>
+    /// Decoder token IDs that spell this word.
+    public let tokenIDs: [Int]
+    /// Positions of those tokens in the complete transcription.
+    public let tokenIndices: [Int]
+    /// Encoder-frame position of each token.
+    public let frameIndices: [Int]
+    /// Predicted duration, in encoder frames, of each token.
+    public let durations: [Int]
+    /// Winning-logit margin of each token.
+    public let logitMargins: [Float]
+    /// Weakest token margin in the word.
+    public let minimumLogitMargin: Float
+    /// Mean token margin in the word.
+    public let meanLogitMargin: Float
+    /// Acoustic frame span covered by the word when available.
+    public let frameRange: Range<Int>?
+    /// Whether the word lies within five frames of a decoded chunk boundary.
+    public let nearChunkBoundary: Bool
+
+    /// Creates evidence for one detokenized word.
+    public init(
+        surface: String,
+        sourceRange: Range<Int>,
+        tokenIDs: [Int],
+        tokenIndices: [Int],
+        frameIndices: [Int],
+        durations: [Int],
+        logitMargins: [Float],
+        minimumLogitMargin: Float,
+        meanLogitMargin: Float,
+        frameRange: Range<Int>?,
+        nearChunkBoundary: Bool
+    ) {
+        self.surface = surface
+        self.sourceRange = sourceRange
+        self.tokenIDs = tokenIDs
+        self.tokenIndices = tokenIndices
+        self.frameIndices = frameIndices
+        self.durations = durations
+        self.logitMargins = logitMargins
+        self.minimumLogitMargin = minimumLogitMargin
+        self.meanLogitMargin = meanLogitMargin
+        self.frameRange = frameRange
+        self.nearChunkBoundary = nearChunkBoundary
+    }
+}
+
 /// Result of a successful transcription.
 public struct Transcription: Sendable {
     /// Final detokenized text.
@@ -232,6 +289,8 @@ public struct Transcription: Sendable {
     /// let loose over a confident transcript, a language model rewrites what
     /// the speaker actually said.
     public let tokenLogitMargins: [Float]
+    /// Absolute frame offsets where independently decoded acoustic chunks meet.
+    public let chunkBoundaryFrames: [Int]
     /// Wall-clock audio duration (seconds).
     public let audioDurationSeconds: Double
     /// Wall-clock inference duration (seconds). Excludes model load time.

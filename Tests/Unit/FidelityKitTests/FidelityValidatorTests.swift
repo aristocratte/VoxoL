@@ -4,6 +4,81 @@ import XCTest
 @testable import TextProcessingKit
 
 final class FidelityValidatorTests: XCTestCase {
+    func testSubjectBoundModalAgreementIsAcceptedWithoutChangingModality() {
+        for (source, corrected) in [
+            ("Tu peut réserver la salle", "Tu peux réserver la salle."),
+            ("Tu doit envoyer le dossier", "Tu dois envoyer le dossier."),
+            ("Elle peux envoyer le dossier", "Elle peut envoyer le dossier."),
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: source, preferredLanguage: .french)
+            )
+            let result = FidelityValidator.validate(candidate: corrected, against: preparation)
+            XCTAssertTrue(
+                result.usedModelOutput, "\(source): \(String(describing: result.rejectionReason))")
+            XCTAssertEqual(result.text, corrected)
+        }
+    }
+
+    func testModalAgreementExceptionDoesNotPermitMeaningChangesOrWrongAgreement() {
+        for (source, candidate) in [
+            ("Tu dois envoyer le dossier", "Tu peux envoyer le dossier."),
+            ("Tu peux envoyer le dossier", "Tu dois envoyer le dossier."),
+            ("Tu peux envoyer le dossier", "Tu peut envoyer le dossier."),
+            ("Il peut envoyer le dossier", "Il peux envoyer le dossier."),
+            ("Tu peut envoyer le dossier", "Il peux envoyer le dossier."),
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: source, preferredLanguage: .french)
+            )
+            XCTAssertFalse(
+                FidelityValidator.validate(candidate: candidate, against: preparation)
+                    .usedModelOutput,
+                "\(source) -> \(candidate)"
+            )
+        }
+    }
+
+    func testNumberCannotMoveAcrossItsNounButCanKeepPluralCorrection() {
+        for (source, changed, kept, language) in [
+            (
+                "La pull request contient 3 commit", "La pull request contient le commit VOXOLP0.",
+                "La pull request contient VOXOLP0 commits.", TextLanguage.french
+            ),
+            ("Keep 4 files", "Keep file VOXOLP0.", "Keep VOXOLP0 files.", .english),
+            ("Open ticket 7", "Open VOXOLP0 tickets.", "Open ticket VOXOLP0.", .english),
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: source, preferredLanguage: language)
+            )
+            XCTAssertEqual(
+                FidelityValidator.validate(candidate: changed, against: preparation)
+                    .rejectionReason,
+                .numberAttachmentChanged, source
+            )
+            XCTAssertTrue(
+                FidelityValidator.validate(candidate: kept, against: preparation).usedModelOutput,
+                source
+            )
+        }
+    }
+
+    func testSentenceRepairKeepsAgreementAndRevertsChangedNumericAttachment() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Tu peut envoyer le dossier. La branche contient 3 commit.",
+                preferredLanguage: .french
+            )
+        )
+        let result = FidelityValidator.validateWithRepair(
+            candidate: "Tu peux envoyer le dossier. La branche contient le commit VOXOLP0.",
+            against: preparation
+        )
+        XCTAssertTrue(result.usedModelOutput)
+        XCTAssertEqual(result.repairedSentenceCount, 1)
+        XCTAssertEqual(result.text, "Tu peux envoyer le dossier. La branche contient 3 commit.")
+    }
+
     func testReorderedProtectedTokensAreRejected() {
         let preparation = prepared("Keep 4500 euros until 17:30")
         XCTAssertEqual(preparation.protectedTokens.count, 2)
@@ -72,6 +147,73 @@ final class FidelityValidatorTests: XCTestCase {
         XCTAssertEqual(
             FidelityValidator.validate(
                 candidate: "<think>rewrite</think> \(preparation.promptText)",
+                against: preparation
+            ).rejectionReason,
+            .thinkingLeak
+        )
+    }
+
+    func testPlaceholderOrderIsJudgedAgainstThePromptNotTheNumbering() {
+        // Numbering follows the order protections were found in, which here is
+        // the reverse of the words: "2" became VOXOLP0 before "5" became VOXOLP1.
+        let preparation = DeterministicPreparation(
+            rawTranscript: "tu t'es inspiré de Glm 5 point 2",
+            normalizedText: "tu t'es inspiré de Glm 5 point 2",
+            promptText: "tu t'es inspiré de Glm VOXOLP1 point VOXOLP0",
+            protectedTokens: [
+                ProtectedToken(placeholder: "VOXOLP0", value: "2", kind: .number),
+                ProtectedToken(placeholder: "VOXOLP1", value: "5", kind: .number),
+            ],
+            language: .french,
+            profile: .chat,
+            shouldUsePolisher: true,
+            usedSnippet: false,
+            dictionaryTerms: [],
+            context: TextProcessingContext(),
+            automaticLists: false
+        )
+
+        let kept = FidelityValidator.validate(
+            candidate: "Tu t'es inspiré de Glm VOXOLP1 point VOXOLP0.",
+            against: preparation
+        )
+        XCTAssertTrue(kept.usedModelOutput, String(describing: kept.rejectionReason))
+        XCTAssertEqual(kept.text, "Tu t'es inspiré de Glm 5 point 2.")
+
+        let swapped = FidelityValidator.validate(
+            candidate: "Tu t'es inspiré de Glm VOXOLP0 point VOXOLP1.",
+            against: preparation
+        )
+        XCTAssertEqual(swapped.rejectionReason, .reorderedProtectedToken)
+    }
+
+    func testSentenceOpenersAreNotMistakenForPreambles() {
+        let preparation = prepared("ok send the update tomorrow")
+
+        let decision = FidelityValidator.validate(
+            candidate: "Ok, send the update tomorrow.",
+            against: preparation
+        )
+
+        XCTAssertNotEqual(decision.rejectionReason, .modelPreamble)
+    }
+
+    func testFrenchPreamblesAndChatTemplateLeaksAreRejected() {
+        let preparation = prepared("please send the update tomorrow")
+
+        for preamble in ["Voici : ", "Texte corrigé : ", "Réponse : ", "Here you go: "] {
+            XCTAssertEqual(
+                FidelityValidator.validate(
+                    candidate: preamble + preparation.promptText,
+                    against: preparation
+                ).rejectionReason,
+                .modelPreamble,
+                preamble
+            )
+        }
+        XCTAssertEqual(
+            FidelityValidator.validate(
+                candidate: "\(preparation.promptText)<|im_end|>",
                 against: preparation
             ).rejectionReason,
             .thinkingLeak
@@ -184,6 +326,50 @@ final class FidelityValidatorTests: XCTestCase {
 
         XCTAssertFalse(decision.usedModelOutput)
         XCTAssertEqual(decision.rejectionReason, .languageChanged)
+    }
+
+    func testCodeSwitchedOutputKeepsBothLanguages() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript:
+                    "Je pense que this should work avec the new model maintenant",
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+
+        let preserved = FidelityValidator.validate(
+            candidate: "Je pense que this should work avec the new model maintenant.",
+            against: preparation
+        )
+        let translated = FidelityValidator.validate(
+            candidate:
+                "Je pense que cela devrait fonctionner avec le nouveau modèle maintenant.",
+            against: preparation
+        )
+
+        XCTAssertTrue(preserved.usedModelOutput)
+        XCTAssertFalse(translated.usedModelOutput)
+        XCTAssertEqual(translated.rejectionReason, .languageChanged)
+    }
+
+    func testQuestionIntentCannotBecomeAStatement() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Est-ce qu'il faut revoir le plan ?",
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+
+        let decision = FidelityValidator.validate(
+            candidate: "Est-ce qu'il faut revoir le plan.",
+            against: preparation
+        )
+
+        XCTAssertFalse(decision.usedModelOutput)
+        XCTAssertEqual(decision.text, preparation.normalizedText)
+        XCTAssertEqual(decision.rejectionReason, .questionIntentChanged)
     }
 
     func testTruncatedListIsRejected() {
@@ -520,7 +706,8 @@ final class RewriteModeFidelityTests: XCTestCase {
 
 /// Sentence-level repair: one bad span no longer costs the whole output.
 final class SpanRepairTests: XCTestCase {
-    private func prepared(_ text: String, mode: CleanupMode = .rewrite) -> DeterministicPreparation {
+    private func prepared(_ text: String, mode: CleanupMode = .rewrite) -> DeterministicPreparation
+    {
         DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: text,

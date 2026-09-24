@@ -14,6 +14,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DefaultSettings.register()
 
         let arguments = ProcessInfo.processInfo.arguments
+        #if DEBUG
+            if arguments.contains("--speaker-preview") {
+                NSApplication.shared.setActivationPolicy(.regular)
+                let window = NSWindow(
+                    contentRect: NSRect(x: 0, y: 0, width: 1100, height: 740),
+                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                    backing: .buffered, defer: false)
+                window.title = "VoxoL — Speakers Preview"
+                window.minSize = NSSize(width: 900, height: 620)
+                window.contentViewController = NSHostingController(rootView: SpeakerPreviewRoot())
+                mainWindowController = NSWindowController(window: window)
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                return
+            }
+        #endif
         if arguments.contains(CaptureProbeRunner.argument) {
             NSApplication.shared.setActivationPolicy(.prohibited)
             Task {
@@ -81,6 +98,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let recorder = MeetingRecorder.activeRecorder else { return .terminateNow }
+        // Finalize the audio container before macOS tears down the process.
+        if recorder.state == .recording || recorder.state == .paused {
+            Task {
+                await recorder.stop()
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+        return .terminateCancel
     }
 
     func applicationShouldHandleReopen(

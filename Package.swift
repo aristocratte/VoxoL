@@ -8,6 +8,8 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
+        .library(name: "SpeakerKit", targets: ["SpeakerKit"]),
+        .executable(name: "voxol-speaker-smoke", targets: ["SpeakerSmokeCLI"]),
         .library(name: "AppCoreKit", targets: ["AppCoreKit"]),
         .library(name: "ASRBenchmarkKit", targets: ["ASRBenchmarkKit"]),
         .library(name: "AudioCaptureKit", targets: ["AudioCaptureKit"]),
@@ -32,6 +34,11 @@ let package = Package(
     ],
     dependencies: [
         .package(
+            url: "https://github.com/FluidInference/FluidAudio.git",
+            revision: "5c51c5c93afff0d89594a2a93c3103e790ba648c",
+            traits: []
+        ),
+        .package(
             url: "https://github.com/ml-explore/mlx-swift-lm.git",
             exact: "2.31.3"
         ),
@@ -41,6 +48,22 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(
+            name: "SpeakerKit",
+            dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
+            path: "Packages/SpeakerKit/Sources"
+        ),
+        .executableTarget(
+            name: "SpeakerSmokeCLI",
+            dependencies: ["SpeakerKit", "ParakeetCore"],
+            path: "Tools/speaker-smoke-cli/Sources"
+        ),
+        .testTarget(
+            name: "SpeakerKitTests",
+            dependencies: ["SpeakerKit"],
+            path: "Tests/Unit/SpeakerKitTests",
+            resources: [.copy("Fixtures")]
+        ),
         .target(
             name: "AppCoreKit",
             path: "Packages/AppCoreKit/Sources"
@@ -127,7 +150,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "PolisherSmokeCLI",
-            dependencies: ["FidelityKit", "QwenPolisher", "TextProcessingKit"],
+            dependencies: ["FidelityKit", "QwenPolisher", "SpeakerKit", "TextProcessingKit"],
             path: "Tools/polisher-smoke-cli/Sources"
         ),
         .executableTarget(

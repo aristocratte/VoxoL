@@ -215,7 +215,8 @@ public final class TextInjector {
     /// Inserts text into a captured or currently focused non-secure control.
     public func insert(
         _ text: String,
-        target: TextInsertionTarget? = nil
+        target: TextInsertionTarget? = nil,
+        richText: RichInsertionText? = nil
     ) async throws -> TextInsertionMethod {
         guard !text.isEmpty else {
             throw TextInjectionError.emptyText
@@ -232,7 +233,9 @@ public final class TextInjector {
 
             // Web content answers this call with `.success` and does nothing, so the write is
             // only attempted where it can be checked, and only believed when the caret moved.
-            if !isWebContent(element: insertionElement), canSetSelectedText(on: insertionElement) {
+            if richText == nil, !isWebContent(element: insertionElement),
+                canSetSelectedText(on: insertionElement)
+            {
                 let before = selection(of: insertionElement)
                 let result = AXUIElementSetAttributeValue(
                     insertionElement,
@@ -269,25 +272,35 @@ public final class TextInjector {
         else {
             throw TextInjectionError.focusedElementUnavailable
         }
-        try await pasteWithClipboardFallback(text)
+        try await pasteWithClipboardFallback(text, richText: richText)
         return .clipboardFallback
     }
 
     /// Leaves text on the clipboard when automatic insertion cannot identify a safe target.
-    public func copyForManualPaste(_ text: String) throws {
+    public func copyForManualPaste(_ text: String, richText: RichInsertionText? = nil) throws {
         guard !text.isEmpty else {
             throw TextInjectionError.emptyText
         }
         pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
+        guard writePasteboard(text, richText: richText) else {
             throw TextInjectionError.pasteboardWriteFailed
         }
     }
 }
 
 private extension TextInjector {
+    /// Every accessibility read in this process is a synchronous IPC into whichever application
+    /// is in front, made from the main thread. The system default lets one call block for
+    /// several seconds when that application is busy — an Electron window redrawing, a page
+    /// loading — and the insertion path makes a dozen of them in a row. Half a second a call is
+    /// an order of magnitude above a healthy answer and keeps the worst case in human scale.
+    static func boundAccessibilityWaits() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
+    }
+
     func focusedUIElement(for preferredProcessIdentifier: pid_t? = nil) throws -> AXUIElement {
         let systemWideElement = AXUIElementCreateSystemWide()
+        Self.boundAccessibilityWaits()
         var value: CFTypeRef?
         var result = AXUIElementCopyAttributeValue(
             systemWideElement,
@@ -393,10 +406,22 @@ private extension TextInjector {
         return result == .success && settable.boolValue
     }
 
-    func pasteWithClipboardFallback(_ text: String) async throws {
+    func writePasteboard(_ text: String, richText: RichInsertionText?) -> Bool {
+        let item = NSPasteboardItem()
+        guard item.setString(text, forType: .string) else { return false }
+        if let richText, richText.plainText == text {
+            guard item.setData(richText.rtf, forType: .rtf),
+                item.setData(richText.html, forType: .html)
+            else { return false }
+        }
+        return pasteboard.writeObjects([item])
+    }
+
+    func pasteWithClipboardFallback(_ text: String, richText: RichInsertionText?) async throws {
         let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
         pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
+        guard writePasteboard(text, richText: richText) else {
+            snapshot.restore(to: pasteboard)
             throw TextInjectionError.pasteboardWriteFailed
         }
         let injectedChangeCount = pasteboard.changeCount

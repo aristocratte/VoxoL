@@ -467,6 +467,7 @@
 "Profile" = "Profil";
 "Prompt" = "Prompt";
 "Qwen local" = "Qwen local";
+"Qwen candidate" = "Candidat Qwen";
 "Refining locally" = "Amélioration locale";
 "Safe fallback" = "Repli sûr";
 "Save" = "Enregistrer";
@@ -579,7 +580,7 @@
 "Two engines verified" = "Deux moteurs vérifiés";
 "Two engines. One seamless flow." = "Deux moteurs. Une\nseule sensation.";
 "Under your control" = "Sous ton contrôle";
-"Verified" = "Vérifié";
+"Verified" = "Vérifiée";
 "Verified artifact unavailable" = "Artefact vérifié indisponible";
 "Verifying" = "Vérification";
 "Voice detected" = "Voix détectée";
@@ -1069,3 +1070,262 @@
 "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases." = "Quantificateurs, obligations, conditions et exceptions — « aucun », « doit », « sauf » — survivent désormais mot pour mot à chaque correction, dans les deux modes, vérifié par des centaines de cas d'attaque générés.";
 "Learning that can back down" = "Un apprentissage qui sait reculer";
 "A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself." = "Un mot appris que vous corrigez est mis en pause immédiatement : une mauvaise déduction ne peut jamais s'auto-renforcer.";
+
+/* Studio d’entraînement */
+"Training" = "Entraînement";
+"Review recordings" = "Relecture";
+"Voice shortcuts" = "Raccourcis vocaux";
+"Names and terms VoxoL should spell your way" = "Noms et termes que VoxoL doit écrire comme tu le souhaites";
+"Say a short phrase to insert text you use often" = "Dis une formule courte pour insérer un texte fréquent";
+"Say a short phrase to insert a longer text you save." = "Dis une formule courte pour insérer un texte plus long que tu as enregistré.";
+"Review your recordings" = "Relire mes dictées";
+"Make dictation your own." = "Une dictée à ta façon.";
+"Set exact words, shortcuts and writing style, then review saved recordings." = "Ajoute tes mots, tes raccourcis et ton style ; relis tes dictées enregistrées.";
+"Edit this dictionary entry" = "Modifier cette entrée du dictionnaire";
+"Edit this snippet" = "Modifier ce snippet";
+"Suggestions from corrections" = "Suggestions issues des corrections";
+"Suggested after one correction. Review each word before adding it." = "Proposées après une correction. Vérifie chaque mot avant de l’ajouter.";
+"Listen and correct saved dictations to create trusted examples for quality checks." = "Écoute et corrige tes dictées enregistrées pour créer des exemples fiables de contrôle qualité.";
+"This does not retrain the model immediately. Everything stays on this Mac." = "Cette validation n’entraîne pas le modèle immédiatement. Tout reste sur ce Mac.";
+"Refresh recordings" = "Actualiser les enregistrements";
+"Export reviewed references as JSONL" = "Exporter les références relues au format JSONL";
+"To review" = "À relire";
+"Verified recordings" = "Validées";
+"Excluded recordings" = "Écartées";
+"Excluded" = "Écartée";
+"Needs checking" = "À vérifier";
+"No recordings yet" = "Aucune dictée enregistrée";
+"Nothing in this section" = "Aucune dictée ici";
+"Enable Personal benchmark capture in Settings to save future dictations for review." = "Active « Capture de référence personnelle » dans Réglages pour conserver les prochaines dictées à relire.";
+"Choose another section to see your recordings." = "Choisis une autre catégorie pour voir tes dictées.";
+"Recording without text" = "Dictée sans texte";
+"Saved recording" = "Dictée enregistrée";
+"Undated" = "Sans date";
+"Unknown app" = "App inconnue";
+"Select a recording to review" = "Choisis une dictée à relire";
+"These texts are prefilled proposals. Listen to the recording and correct them before you verify it." = "Ces textes sont des propositions préremplies. Écoute la dictée et corrige-les avant de les valider.";
+"Words spoken" = "Mots prononcés";
+"What you actually said, including hesitations." = "Ce que tu as réellement dit, avec les hésitations.";
+"Final text expected" = "Texte final attendu";
+"The text you wanted VoxoL to write, without changing the facts." = "Le texte que tu voulais obtenir, sans changer les faits.";
+"More references and comparisons" = "Autres références et comparaisons";
+"Use a different version for Rewrite mode" = "Utiliser une autre version pour le mode Réécriture";
+"Rewrite version" = "Version réécrite";
+"A more polished version with the same meaning and facts." = "Une version plus soignée qui garde le même sens et les mêmes faits.";
+"The final text above is also used for Rewrite mode." = "Le texte final ci-dessus sert aussi de référence au mode Réécriture.";
+"Code reference (optional)" = "Référence de code (facultative)";
+"Only fill this when the recording contains dictated code." = "À remplir seulement si la dictée contient du code.";
+"Other transcription proposals" = "Autres propositions de transcription";
+"Note (optional)" = "Note (facultative)";
+"I listened and checked these texts" = "J’ai écouté et vérifié ces textes";
+"Exclude recording" = "Écarter cette dictée";
+"Excluded recordings are not used as verified examples" = "Les dictées écartées ne servent pas d’exemples vérifiés";
+"Save as verified" = "Valider comme référence";
+"Discard your edits?" = "Abandonner tes modifications ?";
+"Keep editing" = "Continuer à modifier";
+"Discard edits" = "Abandonner";
+"Your changes to this recording have not been saved." = "Les modifications de cette dictée ne sont pas enregistrées.";
+"Reviewed in VoxoL." = "Relu dans VoxoL.";
+"Excluded in VoxoL." = "Écarté dans VoxoL.";
+"Recording saved as verified" = "Dictée enregistrée comme référence vérifiée";
+"Recording excluded" = "Dictée écartée";
+"Training Studio" = "Studio d’entraînement";
+"Auditable personal references" = "Références personnelles auditables";
+"accepted" = "acceptées";
+"attention" = "à vérifier";
+"Export training review" = "Exporter la revue d’entraînement";
+"Refresh training review" = "Actualiser la revue d’entraînement";
+"No personal captures yet" = "Aucune capture personnelle pour le moment";
+"Select a capture" = "Sélectionnez une capture";
+"Stop" = "Arrêter";
+"Listen" = "Écouter";
+"Audio used for transcription (16 kHz). Older recordings have no original copy." = "Audio utilisé pour la transcription (16 kHz). Les anciens enregistrements n’ont pas de copie originale.";
+"Original microphone recording, before transcription processing." = "Enregistrement original du micro, avant le traitement pour la transcription.";
+"Verbatim reference" = "Référence verbatim";
+"What was said, including fillers and false starts." = "Ce qui a été dit, y compris les hésitations et les faux départs.";
+"Clean reference" = "Référence propre";
+"Faithful formatting without changing facts or intent." = "Mise en forme fidèle, sans modifier les faits ni l’intention.";
+"Verbatim gold" = "Référence verbatim de référence";
+"Faithful gold" = "Référence fidèle";
+"Rewrite gold" = "Référence réécrite";
+"Code gold (optional)" = "Référence de code (facultative)";
+"The best written version allowed by rewrite mode." = "La meilleure version écrite autorisée par le mode réécriture.";
+"Exact code dictation reference when this capture contains code." = "Référence exacte de dictée de code lorsque cette capture contient du code.";
+"Teacher evidence" = "Éléments des enseignants";
+"Verbatim candidate" = "Candidat verbatim";
+"Clean candidate" = "Candidat propre";
+"Protected disagreements: %@" = "Désaccords protégés : %@";
+"Decision rationale" = "Justification de la décision";
+"Quarantine" = "Mettre en quarantaine";
+"Save reviewed reference" = "Enregistrer la référence relue";
+"Pending" = "En attente";
+"Accepted" = "Acceptée";
+"Context review" = "Revue contextuelle";
+"Quarantined" = "En quarantaine";
+"Reference saved as human-reviewed" = "Référence enregistrée comme relue par une personne";
+"Capture quarantined" = "Capture mise en quarantaine";
+"Training review exported" = "Revue d’entraînement exportée";
+"Reviewed in Training Studio." = "Relu dans le Studio d’entraînement.";
+
+/* Accueil : scène de dictée et colonne d’activité */
+"Listening. Speak naturally." = "Je t’écoute. Parle naturellement.";
+"Preparing your text." = "Je prépare ton texte.";
+"Finish setup, then speak." = "Finalise la configuration, puis parle.";
+"Release the shortcut when you are done." = "Relâche le raccourci quand tu as fini.";
+"Press the shortcut again to finish." = "Appuie de nouveau sur le raccourci pour terminer.";
+"Nothing leaves this Mac." = "Rien ne quitte ce Mac.";
+"VoxoL needs a few permissions and its local models." = "VoxoL a besoin de quelques autorisations et de ses modèles locaux.";
+
+/* Insights refondus */
+"Busiest on %@." = "Pic d’activité : %@.";
+"the week of %@" = "la semaine du %@";
+"Nothing dictated yet." = "Rien de dicté pour l’instant.";
+"When you dictate" = "Quand tu dictes";
+"Mostly on %@ around %@." = "Surtout le %1$@ vers %2$@.";
+"of dictations cleaned up" = "des dictées nettoyées";
+"Regularity" = "Régularité";
+"active days of %lld" = "jours actifs sur %lld";
+"Longest run %lld" = "Meilleure série : %lld";
+"Dictation log" = "Journal des dictées";
+"%lld dictations" = "%lld dictées";
+"Time" = "Heure";
+"App" = "App";
+"Duration" = "Durée";
+"Pace" = "Débit";
+"Cleanup" = "Nettoyage";
+"Cleaned" = "Nettoyée";
+"As heard" = "Telle quelle";
+"%lld wpm" = "%lld mots/min";
+"And %lld more in Today." = "Et %lld autres dans Aujourd’hui.";
+"Your dictations will appear here." = "Tes dictées apparaîtront ici.";
+"Yesterday" = "Hier";
+
+/* Accueil : recherche dans l’historique, carte de dictée */
+"Search dictations" = "Rechercher une dictée";
+"Clear search" = "Effacer la recherche";
+"No dictation matches “%@”." = "Aucune dictée ne contient « %@ ».";
+"Hold to dictate from any screen" = "Maintiens pour dicter depuis n’importe quel écran";
+
+"Every voice, in the transcript." = "Toutes les voix, dans la transcription.";
+
+"Import audio" = "Importer un audio";
+
+"Processed on this Mac" = "Traité sur ce Mac";
+
+"Install the transcription model in Settings first." = "Installez d’abord le modèle de transcription dans les réglages.";
+
+"Turn a recording into a conversation." = "Retrouvez le fil de la conversation.";
+
+"Import an audio file up to one hour long. Follow the speaker changes, add names, and export your transcript." = "Importez un audio d’une heure maximum. Retrouvez les prises de parole, ajoutez les noms et exportez la transcription.";
+
+"Download speaker recognition · 199 MB" = "Télécharger la reconnaissance des voix · 199 Mo";
+
+"One download. Your recordings stay on your Mac." = "Un seul téléchargement. Vos enregistrements restent sur votre Mac.";
+
+"Up to 8 voices · TXT, SRT and JSON exports" = "Jusqu’à 8 voix · Exports TXT, SRT et JSON";
+
+"Checking speaker recognition…" = "Vérification du modèle de voix…";
+
+"Downloading and verifying speaker recognition…" = "Téléchargement et vérification du modèle de voix…";
+
+"Reading the recording…" = "Lecture de l’enregistrement…";
+
+"Transcribing the conversation…" = "Transcription de la conversation…";
+
+"Identifying speaker turns…" = "Attribution des prises de parole…";
+
+"Cancelling…" = "Annulation…";
+
+"Speakers" = "Intervenants";
+
+"Add a name" = "Ajouter un nom";
+
+"Save name" = "Enregistrer le nom";
+
+"Names apply only to this recording." = "Les noms s’appliquent uniquement à cet enregistrement.";
+
+"Overlapping voices are marked. Their words may be incomplete or attributed ambiguously." = "Les voix superposées sont signalées. Leurs paroles peuvent être incomplètes ou difficiles à attribuer.";
+
+"Overlapping voices" = "Voix superposées";
+
+"Saved locally" = "Enregistré localement";
+
+"This session only" = "Pour cette session uniquement";
+
+"Copy transcript" = "Copier la transcription";
+
+"Export transcript" = "Exporter la transcription";
+
+"Text (.txt)" = "Texte (.txt)";
+
+"Subtitles (.srt)" = "Sous-titres (.srt)";
+
+"Structured data (.json)" = "Données structurées (.json)";
+
+"Delete transcript" = "Supprimer la transcription";
+
+"Delete this transcript?" = "Supprimer cette transcription ?";
+
+"The original audio file will remain on your Mac." = "Le fichier audio d’origine restera sur votre Mac.";
+
+"Transcribe" = "Transcrire";
+
+"Meeting history could not be opened. New results will stay in this session." = "Impossible d’ouvrir l’historique des réunions. Les nouveaux résultats resteront dans cette session.";
+
+"No speech was transcribed in this recording." = "Aucune parole n’a été transcrite dans cet enregistrement.";
+
+"The transcript is available, but saving failed. Export it to keep a copy." = "La transcription est disponible, mais son enregistrement a échoué. Exportez-la pour en garder une copie.";
+
+"Correct speaker" = "Corriger l’intervenant";
+
+"Uncertain speaker" = "Intervenant incertain";
+
+"Dismiss" = "Fermer";
+"Recording" = "Enregistrement";
+
+"Meeting report" = "Compte rendu";
+"Replace the current report?" = "Remplacer le compte rendu actuel ?";
+"Generate a new draft" = "Générer un nouveau brouillon";
+"Your report edits will be replaced. The transcript will remain available." = "Vos modifications du compte rendu seront remplacées. La transcription restera disponible.";
+"From audio to meeting report" = "De l’audio au compte rendu";
+"Import a meeting, review the speakers, then prepare a clear, editable Markdown report." = "Importez une réunion, relisez les intervenants, puis préparez un compte rendu Markdown clair et modifiable.";
+"Import" = "Importer";
+"One audio file, up to one hour." = "Un fichier audio, jusqu’à une heure.";
+"Words, timestamps and speakers." = "Paroles, horaires et intervenants.";
+"Write" = "Rédiger";
+"An editable Markdown report." = "Un compte rendu éditable en Markdown.";
+"Processed locally · your audio stays on this Mac" = "Traitement local · votre audio reste sur ce Mac";
+"Writing the local meeting report…" = "Rédaction du compte rendu local…";
+"Meeting" = "Réunion";
+"Names apply only to this meeting." = "Les noms ne s’appliquent qu’à cette réunion.";
+"Draft to complete" = "Brouillon à compléter";
+"Generated draft to review" = "Brouillon généré à vérifier";
+"Transcript changed" = "La transcription a changé";
+"Generate" = "Générer";
+"Create a local draft from the transcript" = "Créer un brouillon local à partir de la transcription";
+"Presentation" = "Présentation";
+"Copy the Markdown report" = "Copier le compte rendu en Markdown";
+"Export .md" = "Exporter .md";
+"The local report model is unavailable on this Mac. You can still edit and export the draft." = "Le modèle local de compte rendu n’est pas disponible sur ce Mac. Le brouillon reste éditable et exportable.";
+"Markdown report editor" = "Éditeur du compte rendu Markdown";
+"A document for this meeting" = "Un document pour cette réunion";
+"Start a Markdown report linked to this transcript. You can edit and export it." = "Commencez un compte rendu Markdown lié à cette transcription. Vous pourrez le modifier et l’exporter.";
+"Create a draft" = "Créer un brouillon";
+"Timestamped transcript" = "Transcription horodatée";
+"Overlapping voices and uncertain attributions remain marked." = "Les voix superposées et les attributions incertaines restent indiquées.";
+
+"This file contains no audio track." = "Ce fichier ne contient aucune piste audio.";
+
+"Choose a non-empty recording up to one hour long." = "Choisissez un enregistrement non vide de moins d’une heure.";
+
+"This media format could not be read." = "Ce format de fichier ne peut pas être lu.";
+
+"Allow microphone access in System Settings to record a meeting." = "Autorisez le microphone dans Réglages Système pour enregistrer une réunion.";
+
+"The microphone recording could not start." = "L’enregistrement du microphone n’a pas pu démarrer.";
+
+"No display is available for capturing call audio." = "Aucun écran n’est disponible pour capturer le son de l’appel.";
+
+"Audio could not be saved. Check the available disk space." = "L’audio n’a pas pu être enregistré. Vérifiez l’espace disque disponible.";
+
+"No audio was received from the call." = "Aucun son n’a été reçu de l’appel.";

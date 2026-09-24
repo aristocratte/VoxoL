@@ -3,8 +3,16 @@ import ParakeetCore
 
 @main
 struct ASRSmokeCLI {
-    static func main() throws {
+    static func main() async throws {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments.first == "--cache-benchmark" {
+            try await CacheBenchmark.run(Array(arguments.dropFirst()))
+            return
+        }
+        if arguments.first == "--rolling-preview-benchmark" {
+            try await RollingPreviewBenchmark.run(Array(arguments.dropFirst()))
+            return
+        }
         guard arguments.count == 3 || arguments.count == 5 else {
             throw CLIError.invalidArguments
         }
@@ -66,7 +74,8 @@ struct ASRSmokeCLI {
                 overlapDurationSeconds: overlapSeconds,
                 segmentationThresholdDurationSeconds: segmentationThresholdSeconds
             ),
-            retryConfiguration: retryConfiguration
+            retryConfiguration: retryConfiguration,
+            warmUpEncoder: environment["VOXOL_ASR_ENCODER_WARMUP"] == "1"
         )
         let loadDuration = loadStart.duration(to: .now)
         let iterations = max(

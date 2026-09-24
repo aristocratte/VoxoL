@@ -17,10 +17,15 @@ import Foundation
 public struct ParakeetDecodingBias: Sendable, Equatable {
     /// Token id to the logits added to it. Ids absent here are untouched.
     public let offsets: [Int: Float]
+    /// True when applying this bias can only lower (or leave unchanged) logits.
+    /// Cached because the decoder may inspect the same static language penalty
+    /// thousands of times during one utterance.
+    let isNonPositive: Bool
 
     /// Creates a bias from explicit per-token offsets.
     public init(offsets: [Int: Float] = [:]) {
         self.offsets = offsets
+        isNonPositive = offsets.values.allSatisfy { $0 <= 0 }
     }
 
     /// True when there is nothing to apply, so the decoder can skip the scan.

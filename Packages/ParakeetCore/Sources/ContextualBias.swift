@@ -94,6 +94,30 @@ public struct ParakeetContextualBias: Sendable {
         return result.isEmpty ? nil : result
     }
 
+    /// Applies the current sparse contextual offsets directly to an already
+    /// copied logit row, avoiding a per-decision dictionary allocation.
+    ///
+    /// The destination already contains the original logits plus any static
+    /// bias. Repeated contextual candidates for one token keep the strongest
+    /// boost, matching offsets(for:), while collisions with static bias remain
+    /// additive.
+    func applyOffsets(
+        to adjusted: UnsafeMutablePointer<Float32>,
+        original: UnsafePointer<Float32>,
+        count: Int,
+        staticBias: ParakeetDecodingBias?,
+        for state: State
+    ) {
+        guard !isEmpty, count > 0 else { return }
+        for node in state.active {
+            let boost = node === root ? entryBoost : continuationBoost
+            for (piece, _) in node.children where piece >= 0 && piece < count {
+                let baseline = original[piece] + (staticBias?.offsets[piece] ?? 0)
+                adjusted[piece] = max(adjusted[piece], baseline + boost)
+            }
+        }
+    }
+
     /// Advances the state after `tokenID` was emitted.
     ///
     /// The root stays active so a term can begin at any point, and a partial

@@ -70,7 +70,8 @@ public enum DictionaryLearning {
         )
         let heard = Set(replaced.map { fold($0.0) })
         guard !heard.isEmpty else { return [] }
-        return entries
+        return
+            entries
             .filter { entry in
                 entry.origin == .learned && entry.isEnabled
                     && heard.contains(fold(entry.canonical))
@@ -145,6 +146,7 @@ extension DictionaryLearning {
         let meant: String
     }
 
+    /// The words of a text, apostrophes and hyphens kept inside them, everything else dropped.
     public static func words(_ text: String) -> [String] {
         text.replacingOccurrences(of: "\u{2019}", with: "'")
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" && $0 != "-" }

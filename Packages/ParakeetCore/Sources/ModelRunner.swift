@@ -54,6 +54,8 @@ final class ModelRunner: @unchecked Sendable {
 
     private let encoderInputs: EncoderInputStorage
     let predictionOptions = MLPredictionOptions()
+    private let traceEncoderStages =
+        ProcessInfo.processInfo.environment["VOXOL_ASR_ENCODER_STAGE_TRACE"] == "1"
 
     // MARK: - Decoder worker pool
 
@@ -67,6 +69,7 @@ final class ModelRunner: @unchecked Sendable {
         encoder: MLModel,
         decoder: MLModel,
         joint: MLModel,
+        fusedDecoderJoint: MLModel? = nil,
         encoderShapes: EncoderShapes,
         decoderHiddenLayers: Int,
         decoderHiddenSize: Int,
@@ -148,6 +151,7 @@ final class ModelRunner: @unchecked Sendable {
                 try DecoderWorker(
                     decoder: decoder,
                     joint: joint,
+                    fusedDecoderJoint: fusedDecoderJoint,
                     decoderHiddenLayers: decoderHiddenLayers,
                     decoderHiddenSize: decoderHiddenSize
                 )
@@ -171,6 +175,18 @@ final class ModelRunner: @unchecked Sendable {
             return nil
         }
         return maximumSampleCount
+    }
+
+    /// Runs one throwaway encoder prediction so Core ML can finish any first-use
+    /// specialization before the first user utterance reaches the runtime.
+    func warmUpEncoder() throws {
+        switch encoderInputs {
+        case .features:
+            _ = try runEncoder(features: [], mask: [])
+        case .waveform(_, _, _, let maximumSampleCount):
+            let sampleCount = min(maximumSampleCount, 16_000)
+            _ = try runEncoder(samples: [Float](repeating: 0, count: sampleCount))
+        }
     }
 
     static func encoderInputKind(inputNames: Set<String>) throws -> EncoderInputKind {
@@ -238,6 +254,8 @@ final class ModelRunner: @unchecked Sendable {
         else {
             throw ParakeetError.runtimeUnavailable
         }
+        let clock = ContinuousClock()
+        let prepareStart = clock.now
         let audioPointer = audio.dataPointer.bindMemory(
             to: Float32.self,
             capacity: maximumSampleCount
@@ -257,11 +275,24 @@ final class ModelRunner: @unchecked Sendable {
         }
         length.dataPointer.bindMemory(to: Int32.self, capacity: 1)[0] =
             Int32(samples.count)
+        let predictionStart = clock.now
         let out = try encoder.prediction(
             from: inputs,
             options: predictionOptions
         )
-        return try encoderOutputs(from: out)
+        let outputStart = clock.now
+        let outputs = try encoderOutputs(from: out)
+        if traceEncoderStages {
+            let end = clock.now
+            Self.emitEncoderStageTrace(
+                sampleCount: samples.count,
+                maximumSampleCount: maximumSampleCount,
+                prepareMilliseconds: Self.milliseconds(prepareStart.duration(to: predictionStart)),
+                predictionMilliseconds: Self.milliseconds(predictionStart.duration(to: outputStart)),
+                outputMilliseconds: Self.milliseconds(outputStart.duration(to: end))
+            )
+        }
+        return outputs
     }
 
     private func encoderOutputs(
@@ -272,6 +303,30 @@ final class ModelRunner: @unchecked Sendable {
         guard let outMask = out.featureValue(for: "encoder_mask")?.multiArrayValue
         else { throw ParakeetError.missingOutput(name: "encoder_mask") }
         return (hidden, outMask)
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) * 1_000
+            + Double(duration.components.attoseconds) / 1e15
+    }
+
+    private static func emitEncoderStageTrace(
+        sampleCount: Int,
+        maximumSampleCount: Int,
+        prepareMilliseconds: Double,
+        predictionMilliseconds: Double,
+        outputMilliseconds: Double
+    ) {
+        let line = String(
+            format:
+                "encoder_stage samples=%d max_samples=%d prepare_ms=%.4f prediction_ms=%.4f output_ms=%.4f\n",
+            sampleCount,
+            maximumSampleCount,
+            prepareMilliseconds,
+            predictionMilliseconds,
+            outputMilliseconds
+        )
+        FileHandle.standardError.write(Data(line.utf8))
     }
 
     // MARK: - Decoder worker pool

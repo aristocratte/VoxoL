@@ -216,7 +216,9 @@ private actor TranscriptFileStore {
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        // Sorted keys keep diffs readable; pretty printing only made a file nobody reads by
+        // hand a third larger, and it is rewritten in full after every dictation.
+        encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(archive).write(
             to: archiveURL, options: [.atomic, .completeFileProtection])
     }

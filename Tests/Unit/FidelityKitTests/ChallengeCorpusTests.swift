@@ -178,6 +178,16 @@ final class ChallengeCorpusTests: XCTestCase {
                         "\(attack.label) [\(language)/\(mode)] est passé : "
                             + "« \(attack.source) » → « \(attack.candidate) »"
                     )
+                    let v3 = FidelityValidatorV3.validateWithRepair(
+                        candidate: attack.candidate,
+                        against: preparation
+                    )
+                    XCTAssertEqual(
+                        v3.status,
+                        .rejected,
+                        "v3: \(attack.label) [\(language)/\(mode)] est passé : "
+                            + "« \(attack.source) » → « \(attack.candidate) »"
+                    )
                 }
             }
         }
@@ -205,6 +215,14 @@ final class ChallengeCorpusTests: XCTestCase {
                     against: preparation
                 )
                 XCTAssertFalse(decision.usedModelOutput, "token loss passed [\(language)/\(mode)]")
+                XCTAssertEqual(
+                    FidelityValidatorV3.validateWithRepair(
+                        candidate: candidate,
+                        against: preparation
+                    ).status,
+                    .rejected,
+                    "v3 token loss passed [\(language)/\(mode)]"
+                )
             }
         }
     }
@@ -247,6 +265,16 @@ final class ChallengeCorpusTests: XCTestCase {
                 decision.usedModelOutput,
                 "un nettoyage bénin est bloqué [\(language)] : « \(source) » → « \(candidate) »"
                     + " (\(decision.rejectionReason?.rawValue ?? "?"))"
+            )
+            let v3 = FidelityValidatorV3.validateWithRepair(
+                candidate: candidate,
+                against: preparation
+            )
+            XCTAssertNotEqual(
+                v3.status,
+                .rejected,
+                "v3 bloque un nettoyage bénin [\(language)] : « \(source) » → « \(candidate) »"
+                    + " (\(v3.rejectionReason?.rawValue ?? "?"))"
             )
         }
     }

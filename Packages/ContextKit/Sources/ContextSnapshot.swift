@@ -95,6 +95,10 @@ public final class MacOSContextProvider {
             )
         }
 
+        // This runs before the microphone opens: an application slow to answer used to delay
+        // the start of the capture and clip the first words. Bounded, a slow answer costs a
+        // little context, never speech.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
         let applicationElement = AXUIElementCreateApplication(processIdentifier)
         let focusedElement = elementAttribute(
             kAXFocusedUIElementAttribute as String,

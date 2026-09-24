@@ -60,6 +60,66 @@ final class DatasetBuilderTests: XCTestCase {
         XCTAssertTrue(result.test.isEmpty)
     }
 
+    func testImplicitSourceGroupStaysInOneSplit() {
+        let examples = (0..<20).map { index in
+            example(
+                id: "group-member-\(index)",
+                rawTranscript: "um send grouped item \(index)",
+                targetText: "Send grouped item \(index).",
+                splitGroup: "recording-42"
+            )
+        }
+
+        let result = DatasetBuilder.build(examples)
+        let populatedSplits = [result.train, result.validation, result.test].filter { !$0.isEmpty }
+
+        XCTAssertEqual(populatedSplits.count, 1)
+        XCTAssertEqual(populatedSplits.first?.count, examples.count)
+    }
+
+    func testExplicitGroupSplitAppliesToImplicitMembers() {
+        let explicit = example(
+            id: "explicit",
+            rawTranscript: "um send explicit item",
+            targetText: "Send explicit item.",
+            split: "validation",
+            splitGroup: "recording"
+        )
+        let implicit = example(
+            id: "implicit",
+            rawTranscript: "um send implicit item",
+            targetText: "Send implicit item.",
+            splitGroup: "recording"
+        )
+
+        let result = DatasetBuilder.build([explicit, implicit])
+
+        XCTAssertEqual(result.validation.count, 2)
+        XCTAssertTrue(result.train.isEmpty)
+        XCTAssertTrue(result.test.isEmpty)
+    }
+
+    func testInvalidExplicitSplitDoesNotInfluenceValidGroupMember() {
+        let invalid = example(
+            id: "invalid",
+            rawTranscript: "um send invalid item",
+            targetText: "Send invalid item.",
+            split: "future",
+            splitGroup: "recording"
+        )
+        let implicit = example(
+            id: "implicit",
+            rawTranscript: "um send implicit item",
+            targetText: "Send implicit item.",
+            splitGroup: "recording"
+        )
+
+        let result = DatasetBuilder.build([invalid, implicit])
+
+        XCTAssertEqual(result.rejectedIDs, ["invalid"])
+        XCTAssertEqual(result.train.count + result.validation.count + result.test.count, 1)
+    }
+
     private func example(
         id: String,
         protectedTokens: [String] = [],

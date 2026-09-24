@@ -99,7 +99,9 @@ enum DatasetBuilderCLI {
         }
 
         let examples = try readExamples(from: URL(fileURLWithPath: input))
-        let result = DatasetBuilder.build(examples)
+        let aiExperiment = arguments.contains("--ai-experiment")
+        let result = aiExperiment
+            ? DatasetBuilder.buildAIExperiment(examples) : DatasetBuilder.build(examples)
         let outputURL = URL(fileURLWithPath: output, isDirectory: true)
         try FileManager.default.createDirectory(
             at: outputURL,
@@ -110,6 +112,7 @@ enum DatasetBuilderCLI {
         try write(result.test, to: outputURL.appendingPathComponent("test.jsonl"))
 
         let summary: [String: Any] = [
+            "review_policy": aiExperiment ? "ai-curated-experimental" : "human-approved",
             "train": result.train.count,
             "validation": result.validation.count,
             "test": result.test.count,

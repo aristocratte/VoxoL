@@ -27,6 +27,7 @@ enum Pipeline {
         /// Kept per token, not just aggregated: it is the only signal that says
         /// where the recogniser hesitated, which is where a repair pass may act.
         var tokenLogitMargins: [Float]
+        var chunkBoundaryFrames: [Int]
         var melElapsed: Double
         var encoderElapsed: Double
         var decodeElapsed: Double
@@ -38,6 +39,7 @@ enum Pipeline {
         var maximumFramesWithoutEmission: Int
         var minimumOverlapTokenAgreement: Double?
         var meanOverlapTokenAgreement: Double?
+        var reusedEncoderChunks: Int = 0
     }
 
     static func run(
@@ -46,12 +48,18 @@ enum Pipeline {
         runner: ModelRunner,
         sourceCompatibleFeatures: Bool = false,
         logitBias: ParakeetDecodingBias? = nil,
-        contextualBias: ParakeetContextualBias? = nil
+        contextualBias: ParakeetContextualBias? = nil,
+        collectLogitMargins: Bool = true,
+        cancellationCheck: @escaping @Sendable () throws -> Void = {},
+        encoderCache: EncoderResultCache? = nil,
+        sessionID: UUID? = nil
     ) throws -> Result {
+        try cancellationCheck()
         if chunks.isEmpty {
             return Result(
                 tokens: [], frames: [], durations: [],
                 tokenLogitMargins: [],
+                chunkBoundaryFrames: [],
                 melElapsed: 0, encoderElapsed: 0, decodeElapsed: 0,
                 meanTokenLogitMargin: 0,
                 lowerDecileTokenLogitMargin: 0,
@@ -64,53 +72,120 @@ enum Pipeline {
             )
         }
 
+        let outputBackingsOverride =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_DECODER_OUTPUT_BACKINGS"]
+        let useDecoderOutputBackings: Bool
+        switch outputBackingsOverride {
+        case "1":
+            useDecoderOutputBackings = true
+        case "0":
+            useDecoderOutputBackings = false
+        default:
+            useDecoderOutputBackings = chunks.count == 1
+        }
+
         let melQueue = BlockingQueue<MelItem>(capacity: 2)
         let encQueue = BlockingQueue<EncoderItem>(
             capacity: max(2, runner.decoderWorkers.count + 1)
         )
 
         let globalError = ErrorSlot()
+        let stages = DispatchGroup()
+        let fail: @Sendable (Error) -> Void = { error in
+            globalError.set(error)
+            // Release blocked producers and consumers even when one stage
+            // failed before consuming the other stage's last queued item.
+            melQueue.close()
+            encQueue.close()
+        }
 
         // --- Stage 1: CPU mel extraction ---
         let melQ = DispatchQueue(label: "parakeet.mel", qos: .userInitiated)
         let melTotal = AtomicDouble()
+        // Experimental until the launch benchmark establishes a useful gain.
+        let reuseBeforeMel =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_EARLY_ENCODER_CACHE"] == "1"
+        stages.enter()
         melQ.async {
-            for (i, chunk) in chunks.enumerated() {
-                if globalError.hasError { break }
-                let features: MelFeatureExtractor.Features?
-                if runner.encoderInputKind == .waveform {
-                    features = nil
-                } else {
-                    let t0 = Date()
-                    features = featureExtractor.extract(
-                        from: chunk.samples,
-                        sourceCompatibleNormalization: sourceCompatibleFeatures
-                    )
-                    melTotal.add(Date().timeIntervalSince(t0))
-                }
-                melQueue.put(
-                    MelItem(
-                        index: i,
-                        features: features,
-                        samples: chunk.samples,
-                        sampleCount: chunk.samples.count,
-                        discardPrefixSamples: chunk.discardPrefixSamples
-                    )
-                )
+            defer {
+                melQueue.close()
+                stages.leave()
             }
-            melQueue.close()
+            do {
+                for (i, chunk) in chunks.enumerated() {
+                    try cancellationCheck()
+                    if globalError.hasError { break }
+                    let earlyKey =
+                        reuseBeforeMel
+                        ? encoderCache?.key(
+                            samples: chunk.samples,
+                            sourceCompatibleFeatures: sourceCompatibleFeatures,
+                            session: sessionID
+                        ) : nil
+                    let earlyValue = earlyKey.flatMap {
+                        encoderCache?.value(for: $0, session: sessionID)
+                    }
+                    let features: MelFeatureExtractor.Features?
+                    if earlyValue != nil || runner.encoderInputKind == .waveform {
+                        features = nil
+                    } else {
+                        let t0 = Date()
+                        features = featureExtractor.extract(
+                            from: chunk.samples,
+                            sourceCompatibleNormalization: sourceCompatibleFeatures
+                        )
+                        melTotal.add(Date().timeIntervalSince(t0))
+                    }
+                    try cancellationCheck()
+                    melQueue.put(
+                        MelItem(
+                            index: i,
+                            features: features,
+                            samples: chunk.samples,
+                            sampleCount: chunk.samples.count,
+                            discardPrefixSamples: chunk.discardPrefixSamples,
+                            cachedKey: earlyKey,
+                            cachedEncoder: earlyValue
+                        )
+                    )
+                }
+            } catch {
+                fail(error)
+            }
         }
 
         // --- Stage 2: ANE / GPU / CPU encoder ---
         let encQ = DispatchQueue(label: "parakeet.encoder", qos: .userInitiated)
         let encTotal = AtomicDouble()
+        let encReused = AtomicDouble()
+        stages.enter()
         encQ.async {
+            defer {
+                encQueue.close()
+                stages.leave()
+            }
             while let mel = melQueue.take() {
                 if globalError.hasError { break }
                 do {
+                    try cancellationCheck()
                     let t0 = Date()
                     let (hidden, mask): (MLMultiArray, MLMultiArray)
-                    if let features = mel.features {
+                    let cacheKey =
+                        mel.cachedKey
+                        ?? encoderCache?.key(
+                            samples: mel.samples,
+                            sourceCompatibleFeatures: sourceCompatibleFeatures,
+                            session: sessionID
+                        )
+                    if let cached = mel.cachedEncoder {
+                        (hidden, mask) = (cached.hidden, cached.mask)
+                        encReused.add(1)
+                    } else if let cacheKey,
+                        let cached = encoderCache?.value(for: cacheKey, session: sessionID)
+                    {
+                        (hidden, mask) = (cached.hidden, cached.mask)
+                        encReused.add(1)
+                    } else if let features = mel.features {
                         (hidden, mask) = try runner.runEncoder(
                             features: features.mel,
                             mask: features.attentionMask
@@ -119,21 +194,27 @@ enum Pipeline {
                         (hidden, mask) = try runner.runEncoder(samples: mel.samples)
                     }
                     encTotal.add(Date().timeIntervalSince(t0))
+                    try cancellationCheck()
+                    if let cacheKey {
+                        encoderCache?.store(
+                            hidden: hidden, mask: mask, for: cacheKey, session: sessionID
+                        )
+                    }
                     encQueue.put(
                         EncoderItem(
                             index: mel.index,
                             hidden: hidden,
                             mask: mask,
                             sampleCount: mel.sampleCount,
-                            discardPrefixSamples: mel.discardPrefixSamples
+                            discardPrefixSamples: mel.discardPrefixSamples,
+                            encoderCacheKey: cacheKey
                         )
                     )
                 } catch {
-                    globalError.set(error)
+                    fail(error)
                     break
                 }
             }
-            encQueue.close()
         }
 
         // --- Stage 3: CPU decode worker pool ---
@@ -148,6 +229,12 @@ enum Pipeline {
 
         while let item = encQueue.take() {
             if globalError.hasError { break }
+            do {
+                try cancellationCheck()
+            } catch {
+                fail(error)
+                break
+            }
             guard let worker = runner.acquireWorker() else { break }
 
             group.enter()
@@ -165,8 +252,12 @@ enum Pipeline {
                             blankTokenId: runner.blankTokenId,
                             durations: runner.durations,
                             maxSymbolsPerStep: runner.maxSymbolsPerStep,
-                            logitBias: logitBias ?? GreedyTDTDecoder.environmentParakeetDecodingBias,
-                            contextualBias: contextualBias
+                            logitBias: logitBias
+                                ?? GreedyTDTDecoder.environmentParakeetDecodingBias,
+                            contextualBias: contextualBias,
+                            collectLogitMargins: collectLogitMargins,
+                            useOutputBackings: useDecoderOutputBackings,
+                            cancellationCheck: cancellationCheck
                         )
                     }
                     let discardFrames = AudioSegmenter.discardPrefixFrameCount(
@@ -178,9 +269,7 @@ enum Pipeline {
                         decoded.frameIndices.firstIndex { $0 >= discardFrames }
                         ?? decoded.tokenIds.endIndex
                     decodeTotal.add(decoded.elapsedSeconds)
-                    results.set(
-                        index: item.index,
-                        chunk: ChunkResult(
+                    let chunk = ChunkResult(
                             tokenIds: Array(decoded.tokenIds[firstKeptToken...]),
                             frameIndices: decoded.frameIndices[firstKeptToken...].map {
                                 $0 - discardFrames
@@ -197,12 +286,15 @@ enum Pipeline {
                             timelineFrames: decoded.validFrames - discardFrames,
                             originalTokenIds: decoded.tokenIds,
                             originalFrameIndices: decoded.frameIndices,
+                            originalDurations: decoded.durations,
+                            originalTokenLogitMargins: decoded.tokenLogitMargins,
+                            firstKeptTokenIndex: firstKeptToken,
                             validFrames: decoded.validFrames,
                             discardFrames: discardFrames
                         )
-                    )
+                    results.set(index: item.index, chunk: chunk)
                 } catch {
-                    globalError.set(error)
+                    fail(error)
                 }
             }
         }
@@ -210,6 +302,10 @@ enum Pipeline {
         group.wait()
         melQueue.close()
         encQueue.close()
+        // The transcriber owns reusable Core ML buffers. No upstream producer
+        // may still be touching them when a cancelled partial returns.
+        stages.wait()
+        try cancellationCheck()
 
         if let err = globalError.error {
             throw err
@@ -221,6 +317,7 @@ enum Pipeline {
         var frames = [Int]()
         var durations = [Int]()
         var tokenLogitMargins = [Float]()
+        var chunkBoundaryFrames = [Int]()
         var durationLogitMargins = [Float]()
         var blankDecisionCount = 0
         var totalDecisionCount = 0
@@ -228,7 +325,31 @@ enum Pipeline {
         var overlapAgreements = [Double]()
         var totalFrameOffset = 0
         var previousChunk: ChunkResult?
-        for chunk in results.ordered(count: chunks.count) {
+        var orderedChunks = results.ordered(count: chunks.count)
+        if ProcessInfo.processInfo.environment["VOXOL_ASR_SEAM_ALIGNMENT"] == "1",
+            orderedChunks.count > 1
+        {
+            for index in 1..<orderedChunks.count {
+                let previous = orderedChunks[index - 1]
+                let current = orderedChunks[index]
+                guard
+                    let cut = TokenSeamAlignment.select(
+                        previousTokens: previous.originalTokenIds,
+                        previousFrames: previous.originalFrameIndices,
+                        previousValidFrames: previous.validFrames,
+                        minimumPreviousIndex: previous.firstKeptTokenIndex,
+                        currentTokens: current.originalTokenIds,
+                        currentFrames: current.originalFrameIndices,
+                        overlapFrames: current.discardFrames
+                    )
+                else { continue }
+                orderedChunks[index - 1].retainTokens(
+                    from: previous.firstKeptTokenIndex, to: cut.previousEnd)
+                orderedChunks[index].retainTokens(
+                    from: cut.currentStart, to: current.originalTokenIds.count)
+            }
+        }
+        for (chunkIndex, chunk) in orderedChunks.enumerated() {
             if let previousChunk, chunk.discardFrames > 0 {
                 let previousTailStart = max(
                     0,
@@ -266,6 +387,9 @@ enum Pipeline {
                 chunk.maximumFramesWithoutEmission
             )
             totalFrameOffset += chunk.timelineFrames
+            if chunkIndex < orderedChunks.count - 1 {
+                chunkBoundaryFrames.append(totalFrameOffset)
+            }
             previousChunk = chunk
         }
 
@@ -307,6 +431,7 @@ enum Pipeline {
             frames: frames,
             durations: durations,
             tokenLogitMargins: tokenLogitMargins,
+            chunkBoundaryFrames: chunkBoundaryFrames,
             melElapsed: melTotal.value,
             encoderElapsed: encTotal.value,
             decodeElapsed: decodeTotal.value,
@@ -320,7 +445,8 @@ enum Pipeline {
             meanOverlapTokenAgreement: overlapAgreements.isEmpty
                 ? nil
                 : overlapAgreements.reduce(0, +)
-                    / Double(overlapAgreements.count)
+                    / Double(overlapAgreements.count),
+            reusedEncoderChunks: Int(encReused.value)
         )
     }
 
@@ -351,12 +477,129 @@ enum Pipeline {
 
 // MARK: - Helpers
 
+/// Exact, bounded encoder outputs for one recording. The decoder is deliberately
+/// not cached: dictionary/language biases and confidence are always evaluated anew.
+/// The owning runtime has one immutable model/compute configuration. Entries hold
+/// the actual sample bytes (not approximate audio hashes) and are cleared on end.
+final class EncoderResultCache: @unchecked Sendable {
+    struct Key: Hashable {
+        let sampleBytes: Data
+        let sourceCompatibleFeatures: Bool
+    }
+
+    struct Value {
+        let hidden: MLMultiArray
+        let mask: MLMultiArray
+        let chargedBytes: Int
+    }
+
+    private let lock = NSLock()
+    private var sessionID: UUID?
+    private var entries = [Key: Value]()
+    private var insertionOrder = [Key]()
+    private var retainedBytes = 0
+    private let maximumEntries: Int
+    private let maximumBytes: Int
+    private let tracesEvents =
+        ProcessInfo.processInfo.environment["VOXOL_ASR_CACHE_TRACE"] == "1"
+
+    // A 180-second recording needs eleven production windows. At 32 MiB the
+    // final short window evicted a completed one, causing scan-wide LRU misses.
+    // Keep the sixteen-entry bound and room for their conservatively charged payloads.
+    init(maximumEntries: Int = 16, maximumBytes: Int = 64 * 1_024 * 1_024) {
+        self.maximumEntries = max(0, maximumEntries)
+        self.maximumBytes = max(0, maximumBytes)
+    }
+
+    var byteCount: Int { lock.withLock { retainedBytes } }
+
+    func begin(_ id: UUID) {
+        lock.withLock {
+            guard sessionID != id else { return }
+            entries.removeAll()
+            insertionOrder.removeAll()
+            retainedBytes = 0
+            sessionID = id
+            trace("begin")
+        }
+    }
+
+    func end(_ id: UUID) {
+        lock.withLock {
+            guard sessionID == id else { return }
+            entries.removeAll()
+            insertionOrder.removeAll()
+            retainedBytes = 0
+            sessionID = nil
+            trace("end")
+        }
+    }
+
+    func key(samples: [Float], sourceCompatibleFeatures: Bool, session id: UUID?) -> Key? {
+        guard let id, lock.withLock({ sessionID == id }) else { return nil }
+        return Key(
+            sampleBytes: samples.withUnsafeBytes { Data($0) },
+            sourceCompatibleFeatures: sourceCompatibleFeatures
+        )
+    }
+
+    func value(for key: Key, session id: UUID?) -> Value? {
+        lock.withLock {
+            guard let id, sessionID == id else { return nil }
+            guard let value = entries[key] else {
+                trace("miss", key: key)
+                return nil
+            }
+            if let index = insertionOrder.firstIndex(of: key) {
+                let retainedKey = insertionOrder.remove(at: index)
+                insertionOrder.append(retainedKey)
+            }
+            trace("hit", key: key)
+            return value
+        }
+    }
+
+    func store(hidden: MLMultiArray, mask: MLMultiArray, for key: Key, session id: UUID?) {
+        lock.withLock {
+            guard let id, sessionID == id, entries[key] == nil, maximumEntries > 0 else { return }
+            // Eight bytes per element conservatively covers all supported
+            // scalar storage types. Include input bytes and bookkeeping too.
+            let bytes = key.sampleBytes.count + (hidden.count + mask.count) * 8 + 256
+            guard bytes <= maximumBytes else { return }
+            while entries.count >= maximumEntries || retainedBytes + bytes > maximumBytes {
+                let oldest = insertionOrder.removeFirst()
+                if let removed = entries.removeValue(forKey: oldest) {
+                    retainedBytes -= removed.chargedBytes
+                    trace("evict", key: oldest)
+                }
+            }
+            entries[key] = Value(hidden: hidden, mask: mask, chargedBytes: bytes)
+            insertionOrder.append(key)
+            retainedBytes += bytes
+            trace("store", key: key)
+        }
+    }
+
+    /// Opt-in diagnostics contain counts and process-local key IDs, never audio or text.
+    /// Called under the cache lock; disable tracing for performance comparisons.
+    private func trace(_ event: String, key: Key? = nil) {
+        guard tracesEvents else { return }
+        let keyID = key.map { String($0.hashValue) } ?? "none"
+        let sampleCount = (key?.sampleBytes.count ?? 0) / MemoryLayout<Float>.size
+        let line =
+            "encoder_cache event=\(event) key=\(keyID) samples=\(sampleCount) entries=\(entries.count) charged_bytes=\(retainedBytes)\n"
+        FileHandle.standardError.write(Data(line.utf8))
+    }
+}
+
 private struct MelItem {
     let index: Int
     let features: MelFeatureExtractor.Features?
     let samples: [Float]
     let sampleCount: Int
     let discardPrefixSamples: Int
+    let cachedKey: EncoderResultCache.Key?
+    let cachedEncoder: EncoderResultCache.Value?
 }
 
 private struct EncoderItem: @unchecked Sendable {
@@ -365,13 +608,14 @@ private struct EncoderItem: @unchecked Sendable {
     let mask: MLMultiArray
     let sampleCount: Int
     let discardPrefixSamples: Int
+    let encoderCacheKey: EncoderResultCache.Key?
 }
 
-private struct ChunkResult {
-    let tokenIds: [Int]
-    let frameIndices: [Int]
-    let durations: [Int]
-    let tokenLogitMargins: [Float]
+private struct ChunkResult: Sendable {
+    var tokenIds: [Int]
+    var frameIndices: [Int]
+    var durations: [Int]
+    var tokenLogitMargins: [Float]
     let durationLogitMargins: [Float]
     let blankDecisionCount: Int
     let totalDecisionCount: Int
@@ -379,12 +623,23 @@ private struct ChunkResult {
     let timelineFrames: Int
     let originalTokenIds: [Int]
     let originalFrameIndices: [Int]
+    let originalDurations: [Int]
+    let originalTokenLogitMargins: [Float]
+    var firstKeptTokenIndex: Int
     let validFrames: Int
     let discardFrames: Int
+
+    mutating func retainTokens(from start: Int, to end: Int) {
+        firstKeptTokenIndex = start
+        tokenIds = Array(originalTokenIds[start..<end])
+        frameIndices = originalFrameIndices[start..<end].map { $0 - discardFrames }
+        durations = Array(originalDurations[start..<end])
+        tokenLogitMargins = Array(originalTokenLogitMargins[start..<end])
+    }
 }
 
 /// Capacity-bounded MPSC blocking queue.
-private final class BlockingQueue<T>: @unchecked Sendable {
+final class BlockingQueue<T>: @unchecked Sendable {
     private var buffer: [T] = []
     private var closed = false
     private let lock = NSLock()

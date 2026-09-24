@@ -1065,11 +1065,21 @@ struct DictationStudioView: View {
                                 .font(.caption)
                                 .foregroundStyle(theme.secondaryInk)
 
+                                Text(
+                                    verbatim:
+                                        "Qwen: \(trace.polisherOutcome.rawValue) · v2: \(trace.v2RejectionReason ?? "accepted") · v3: \(trace.v3Status ?? "off")"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(theme.secondaryInk)
+
                                 HStack(alignment: .top, spacing: 14) {
                                     pipelineText(
                                         label: "Parakeet raw",
                                         text: trace.rawTranscript
                                     )
+                                    if let candidate = trace.qwenCandidate {
+                                        pipelineText(label: "Qwen candidate", text: candidate)
+                                    }
                                     pipelineText(
                                         label: "Final text",
                                         text: trace.finalText
