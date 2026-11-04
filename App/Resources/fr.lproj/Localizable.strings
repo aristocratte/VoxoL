@@ -1531,3 +1531,8 @@
 "If the history can’t be read, VoxoL says so, lets you retry or export a recovery copy, and no longer overwrites it with the next dictation." = "Si l’historique ne peut pas être lu, VoxoL le signale, propose de réessayer ou d’exporter une copie de secours, et ne l’écrase plus à la dictée suivante.";
 "Update checks tell the truth" = "Des vérifications de mise à jour honnêtes";
 "A check that fails now says so and offers to retry, instead of claiming you’re up to date." = "Une vérification qui échoue le dit et propose de réessayer, au lieu d’annoncer que tout est à jour.";
+
+/* Notes de version 0.1.8 */
+"Dictation cleanup is about twice as fast." = "La correction des dictées est environ deux fois plus rapide.";
+"Faster cleanup" = "Une correction plus rapide";
+"Cleanup now checks drafts taken from what you said instead of writing every word, which halves its usual time." = "La correction vérifie maintenant des brouillons tirés de ce que vous avez dit au lieu d’écrire chaque mot, ce qui divise par deux son temps habituel.";

@@ -25,6 +25,17 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.8",
+                headline: "Dictation cleanup is about twice as fast.",
+                items: [
+                    Item(
+                        title: "Faster cleanup",
+                        detail:
+                            "Cleanup now checks drafts taken from what you said instead of writing every word, which halves its usual time."
+                    )
+                ]
+            ),
+            Entry(
                 version: "0.1.7",
                 headline: "A meeting becomes a document you can edit.",
                 items: [
