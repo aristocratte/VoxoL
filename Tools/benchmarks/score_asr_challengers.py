@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Score local ASR challengers against the frozen Wispr raw teacher corpus."""
+"""Compare frozen dictation campaigns, or explicitly labelled historical teachers."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import math
+import os
+import random
 import re
 import statistics
 import unicodedata
 from pathlib import Path
+
+import dictation_campaign as campaign
 
 
 WORD = re.compile(r"[^\W_]+(?:['’\-][^\W_]+)*|\d+(?:[.,]\d+)*", re.UNICODE)
@@ -21,6 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--candidate", action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--campaign-manifest", type=Path)
+    parser.add_argument("--split", choices=("diagnostic", "public"), default="diagnostic")
+    parser.add_argument("--stage", choices=("raw", "normalized", "final"), default="raw")
     return parser.parse_args()
 
 
@@ -145,7 +152,7 @@ def summarize(scored: list[dict[str, object]]) -> dict[str, object]:
     return {
         "count": len(scored),
         "microWER": errors / max(reference_words, 1),
-        "macroWER": statistics.mean(float(row["wer"]) for row in scored),
+        "macroWER": statistics.mean(float(row["wer"]) for row in scored) if scored else None,
         "substitutions": sum(int(row["substitutions"]) for row in scored),
         "insertions": sum(int(row["insertions"]) for row in scored),
         "deletions": sum(int(row["deletions"]) for row in scored),
@@ -171,13 +178,22 @@ def grouped_summary(
 
 def main() -> None:
     args = parse_args()
+    if args.campaign_manifest:
+        compare_campaign(args)
+        return
+    if args.stage != "raw":
+        raise ValueError("Non-ASR stages require --campaign-manifest")
     baseline_rows = read_jsonl(args.baseline)
     baseline_by_id = {str(row["id"]): row for row in baseline_rows}
+    if not baseline_rows or len(baseline_by_id) != len(baseline_rows):
+        raise ValueError("Historical baseline must be nonempty with unique IDs")
     candidate_paths: dict[str, Path] = {}
     for value in args.candidate:
         name, separator, path = value.partition("=")
         if not separator or not name or not path:
             raise ValueError("--candidate must use NAME=PATH")
+        if name in candidate_paths:
+            raise ValueError("Duplicate candidate name")
         candidate_paths[name] = Path(path)
 
     report: dict[str, object] = {
@@ -188,21 +204,24 @@ def main() -> None:
     }
     for name, path in candidate_paths.items():
         all_candidate_rows = read_jsonl(path)
-        candidate_rows = [
-            row for row in all_candidate_rows if row.get("status", "ok") == "ok"
-        ]
-        common_ids = [
-            str(row["id"])
-            for row in candidate_rows
-            if str(row["id"]) in baseline_by_id
-        ]
-        candidate_by_id = {str(row["id"]): row for row in candidate_rows}
+        candidate_by_id = {str(row["id"]): row for row in all_candidate_rows}
+        if len(candidate_by_id) != len(all_candidate_rows) or not candidate_by_id.keys() <= baseline_by_id.keys():
+            raise ValueError("Unknown or duplicate candidate ID")
+        for identifier, row in candidate_by_id.items():
+            baseline = baseline_by_id[identifier]
+            if row.get("referenceRawText") not in (None, baseline["referenceRawText"]):
+                raise ValueError("Candidate reference differs from the fixed baseline reference")
+        common_ids = list(baseline_by_id)
         baseline_scored = [
             score_row(baseline_by_id[item_id], "parakeetText")
             for item_id in common_ids
         ]
         candidate_scored = [
-            score_row(candidate_by_id[item_id], "transcript")
+            score_row({**baseline_by_id[item_id],
+                       "transcript": candidate_by_id.get(item_id, {}).get("transcript", "")
+                           if candidate_by_id.get(item_id, {}).get("status", "ok") == "ok" else "",
+                       "inferenceMilliseconds": candidate_by_id.get(item_id, {}).get("inferenceMilliseconds"),
+                       "mlxPeakMemoryBytes": candidate_by_id.get(item_id, {}).get("mlxPeakMemoryBytes")}, "transcript")
             for item_id in common_ids
         ]
         baseline_wer = {str(row["id"]): float(row["wer"]) for row in baseline_scored}
@@ -217,6 +236,9 @@ def main() -> None:
                 "scored": len(common_ids),
                 "baselineTotal": len(baseline_rows),
                 "errors": sum(row.get("status", "ok") != "ok" for row in all_candidate_rows),
+                "missing": len(baseline_by_id.keys() - candidate_by_id.keys()),
+                "complete": baseline_by_id.keys() == candidate_by_id.keys(),
+                "denominatorPolicy": "every baseline ID; errors and missing predictions are empty hypotheses",
             },
             "baselineOnSameRows": baseline_summary,
             "candidate": candidate_summary,
@@ -246,12 +268,84 @@ def main() -> None:
             },
         }
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    campaign.write_json(args.output, report)
     print(args.output)
+
+
+def load_run(directory: Path, items: list[dict]) -> tuple[dict, list[dict]]:
+    config = json.loads((directory / "run.json").read_text())
+    path = directory / "predictions.jsonl"
+    rows = campaign.read_jsonl(path) if path.is_file() else []
+    campaign.validate_results(rows, items, config)
+    return config, rows
+
+
+def paired_difference(items: list[dict], baseline: dict, candidate: dict) -> dict:
+    baseline_by_id = {row["id"]: row for row in baseline["rows"]}
+    candidate_by_id = {row["id"]: row for row in candidate["rows"]}
+    groups = {}
+    changes = []
+    for item in items:
+        before, after = baseline_by_id[item["id"]], candidate_by_id[item["id"]]
+        group = groups.setdefault(item["sourceGroup"], [0, 0, 0])
+        group[0] += before["errors"]
+        group[1] += after["errors"]
+        group[2] += before["referenceWords"]
+        changes.append({"id": item["id"], "baselineErrors": before["errors"], "candidateErrors": after["errors"],
+                        "errorDelta": after["errors"] - before["errors"],
+                        "baselineCorrectRegressed": before["errors"] == 0 and after["errors"] > 0,
+                        "newNumericSequenceAlert": not before["numericDifference"] and after["numericDifference"],
+                        "newNegationSequenceAlert": not before["negationDifference"] and after["negationDifference"]})
+    rng = random.Random(1729)
+    draws = []
+    values = list(groups.values())
+    if len(values) > 1:
+        for _ in range(1000):
+            sample = rng.choices(values, k=len(values))
+            draws.append(sum(row[1] - row[0] for row in sample) / max(1, sum(row[2] for row in sample)))
+    before, after = baseline["summary"]["errors"], candidate["summary"]["errors"]
+    return {"relativeErrorReduction": (before - after) / before if before else None,
+            "lexicalWERDelta": candidate["summary"]["lexicalWER"] - baseline["summary"]["lexicalWER"],
+            "pairedGroupBootstrapDelta95CI": [campaign.percentile(draws, .025), campaign.percentile(draws, .975)],
+            "improved": sum(row["errorDelta"] < 0 for row in changes),
+            "worsened": sum(row["errorDelta"] > 0 for row in changes),
+            "unchanged": sum(row["errorDelta"] == 0 for row in changes),
+            "previouslyCorrectRegressions": sum(row["baselineCorrectRegressed"] for row in changes),
+            "newNumericSequenceAlerts": sum(row["newNumericSequenceAlert"] for row in changes),
+            "newNegationSequenceAlerts": sum(row["newNegationSequenceAlert"] for row in changes),
+            "changes": changes}
+
+
+def compare_campaign(args: argparse.Namespace) -> None:
+    os.umask(0o077)
+    manifest = json.loads(args.campaign_manifest.read_text())
+    items = campaign.select(manifest, args.split)
+    config, rows = load_run(args.baseline, items)
+    if config.get("manifestSHA256") != manifest["manifestSHA256"]:
+        raise ValueError("Baseline was run against a different campaign")
+    baseline = campaign.score(items, rows, config, args.stage)
+    report = {"schemaVersion": campaign.SCHEMA, "stage": args.stage, "sourceKind": manifest.get("sourceKind"),
+              "manifestSHA256": manifest["manifestSHA256"], "split": args.split, "promotionAllowed": False,
+              "scorerSHA256": campaign.file_digest(Path(__file__)),
+              "contractSHA256": campaign.file_digest(Path(campaign.__file__)),
+              "baseline": baseline, "candidates": {},
+              "limitations": ["diagnostic comparison; the reserved final control is not exposed",
+                              "literal numeric/negation alerts are not semantic fact validation",
+                              "historical AI references may share candidate ancestry",
+                              "candidate-only quality is not retained product quality"]}
+    for entry in args.candidate:
+        name, separator, path = entry.partition("=")
+        if not separator or not name or not path or name in report["candidates"]:
+            raise ValueError("Unique --candidate NAME=RUN_DIRECTORY entries are required")
+        candidate_config, candidate_rows = load_run(Path(path), items)
+        if candidate_config.get("manifestSHA256") != manifest["manifestSHA256"]:
+            raise ValueError("Candidate was run against a different campaign")
+        scored = campaign.score(items, candidate_rows, candidate_config, args.stage)
+        report["candidates"][name] = {"score": scored, "versusBaseline": paired_difference(items, baseline, scored)}
+    campaign.write_json(args.output, report)
+    print(args.output)
+    for name, value in report["candidates"].items():
+        print(name, json.dumps({k: v for k, v in value["versusBaseline"].items() if k != "changes"}))
 
 
 if __name__ == "__main__":

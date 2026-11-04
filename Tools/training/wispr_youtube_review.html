@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoxoL · Revue audio YouTube</title>
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; color: #182026; background: #f5f6f4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; border: 1px solid #cbd2d4; border-radius: 8px; padding: 9px 13px; background: white; color: inherit; }
+    button:hover { background: #eef4f5; }
+    button.primary { background: #075b63; border-color: #075b63; color: white; }
+    button.primary:hover { background: #064c53; }
+    .shell { display: grid; grid-template-columns: 330px minmax(0, 1fr); min-height: 100vh; }
+    aside { border-right: 1px solid #d7dddd; background: #fafbf9; height: 100vh; overflow: auto; position: sticky; top: 0; }
+    aside header { padding: 20px; border-bottom: 1px solid #d7dddd; position: sticky; top: 0; background: #fafbf9; z-index: 2; }
+    h1 { margin: 0; font-size: 18px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+    .muted { color: #627078; }
+    .small { font-size: 12px; }
+    .controls { display: grid; gap: 8px; margin-top: 14px; }
+    .controls input, .controls select, textarea { width: 100%; border: 1px solid #cbd2d4; border-radius: 8px; padding: 9px; background: white; color: #182026; }
+    .row { width: 100%; display: grid; grid-template-columns: 42px 1fr auto; gap: 8px; text-align: left; border: 0; border-bottom: 1px solid #e7ebea; border-radius: 0; background: transparent; }
+    .row.active { background: #e1eff0; box-shadow: inset 3px 0 #075b63; }
+    .row .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .row .state { font-size: 11px; color: #666; }
+    .pages { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 12px; }
+    main { padding: 28px; max-width: 1180px; width: 100%; margin: 0 auto; }
+    .intro, .card { border: 1px solid #d7dddd; border-radius: 12px; background: white; padding: 18px; margin-bottom: 16px; }
+    .intro p { margin: 8px 0 0; }
+    .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .pill { border-radius: 999px; background: #edf1ef; padding: 3px 8px; font-size: 12px; }
+    .pill.warn { background: #fff1d8; color: #764c00; }
+    audio { display: block; width: 100%; margin-top: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .source { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; background: #f6f8f7; border-radius: 8px; padding: 12px; min-height: 90px; }
+    .source-label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #516067; }
+    textarea { min-height: 130px; resize: vertical; }
+    label.check { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    label.check input { width: auto; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .error { color: #a22e2e; }
+    .success { color: #116735; }
+    @media (max-width: 800px) { .shell { grid-template-columns: 1fr; } aside { height: 250px; position: static; } main { padding: 16px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <header>
+        <h1>Revue audio · VoxoL</h1>
+        <div id="progress" class="muted small">Chargement…</div>
+        <div class="controls">
+          <input id="search" type="search" placeholder="Vidéo, segment, motif…" aria-label="Rechercher">
+          <select id="filter" aria-label="Filtrer"><option value="pending">À vérifier</option><option value="all">Tous</option><option value="accepted">Candidats Qwen retenus</option><option value="needs_audio">À écouter selon Luna</option><option value="failed">Échecs Wispr</option><option value="verified">Vérifiés</option></select>
+          <select id="split" aria-label="Split"><option value="all">Tous les splits</option><option value="validation">Validation</option><option value="test">Test</option><option value="train">Train</option><option value="unassigned">Sans split</option></select>
+        </div>
+      </header>
+      <div id="rows"></div>
+      <div class="pages"><button id="prev-page">←</button><span id="page-label" class="small muted"></span><button id="next-page">→</button></div>
+    </aside>
+    <main>
+      <section class="intro">
+        <h2>Écoute et validation manuelle</h2>
+        <p id="global-approval" class="success" hidden></p>
+        <p class="muted">Chaque proposition Wispr, Luna ou VoxoL est expérimentale. Écoutez l’extrait, corrigez le verbatim ASR et/ou le texte fidèle pour Qwen, puis cochez ce que vous avez réellement vérifié. La sauvegarde ne lance aucun entraînement et n’approuve aucun modèle.</p>
+      </section>
+      <section id="detail" class="card"><p class="muted">Sélectionnez un segment dans la liste.</p></section>
+      <p id="message" role="status"></p>
+    </main>
+  </div>
+  <script>
+    const TOKEN = __REVIEW_TOKEN__;
+    const pageSize = 70;
+    let entries = [], filtered = [], page = 0, selectedId = null;
+    const byId = id => document.getElementById(id);
+    function showProgress(summary) {
+      byId("progress").textContent = `${summary.globally_approved_count || 0} approuvés globalement · ${summary.verified_count} revus sur audio · ${entries.length} au total`;
+      const banner = byId("global-approval");
+      banner.hidden = !summary.globally_approved_count;
+      banner.textContent = `Votre validation globale couvre les ${summary.globally_approved_count} segments pour les essais expérimentaux. La revue audio individuelle reste disponible.`;
+    }
+    async function request(path, options = {}) {
+      const response = await fetch(path, { ...options, headers: { ...(options.headers || {}), "X-VoxoL-Review-Token": TOKEN } });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      return result;
+    }
+    function node(tag, text, className) {
+      const element = document.createElement(tag);
+      element.textContent = text;
+      if (className) element.className = className;
+      return element;
+    }
+    function message(text, good = false) {
+      const target = byId("message"); target.textContent = text; target.className = good ? "success" : "error";
+    }
+    function updateList() {
+      const query = byId("search").value.toLowerCase().trim();
+      const filter = byId("filter").value;
+      const split = byId("split").value;
+      filtered = entries.filter(item => {
+        if (split !== "all" && item.split !== split) return false;
+        if (filter === "pending" && item.review_status !== "pending") return false;
+        if (filter === "verified" && item.review_status !== "verified") return false;
+        if (filter === "accepted" && item.candidate !== "accepted") return false;
+        if (filter === "needs_audio" && !item.flags.includes("luna_needs_audio")) return false;
+        if (filter === "failed" && !item.flags.some(flag => flag.startsWith("wispr_") && flag.endsWith("_failed"))) return false;
+        return !query || [item.id, item.video, item.language, ...item.flags].join(" ").toLowerCase().includes(query);
+      });
+      page = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
+      renderList();
+    }
+    function renderList() {
+      const holder = byId("rows"); holder.replaceChildren();
+      const first = page * pageSize;
+      for (const item of filtered.slice(first, first + pageSize)) {
+        const row = document.createElement("button"); row.className = "row" + (item.id === selectedId ? " active" : "");
+        row.append(node("span", item.language.toUpperCase(), "small"));
+        row.append(node("span", `${item.video} · ${item.chunk}`, "name"));
+        row.append(node("span", item.review_status === "verified" ? "✓" : item.review_status === "skipped" ? "↷" : "·", "state"));
+        row.addEventListener("click", () => select(item.id)); holder.append(row);
+      }
+      byId("page-label").textContent = `${filtered.length ? first + 1 : 0}–${Math.min(first + pageSize, filtered.length)} / ${filtered.length}`;
+      byId("prev-page").disabled = page === 0;
+      byId("next-page").disabled = first + pageSize >= filtered.length;
+    }
+    function sourceCard(label, text) {
+      const box = document.createElement("div");
+      box.append(node("span", label, "source-label"));
+      box.append(node("div", text || "Aucun texte disponible", "source"));
+      return box;
+    }
+    function checkbox(id, text) {
+      const label = document.createElement("label"); label.className = "check";
+      const input = document.createElement("input"); input.type = "checkbox"; input.id = id;
+      label.append(input, node("span", text)); return label;
+    }
+    async function select(id) {
+      selectedId = id; renderList(); message("");
+      try {
+        const { item, review } = await request(`/api/item/${encodeURIComponent(id)}`);
+        const detail = byId("detail"); detail.replaceChildren();
+        detail.append(node("h2", `${item.source_video_id} · segment ${item.chunk}`));
+        const meta = document.createElement("div"); meta.className = "meta";
+        for (const value of [item.language.toUpperCase(), item.split, `${item.start_seconds}–${item.end_seconds} s`, item.qwen_candidate_status, ...item.flags]) meta.append(node("span", String(value), "pill" + (String(value).includes("failed") || String(value).includes("quarantine") ? " warn" : "")));
+        detail.append(meta);
+        const player = document.createElement("audio"); player.controls = true; player.preload = "none"; player.src = `/audio/${encodeURIComponent(id)}?token=${encodeURIComponent(TOKEN)}`;
+        detail.append(node("span", "Extrait audio local (SSD)", "source-label"), player);
+        const sources = document.createElement("div"); sources.className = "grid"; sources.style.marginTop = "18px";
+        sources.append(sourceCard("Wispr brut", item.wispr_raw), sourceCard("Wispr édité", item.wispr_edited), sourceCard("VoxoL brut sur le même audio", item.voxol_raw), sourceCard("Proposition Luna", item.luna_proposed));
+        detail.append(sources);
+        detail.append(node("h2", "Votre transcription vérifiée"));
+        const labelAsr = node("label", "Verbatim ASR après écoute", "source-label"); labelAsr.htmlFor = "asr-text"; detail.append(labelAsr);
+        const asr = document.createElement("textarea"); asr.id = "asr-text"; asr.value = review?.asr_text || item.wispr_raw || ""; detail.append(asr);
+        detail.append(checkbox("verify-asr", "J’ai vérifié ce verbatim ASR sur l’audio"));
+        detail.append(node("h2", "Votre texte fidèle pour Qwen"));
+        const labelQwen = node("label", "Cible fidèle au contenu de l’audio et du brut VoxoL", "source-label"); labelQwen.htmlFor = "qwen-target"; detail.append(labelQwen);
+        const qwen = document.createElement("textarea"); qwen.id = "qwen-target"; qwen.value = review?.qwen_target || item.qwen_silver_target || item.luna_proposed || item.wispr_edited || ""; detail.append(qwen);
+        const qwenCheck = checkbox("verify-qwen", "J’ai vérifié cette cible Qwen sur l’audio"); qwenCheck.querySelector("input").disabled = !item.voxol_raw; detail.append(qwenCheck);
+        if (!item.voxol_raw) detail.append(node("p", "Aucune sortie brute VoxoL pour cet extrait : seule la revue ASR peut être enregistrée pour le moment.", "muted small"));
+        detail.append(checkbox("audio-confirmed", "J’ai écouté cet extrait avant de valider"));
+        const notesLabel = node("label", "Notes facultatives", "source-label"); notesLabel.htmlFor = "notes"; detail.append(notesLabel);
+        const notes = document.createElement("textarea"); notes.id = "notes"; notes.style.minHeight = "70px"; notes.value = review?.notes || ""; detail.append(notes);
+        if (review?.status === "verified") {
+          byId("verify-asr").checked = review.verify_asr; byId("verify-qwen").checked = review.verify_qwen; byId("audio-confirmed").checked = true;
+        }
+        const actions = document.createElement("div"); actions.className = "actions";
+        const save = node("button", "Enregistrer ma vérification", "primary");
+        save.addEventListener("click", () => saveReview("verified"));
+        const skip = node("button", "Passer ce segment"); skip.addEventListener("click", () => saveReview("skipped"));
+        actions.append(save, skip); detail.append(actions);
+      } catch (error) { message(error.message); }
+    }
+    async function saveReview(status) {
+      if (!selectedId) return;
+      const payload = { status, notes: byId("notes").value, audio_confirmed: byId("audio-confirmed").checked, verify_asr: byId("verify-asr").checked, verify_qwen: byId("verify-qwen").checked, asr_text: byId("asr-text").value, qwen_target: byId("qwen-target").value };
+      try {
+        const result = await request(`/api/review/${encodeURIComponent(selectedId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const entry = entries.find(item => item.id === selectedId); entry.review_status = result.review.status;
+        showProgress(result.summary);
+        message("Enregistré sur le SSD.", true); updateList();
+      } catch (error) { message(error.message); }
+    }
+    for (const id of ["search", "filter", "split"]) byId(id).addEventListener(id === "search" ? "input" : "change", () => { page = 0; updateList(); });
+    byId("prev-page").addEventListener("click", () => { page--; renderList(); });
+    byId("next-page").addEventListener("click", () => { page++; renderList(); });
+    request("/api/index").then(data => {
+      entries = data.items;
+      showProgress(data.summary);
+      updateList();
+      if (filtered.length) select(filtered[0].id);
+    }).catch(error => message(error.message));
+  </script>
+</body>
+</html>

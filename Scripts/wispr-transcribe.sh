@@ -35,10 +35,17 @@
 # Auth uses the signed-in Wispr Flow desktop session. No token, transcript or
 # audio content is written to logs.
 #
-# Requires: ffmpeg, ffprobe, jq, curl, python3.
+# Requires: ffmpeg, ffprobe, jq, curl, python3; yt-dlp for YouTube URLs.
 #
 # Usage:
 #   ./wispr-transcribe.sh <audio-or-folder> [<audio-or-folder> ...]
+#   ./wispr-transcribe.sh <YouTube-URL> [<YouTube-URL> ...]
+#   ./wispr-transcribe.sh --urls-file links.txt
+#   pbpaste | ./wispr-transcribe.sh --urls-stdin
+#   ./wispr-transcribe.sh --resume
+#   ./wispr-transcribe.sh --resume --parallel 4
+# YouTube and pasted batches persist under $WISPR_OUT_DIR/youtube-jobs.
+# An interrupted batch resumes with --resume; completed requests are reused.
 #
 # Durable output, by default under ~/Documents/wispr/transcripts:
 #
@@ -71,9 +78,33 @@
 #   WISPR_MIN_REQUEST_INTERVAL
 #                        global delay between request starts (default: 0.8s)
 #   WISPR_MAX_RETRIES    transient HTTP attempts per request (default: 6)
+#   WISPR_PARALLEL_VIDEOS batch workers (default: 3; maximum: 8)
+#   WISPR_RATE_FILE      shared timestamp file for parallel request throttling
+#   WISPR_ACCESS_TOKEN   already-refreshed token supplied by a batch supervisor
+#   WISPR_LOG_PREFIX     identifies a video in interleaved batch logs
 #   WISPR_API_BASE, WISPR_SUPA_URL, WISPR_SESSION_FILE overrides
 # ---------------------------------------------------------------------------
 set -uo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+if [ "${1:-}" = "--ui" ]; then
+  shift
+  exec python3 "$SCRIPT_DIR/wispr_youtube_ui.py" "$@"
+fi
+for argument in "$@"; do
+  case "$argument" in
+    --help|-h)
+      printf '%s\n' \
+        'Usage: wispr-transcribe.sh <audio-or-folder|YouTube-URL> [...]' \
+        '       wispr-transcribe.sh --urls-file links.txt' \
+        '       pbpaste | wispr-transcribe.sh --urls-stdin' \
+        '       wispr-transcribe.sh --resume [--parallel 1..8]' \
+        '       wispr-transcribe.sh --ui'
+      exit 0 ;;
+    --urls-file|--urls-stdin|--resume|--parallel|http://*|https://*)
+      exec python3 "$SCRIPT_DIR/wispr_youtube_batch.py" "$@" ;;
+  esac
+done
 
 OUT_DIR="${WISPR_OUT_DIR:-$HOME/Documents/wispr/transcripts}"
 DATASET_DIR="${WISPR_DATASET_DIR:-$OUT_DIR/dataset}"
@@ -98,14 +129,20 @@ DEFER_MANIFESTS="${WISPR_DEFER_MANIFEST_REBUILD:-0}"
 
 # The service rejects anything longer; a caller asking for more gets the cap
 # rather than a run that fails one clip at a time.
-if [ "$MAX_CHUNK" -gt 30 ] 2>/dev/null; then
+if ! [[ "$MAX_CHUNK" =~ ^[0-9]+$ ]] || [ "$MAX_CHUNK" -lt 1 ] || [ "$MAX_CHUNK" -gt 30 ]; then
   echo "WISPR_MAX_CHUNK_SEC must be between 1 and 30 seconds." >&2
   exit 1
 fi
 TARGET_CHUNK="${WISPR_TARGET_CHUNK_SEC:-$((MAX_CHUNK < 18 ? MAX_CHUNK : 18))}"
 MIN_CHUNK="${WISPR_MIN_CHUNK_SEC:-$((TARGET_CHUNK < 6 ? TARGET_CHUNK : 6))}"
 
-log() { printf '%s\n' "$*"; }
+log() {
+  if [ -n "${WISPR_LOG_PREFIX:-}" ]; then
+    printf '%s %s\n' "$WISPR_LOG_PREFIX" "$*"
+  else
+    printf '%s\n' "$*"
+  fi
+}
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
 for tool in ffmpeg ffprobe jq curl python3; do
@@ -117,7 +154,6 @@ done
 # otherwise, so the refresh token is exchanged once per run. The anon key is
 # read from the app bundle rather than hard-coded: it rotates with releases.
 TOKEN_FILE="$(mktemp -t wispr-token)"
-trap 'rm -f "$TOKEN_FILE"' EXIT
 
 refresh_token() {
   python3 - "$SESSION_FILE" "$ASAR" "$SUPA_URL" "$TOKEN_FILE" <<'PYTHON'
@@ -183,14 +219,33 @@ open(out, "w").write(session["access_token"])
 PYTHON
 }
 
-refresh_token || die "could not obtain a Wispr Flow access token"
-ACCESS_TOKEN="$(cat "$TOKEN_FILE")"
-[ -n "$ACCESS_TOKEN" ] || die "empty Wispr Flow access token"
+ACCESS_TOKEN="${WISPR_ACCESS_TOKEN:-}"
+ensure_token() {
+  [ -n "$ACCESS_TOKEN" ] && return 0
+  refresh_token || { printf '%s\n' 'could not obtain a Wispr Flow access token' >&2; return 2; }
+  ACCESS_TOKEN="$(cat "$TOKEN_FILE")"
+  [ -n "$ACCESS_TOKEN" ] || { printf '%s\n' 'empty Wispr Flow access token' >&2; return 2; }
+}
 
 # --- request --------------------------------------------------------------
-LAST_REQUEST_FILE="$(mktemp -t wispr-rate)"
-trap 'rm -f "$TOKEN_FILE" "$LAST_REQUEST_FILE"' EXIT
-printf '0' >"$LAST_REQUEST_FILE"
+if [ -n "${WISPR_RATE_FILE:-}" ]; then
+  LAST_REQUEST_FILE="$WISPR_RATE_FILE"
+  mkdir -p "$(dirname "$LAST_REQUEST_FILE")" || exit 1
+  touch "$LAST_REQUEST_FILE" || exit 1
+  SHARED_RATE_FILE=1
+else
+  LAST_REQUEST_FILE="$(mktemp -t wispr-rate)"
+  SHARED_RATE_FILE=0
+fi
+cleanup() {
+  rm -f "$TOKEN_FILE"
+  if [ "$SHARED_RATE_FILE" -eq 0 ]; then rm -f "$LAST_REQUEST_FILE"; fi
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if [ "$SHARED_RATE_FILE" -eq 0 ]; then printf '0' >"$LAST_REQUEST_FILE"; fi
 
 throttle() {
   python3 - "$LAST_REQUEST_FILE" "$MIN_INTERVAL" <<'PYTHON'
@@ -220,6 +275,7 @@ PYTHON
 # benchmark by a factor of three.
 post_chunk() {
   local endpoint="$1" body_file="$2" attempt=1 status body
+  ensure_token || return 2
   while :; do
     throttle
     local response
@@ -231,23 +287,34 @@ post_chunk() {
     )"
     status="${response##*$'\n'}"
     body="${response%$'\n'*}"
+    [[ "$status" =~ ^[0-9][0-9][0-9]$ ]] || status="000"
     case "$status" in
       200) printf '%s\t%s' "$status" "$body"; return 0 ;;
       # 429 is the service asking for less, not refusing the request. Treating
       # it as final made a first pass drop 47 of 300 clips, which the caller
       # then had to re-request wholesale. It backs off harder than a transient
       # network failure because the cause is this client's own rate.
-      429) sleep "$((attempt * attempt * 5))" ;;
-      000|5*) sleep "$((attempt * 2))" ;;
+      429|000|5*) ;;
       *) printf '%s\t%s' "$status" "$body"; return 0 ;;
     esac
     if [ "$attempt" -ge "$MAX_RETRIES" ]; then
       printf '%s\t%s' "${status:-000}" "$body"
       return 0
     fi
+    if [ "$status" = "429" ]; then
+      sleep "$((attempt * attempt * 5))"
+    else
+      sleep "$((attempt * 2))"
+    fi
     attempt=$((attempt + 1))
   done
 }
+
+if [ "${1:-}" = "--token-only" ]; then
+  ensure_token || exit 2
+  printf '%s' "$ACCESS_TOKEN"
+  exit 0
+fi
 
 # --- inputs ---------------------------------------------------------------
 DATASET_ABS="$(cd "$(dirname "$DATASET_DIR")" 2>/dev/null && pwd -P)/$(basename "$DATASET_DIR")"
@@ -299,7 +366,11 @@ for source in "${inputs[@]}"; do
   recording_id="$stem-$(printf '%s' "$source_sha" | cut -c1-16)"
   record_dir="$RECORDS_DIR/$recording_id"
 
-  if [ -f "$record_dir/record.json" ]; then
+  if [ -f "$record_dir/record.json" ] &&
+     jq -e --arg sha "$source_sha" '
+       .source.sha256 == $sha and (.results | length) > 0 and
+       all(.results[]; .raw_http_status == "200" and .edited_http_status == "200")
+     ' "$record_dir/record.json" >/dev/null 2>&1; then
     log "skip (already collected): $name"
     processed=$((processed + 1))
     continue
@@ -308,26 +379,23 @@ for source in "${inputs[@]}"; do
   log "▶ $name [$recording_id]"
   mkdir -p "$record_dir/audio" "$record_dir/results"
 
-  duration="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$source" 2>/dev/null)"
-  duration="${duration:-0}"
-
   # Normalise once, then segment. Sixteen kilohertz mono PCM is what the
   # service expects and what the benchmark audio already is, so a benchmark
   # clip passes through untouched.
   normalised="$record_dir/audio/source-16k.wav"
   ffmpeg -hide_banner -loglevel error -y -i "$source" \
     -ac 1 -ar 16000 -acodec pcm_s16le "$normalised" 2>/dev/null || {
-      log "  ✗ could not decode audio"
-      failed=$((failed + 1))
-      rm -rf "$record_dir"
-      continue
-    }
+    log "  ✗ could not decode audio"
+    failed=$((failed + 1))
+    rm -f "$normalised"
+    continue
+  }
 
   # Silence-aware segmentation, capped by the service limit. A clip already
   # shorter than the cap stays one chunk, which is what the benchmark needs:
   # one clip, one request, no segmentation artefacts in the comparison.
   python3 - "$normalised" "$record_dir" "$MAX_CHUNK" "$TARGET_CHUNK" "$MIN_CHUNK" "$MIN_SILENCE" <<'PYTHON'
-import json, math, subprocess, sys, wave
+import json, math, os, subprocess, sys, wave
 from pathlib import Path
 
 source, record_dir, maximum, target, minimum, min_silence = (
@@ -387,30 +455,83 @@ for index in range(len(cuts) - 1):
         "duration_seconds": round(end - start, 3),
     })
 
-(record_dir / "segmentation.json").write_text(
+temporary = record_dir / f"segmentation.json.tmp.{os.getpid()}"
+temporary.write_text(
     json.dumps({"chunks": chunks, "source_duration_seconds": round(total, 3),
                 "max_chunk_seconds": maximum, "target_chunk_seconds": target,
                 "min_chunk_seconds": minimum,
                 "min_silence_seconds": min_silence}, indent=2) + "\n"
 )
+temporary.replace(record_dir / "segmentation.json")
 PYTHON
+  if [ "$?" -ne 0 ]; then
+    log "  ✗ could not segment audio"
+    failed=$((failed + 1))
+    rm -f "$normalised"
+    continue
+  fi
 
   chunk_count="$(jq '.chunks | length' "$record_dir/segmentation.json")"
+  if ! [[ "$chunk_count" =~ ^[0-9]+$ ]] || [ "$chunk_count" -lt 1 ]; then
+    log "  ✗ no usable audio chunks"
+    failed=$((failed + 1))
+    rm -f "$normalised"
+    continue
+  fi
+  duration="$(jq -r '.source_duration_seconds' "$record_dir/segmentation.json")"
   log "  $chunk_count persistent chunk(s) (≤ ${MAX_CHUNK}s)"
 
-  results_json="[]"
   chunk_index=0
+  auth_failed=0
+  save_chunk_state() {
+    local destination="$1" payload="$2" temporary="${1}.tmp.$$"
+    printf '%s\n' "$payload" >"$temporary" && mv "$temporary" "$destination"
+  }
   while [ "$chunk_index" -lt "$chunk_count" ]; do
     chunk_index=$((chunk_index + 1))
     chunk_file="$(jq -r ".chunks[$((chunk_index - 1))].audio_file" "$record_dir/segmentation.json")"
     chunk_path="$record_dir/$chunk_file"
     chunk_sha="$(shasum -a 256 "$chunk_path" | cut -d' ' -f1)"
+    state_file="$record_dir/results/chunk_$(printf '%04d' "$chunk_index").state.json"
+
+    # Old partial records predate per-chunk state files. Import their successful
+    # requests once so a retry does not pay for the same audio again.
+    if [ ! -s "$state_file" ] && [ -s "$record_dir/record.json" ]; then
+      jq -c --argjson index "$chunk_index" --arg sha "$chunk_sha" \
+        --arg lang "$LANG_PREF" --arg app "$APP_TYPE" '
+        first(.results[] | select(.chunk == $index and .audio_sha256 == $sha and
+          .requested_language == $lang and .app_type == $app)) // empty
+      ' "$record_dir/record.json" >"${state_file}.migration.$$" 2>/dev/null || true
+      if [ -s "${state_file}.migration.$$" ]; then
+        mv "${state_file}.migration.$$" "$state_file"
+      else
+        rm -f "${state_file}.migration.$$"
+      fi
+    fi
+    if [ -s "$state_file" ] && jq -e --arg sha "$chunk_sha" \
+        --arg lang "$LANG_PREF" --arg app "$APP_TYPE" \
+        --arg recording "$recording_id" '
+        .audio_sha256 == $sha and .requested_language == $lang and
+        .app_type == $app and .recording_id == $recording
+      ' "$state_file" >/dev/null 2>&1; then
+      state="$(cat "$state_file")"
+    else
+      state="$(jq -n --arg sha "$chunk_sha" --arg lang "$LANG_PREF" \
+        --arg app "$APP_TYPE" --arg recording "$recording_id" '{
+        audio_sha256: $sha, requested_language: $lang, app_type: $app,
+        recording_id: $recording, raw: "", raw_http_status: "pending",
+        edited: "", edited_http_status: "pending", detected_language: ""
+      }')"
+    fi
 
     language_field="$LANG_PREF"
     [ "$language_field" = "auto" ] && language_field=""
 
-    body_raw="$(mktemp -t wispr-body)"
-    python3 - "$chunk_path" "$language_field" "$body_raw" <<'PYTHON'
+    raw_status="$(printf '%s' "$state" | jq -r '.raw_http_status // "pending"')"
+    if [ "$raw_status" != "200" ]; then
+      if ! ensure_token; then auth_failed=1; break; fi
+      body_raw="$(mktemp -t wispr-body)"
+      python3 - "$chunk_path" "$language_field" "$body_raw" <<'PYTHON'
 import base64, json, sys
 audio, language, out = sys.argv[1:4]
 json.dump(
@@ -419,15 +540,36 @@ json.dump(
     open(out, "w"),
 )
 PYTHON
+      raw_response="$(post_chunk /llm/asr "$body_raw")"
+      rm -f "$body_raw"
+      raw_status="${raw_response%%$'\t'*}"
+      raw_body="${raw_response#*$'\t'}"
+      if [ "$raw_status" = "200" ] &&
+         ! printf '%s' "$raw_body" | jq -e 'type == "object" and (.content | type == "string")' >/dev/null 2>&1; then
+        raw_status="invalid_response"
+      fi
+      raw_text="$(printf '%s' "$raw_body" | jq -r '.content // ""' 2>/dev/null)"
+      detected="$(printf '%s' "$raw_body" | jq -r '.detected_language // ""' 2>/dev/null)"
+      state="$(jq -n --argjson prior "$state" --arg raw "$raw_text" \
+        --arg status "$raw_status" --arg detected "$detected" '
+        $prior + {raw: $raw, raw_http_status: $status, detected_language: $detected}
+      ')"
+      save_chunk_state "$state_file" "$state" || die "cannot save chunk state: $state_file"
+      if printf '%s' "$raw_body" | jq -e . >/dev/null 2>&1; then
+        printf '%s\n' "$raw_body" >"${state_file%.state.json}.json.tmp.$$" &&
+          mv "${state_file%.state.json}.json.tmp.$$" "${state_file%.state.json}.json"
+      fi
+      if [ "$raw_status" = "401" ] || [ "$raw_status" = "403" ]; then
+        auth_failed=1
+        break
+      fi
+    fi
 
-    raw_response="$(post_chunk /llm/asr "$body_raw")"
-    raw_status="${raw_response%%$'\t'*}"
-    raw_body="${raw_response#*$'\t'}"
-    raw_text="$(printf '%s' "$raw_body" | jq -r '.content // ""' 2>/dev/null)"
-    detected="$(printf '%s' "$raw_body" | jq -r '.detected_language // ""' 2>/dev/null)"
-
-    body_edited="$(mktemp -t wispr-body)"
-    python3 - "$chunk_path" "$body_edited" "$APP_TYPE" <<'PYTHON'
+    edited_status="$(printf '%s' "$state" | jq -r '.edited_http_status // "pending"')"
+    if [ "$edited_status" != "200" ]; then
+      if ! ensure_token; then auth_failed=1; break; fi
+      body_edited="$(mktemp -t wispr-body)"
+      python3 - "$chunk_path" "$body_edited" "$APP_TYPE" <<'PYTHON'
 import base64, json, sys
 audio, out, app_type = sys.argv[1:4]
 json.dump(
@@ -436,135 +578,61 @@ json.dump(
     open(out, "w"),
 )
 PYTHON
-
-    edited_response="$(post_chunk /llm/api "$body_edited")"
-    edited_status="${edited_response%%$'\t'*}"
-    edited_body="${edited_response#*$'\t'}"
-    edited_text="$(printf '%s' "$edited_body" | jq -r '.text // ""' 2>/dev/null)"
-
-    rm -f "$body_raw" "$body_edited"
-
-    results_json="$(
-      jq -n --argjson previous "$results_json" \
-            --argjson segmentation "$(cat "$record_dir/segmentation.json")" \
-            --arg index "$chunk_index" --arg sha "$chunk_sha" \
-            --arg file "$chunk_file" --arg raw "$raw_text" \
-            --arg raw_status "$raw_status" --arg edited "$edited_text" \
-            --arg edited_status "$edited_status" --arg detected "$detected" \
-            --arg requested "$LANG_PREF" --arg app "$APP_TYPE" \
-            --arg recording "$recording_id" '
-        ($segmentation.chunks[($index | tonumber) - 1]) as $chunk |
-        $previous + [{
-          chunk: ($index | tonumber),
-          audio_path: $file,
-          audio_sha256: $sha,
-          start_seconds: $chunk.start_seconds,
-          end_seconds: $chunk.end_seconds,
-          duration_seconds: $chunk.duration_seconds,
-          raw: $raw, raw_http_status: $raw_status,
-          edited: $edited, edited_http_status: $edited_status,
-          detected_language: $detected, requested_language: $requested,
-          app_type: $app, recording_id: $recording
-        }]'
-    )"
-
-    printf '%s' "$raw_body" >"$record_dir/results/chunk_$(printf '%04d' "$chunk_index").json"
-    if [ "$raw_status" = "200" ]; then
-      log "  chunk $chunk_index/$chunk_count collected"
+      edited_response="$(post_chunk /llm/api "$body_edited")"
+      rm -f "$body_edited"
+      edited_status="${edited_response%%$'\t'*}"
+      edited_body="${edited_response#*$'\t'}"
+      if [ "$edited_status" = "200" ] &&
+         ! printf '%s' "$edited_body" | jq -e 'type == "object" and (.text | type == "string")' >/dev/null 2>&1; then
+        edited_status="invalid_response"
+      fi
+      edited_text="$(printf '%s' "$edited_body" | jq -r '.text // ""' 2>/dev/null)"
+      state="$(jq -n --argjson prior "$state" --arg edited "$edited_text" \
+        --arg status "$edited_status" '$prior + {edited: $edited, edited_http_status: $status}')"
+      save_chunk_state "$state_file" "$state" || die "cannot save chunk state: $state_file"
+      if [ "$edited_status" = "401" ] || [ "$edited_status" = "403" ]; then
+        auth_failed=1
+        break
+      fi
+    fi
+    if [ "$raw_status" = "200" ] && [ "$edited_status" = "200" ]; then
+      log "  chunk $chunk_index/$chunk_count ready"
     else
-      log "  chunk $chunk_index/$chunk_count failed (HTTP $raw_status)"
+      log "  chunk $chunk_index/$chunk_count incomplete (raw $raw_status; edited $edited_status)"
     fi
   done
 
-  printf '%s' "$results_json" | jq -r 'map(select(.raw_http_status == "200") | .raw) | join(" ")' >"$record_dir/raw.txt"
-  printf '%s' "$results_json" | jq -r 'map(select(.edited_http_status == "200") | .edited) | join(" ")' >"$record_dir/edited.txt"
+  record_status=0
+  python3 "$SCRIPT_DIR/wispr_finalize_record.py" \
+    --record-dir "$record_dir" --source "$source" --source-sha256 "$source_sha" \
+    --duration "$duration" --language "$LANG_PREF" --app-type "$APP_TYPE" \
+    --speaker-id "$SPEAKER_ID" --session-id "$SESSION_ID" \
+    --youtube-url "${WISPR_SOURCE_URL:-}" \
+    --youtube-video-id "${WISPR_SOURCE_VIDEO_ID:-}" || record_status=$?
 
-  usable="$(printf '%s' "$results_json" | jq '[.[] | select(.raw_http_status == "200" and (.raw | length) > 0)] | length')"
-  jq -n --arg id "$recording_id" --arg name "$name" --arg sha "$source_sha" \
-        --argjson bytes "$source_bytes" --argjson duration "${duration:-0}" \
-        --argjson results "$results_json" \
-        --argjson segmentation "$(cat "$record_dir/segmentation.json")" \
-        --argjson usable "$usable" --arg speaker "$SPEAKER_ID" \
-        --arg session "$SESSION_ID" --arg lang "$LANG_PREF" '{
-    schema_version: "voxol-wispr-teacher-v1",
-    recording_id: $id,
-    source: {name: $name, sha256: $sha, bytes: $bytes, duration_seconds: $duration},
-    collection: {speaker_id: $speaker, session_id: $session, requested_language: $lang},
-    teacher: {
-      provider: "Wispr Flow",
-      raw_endpoint: "/llm/asr",
-      edited_endpoint: "/llm/api",
-      note: "raw and edited are independent requests over the same audio chunk"
-    },
-    segmentation: $segmentation,
-    results: $results,
-    summary: {chunk_count: ($results | length), usable_chunk_count: $usable}
-  }' >"$record_dir/record.json"
-
-  if [ "$usable" -gt 0 ]; then
+  if [ "$record_status" -eq 0 ]; then
     log "  ✓ record -> $record_dir/record.json"
     processed=$((processed + 1))
   else
-    log "  ✗ no usable chunk"
+    log "  ✗ incomplete record; re-run to retry missing requests"
     failed=$((failed + 1))
   fi
   rm -f "$normalised"
+  if [ "$auth_failed" -eq 1 ]; then
+    log "Wispr authentication rejected; sign in to the desktop app, then resume."
+    if [ "$DEFER_MANIFESTS" != "1" ]; then
+      python3 "$SCRIPT_DIR/wispr_rebuild_manifests.py" --dataset-dir "$DATASET_DIR"
+    fi
+    exit 42
+  fi
 done
 
 # --- shared manifests -----------------------------------------------------
 if [ "$DEFER_MANIFESTS" != "1" ]; then
   log ""
   log "Rebuilding dataset manifests..."
-  python3 - "$RECORDS_DIR" "$DATASET_DIR" <<'PYTHON'
-import json
-from pathlib import Path
-import sys
-
-records_dir, dataset_dir = Path(sys.argv[1]), Path(sys.argv[2])
-everything, asr, polisher = [], [], []
-languages, chunks, seconds = {}, 0, 0.0
-
-for record_path in sorted(records_dir.glob("*/record.json")):
-    record = json.loads(record_path.read_text())
-    for chunk in record.get("results") or []:
-        everything.append(chunk)
-        chunks += 1
-        seconds += chunk.get("duration_seconds") or 0
-        language = chunk.get("detected_language") or "unknown"
-        languages[language] = languages.get(language, 0) + 1
-        if chunk.get("raw_http_status") == "200" and chunk.get("raw"):
-            asr.append({
-                "audio": str(record_path.parent / chunk["audio_path"]),
-                "text": chunk["raw"],
-                "duration": chunk.get("duration_seconds"),
-            })
-            if chunk.get("edited_http_status") == "200" and chunk.get("edited"):
-                polisher.append({"raw": chunk["raw"], "edited": chunk["edited"]})
-
-def dump(name, rows):
-    (dataset_dir / name).write_text(
-        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
-    )
-
-dump("all-manifest.jsonl", everything)
-dump("asr-manifest.jsonl", asr)
-dump("polisher-manifest.jsonl", polisher)
-
-summary = {
-    "schema_version": "voxol-wispr-teacher-summary-v1",
-    "recording_count": len(list(records_dir.glob("*/record.json"))),
-    "chunk_count": chunks,
-    "duration_hours": round(seconds / 3600, 6),
-    "languages": languages,
-    "usable_asr_count": len(asr),
-    "usable_polisher_count": len(polisher),
-    "split_status": "unassigned; group by speaker/source before train/dev/test",
-}
-(dataset_dir / "dataset-summary.json").write_text(
-    json.dumps(summary, sort_keys=True) + "\n"
-)
-print(json.dumps(summary, sort_keys=True))
-PYTHON
+  python3 "$SCRIPT_DIR/wispr_rebuild_manifests.py" --dataset-dir "$DATASET_DIR" || exit 1
 fi
 
 log "Done. $processed file(s), $failed failed -> $DATASET_DIR"
+[ "$failed" -eq 0 ]

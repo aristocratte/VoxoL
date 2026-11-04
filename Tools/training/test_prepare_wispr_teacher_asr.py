@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -139,6 +140,39 @@ class WisprTeacherASRBuilderTests(unittest.TestCase):
                         name.startswith(f"{BUILDER.PACKAGE_ROOT}/")
                         for name in names
                     )
+                )
+
+    def test_quarantine_excludes_only_matching_source_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "dataset"
+            manifest = dataset / "all-manifest.jsonl"
+            manifest.parent.mkdir(parents=True)
+            write_manifest(manifest, dataset)
+            row = json.loads(manifest.read_text(encoding="utf-8").splitlines()[0])
+            quarantine = root / "quarantine.jsonl"
+            item = {
+                "id": row["id"],
+                "audio_sha256": row["audio_sha256"],
+                "raw_sha256": hashlib.sha256(row["raw"].encode()).hexdigest(),
+                "reasons": ["strong_repetition"],
+            }
+            quarantine.write_text(json.dumps(item) + "\n", encoding="utf-8")
+
+            report = BUILDER.prepare(
+                manifest, dataset, root / "prepared", None,
+                BUILDER.FREEZE_TIMESTAMP, quarantine_path=quarantine,
+            )
+            self.assertEqual(report["filter"]["includedItemCount"], 14)
+            self.assertEqual(report["filter"]["excludedByReason"]["quarantine_strong_repetition"], 1)
+            self.assertEqual(report["filter"]["quarantinedItemCount"], 1)
+
+            item["raw_sha256"] = "0" * 64
+            quarantine.write_text(json.dumps(item) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "Stale quarantine source identity"):
+                BUILDER.prepare(
+                    manifest, dataset, root / "stale", None,
+                    BUILDER.FREEZE_TIMESTAMP, quarantine_path=quarantine,
                 )
 
     def test_assignment_is_deterministic(self) -> None:

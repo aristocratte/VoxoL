@@ -35,6 +35,7 @@ COREMLTOOLS_VERSION = "9.0"
 MODEL_INPUT_FRAMES = 3_000
 MEL_BINS = 128
 MAX_AUDIO_SAMPLES = 480_000
+MIN_WAVEFORM_SAMPLES = 16_000
 FEATURE_OUTPUT_FRAMES = 375
 WAVEFORM_OUTPUT_FRAMES = 376
 OUTPUT_FEATURES = 640
@@ -47,6 +48,27 @@ JOINT_TRACE_FILENAME = "joint-traced.pt"
 HEADS_VALIDATION_FILENAME = "heads-validation-inputs-and-reference.npz"
 HEADS_TRACE_METADATA_FILENAME = "heads-trace-metadata.json"
 MAX_TRACE_NORMALIZED_L2_ERROR = 1e-5
+
+
+def validated_waveform_sample_count(value: int) -> int:
+    if not MIN_WAVEFORM_SAMPLES <= value <= MAX_AUDIO_SAMPLES:
+        raise ValueError(
+            "Waveform sample count must be between "
+            f"{MIN_WAVEFORM_SAMPLES} and {MAX_AUDIO_SAMPLES}."
+        )
+    return value
+
+
+def waveform_runtime_contract(sample_count: int, output_frames: int) -> str:
+    if sample_count == MAX_AUDIO_SAMPLES and output_frames == WAVEFORM_OUTPUT_FRAMES:
+        return "waveform-480000-to-376x640-v2"
+    return f"waveform-{sample_count}-to-{output_frames}x{OUTPUT_FEATURES}-v3"
+
+
+def waveform_sample_count_from_trace_metadata(metadata: dict[str, Any]) -> int:
+    return validated_waveform_sample_count(
+        int(metadata.get("waveformSampleCount", MAX_AUDIO_SAMPLES))
+    )
 
 
 def validate_nemo_toolchain(
@@ -226,19 +248,23 @@ def trace_encoder(arguments: argparse.Namespace) -> None:
     else:
         import soundfile as sf
 
+        waveform_sample_count = validated_waveform_sample_count(
+            arguments.waveform_sample_count
+        )
+
         wrapper = VoxoLNeMoWaveformEncoder(
             model.preprocessor,
             model.encoder,
             model.joint.enc,
         ).eval()
         trace_inputs = (
-            torch.randn((1, MAX_AUDIO_SAMPLES), dtype=torch.float32),
-            torch.tensor([MAX_AUDIO_SAMPLES], dtype=torch.int32),
+            torch.randn((1, waveform_sample_count), dtype=torch.float32),
+            torch.tensor([waveform_sample_count], dtype=torch.int32),
         )
         if arguments.validation_audio is None:
-            validation_sample_count = MAX_AUDIO_SAMPLES // 2
+            validation_sample_count = waveform_sample_count // 2
             validation_audio = torch.randn(
-                (1, MAX_AUDIO_SAMPLES),
+                (1, waveform_sample_count),
                 dtype=torch.float32,
             )
             validation_audio[:, validation_sample_count:] = 0
@@ -251,17 +277,17 @@ def trace_encoder(arguments: argparse.Namespace) -> None:
             if sample_rate != 16_000 or waveform.ndim != 1:
                 raise ValueError("Validation audio must be mono 16 kHz.")
             validation_sample_count = int(waveform.shape[0])
-            if not 0 < validation_sample_count <= MAX_AUDIO_SAMPLES:
+            if not 0 < validation_sample_count <= waveform_sample_count:
                 raise ValueError("Validation audio exceeds the fixed Core ML window.")
-            padded = np.zeros((1, MAX_AUDIO_SAMPLES), dtype=np.float32)
+            padded = np.zeros((1, waveform_sample_count), dtype=np.float32)
             padded[0, :validation_sample_count] = waveform
             validation_audio = torch.from_numpy(padded)
         validation_inputs = (
             validation_audio,
             torch.tensor([validation_sample_count], dtype=torch.int32),
         )
-        runtime_contract = "waveform-480000-to-376x640-v2"
-        expected_output_frames = WAVEFORM_OUTPUT_FRAMES
+        runtime_contract = None
+        expected_output_frames = None
         validation_payload = {
             "audio_signal": validation_inputs[0].numpy(),
             "audio_length": validation_inputs[1].numpy(),
@@ -278,6 +304,12 @@ def trace_encoder(arguments: argparse.Namespace) -> None:
         traced = torch.jit.freeze(traced.eval())
         traced_hidden, traced_mask = traced(*validation_inputs)
 
+    if expected_output_frames is None:
+        expected_output_frames = int(reference_hidden.shape[1])
+        runtime_contract = waveform_runtime_contract(
+            waveform_sample_count,
+            expected_output_frames,
+        )
     if list(reference_hidden.shape) != [1, expected_output_frames, OUTPUT_FEATURES]:
         raise ValueError(f"Unexpected NeMo encoder shape: {list(reference_hidden.shape)}")
     if list(reference_mask.shape) != [1, expected_output_frames]:
@@ -319,6 +351,9 @@ def trace_encoder(arguments: argparse.Namespace) -> None:
         "outputFrameCount": expected_output_frames,
         "traceValidationNormalizedL2Error": trace_error,
     }
+    if arguments.input_contract == "waveform":
+        metadata["waveformSampleCount"] = waveform_sample_count
+        metadata["waveformDurationSeconds"] = waveform_sample_count / 16_000
     (arguments.output_root / TRACE_METADATA_FILENAME).write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -541,10 +576,11 @@ def convert_encoder(arguments: argparse.Namespace) -> None:
             "attention_mask": validation["attention_mask"],
         }
     elif input_contract == "waveform":
+        waveform_sample_count = waveform_sample_count_from_trace_metadata(trace_metadata)
         coreml_inputs = [
             ct.TensorType(
                 name="audio_signal",
-                shape=(1, MAX_AUDIO_SAMPLES),
+                shape=(1, waveform_sample_count),
                 dtype=np.float32,
             ),
             ct.TensorType(
@@ -807,6 +843,15 @@ def parser() -> argparse.ArgumentParser:
         "--input-contract",
         choices=("features", "waveform"),
         default="features",
+    )
+    trace.add_argument(
+        "--waveform-sample-count",
+        type=int,
+        default=MAX_AUDIO_SAMPLES,
+        help=(
+            "Fixed waveform window for direct-waveform traces. "
+            f"Default: {MAX_AUDIO_SAMPLES} samples (30 s at 16 kHz)."
+        ),
     )
     trace.add_argument("--validation-audio", type=Path)
 

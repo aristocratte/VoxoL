@@ -36,42 +36,17 @@ if pgrep -f '/Users/aris/Documents/wispr/wispr-transcribe.sh' >/dev/null 2>&1; t
   printf 'Wispr transcription is still active; Qwen training must wait.\n' >&2
   exit 1
 fi
-if [[ -s "$promotion_result" ]]; then
+if [[ -s "$promotion_result" ]] && ! jq -e '.status == "not-trained"' "$promotion_result" >/dev/null; then
   printf 'Qwen v8 experiment already completed: %s\n' "$promotion_result"
   jq . "$promotion_result"
   exit 0
 fi
-if ! jq -e '.promotion_training_eligible == true' "$gate" >/dev/null; then
-  mkdir -p "$work_root"
-  python3 - "$gate" "$promotion_result" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-gate = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-Path(sys.argv[2]).write_text(
-    json.dumps(
-        {
-            "gate": gate,
-            "reason": "mass-corpus-thresholds-not-met",
-            "schemaVersion": "voxol-qwen-v8-promotion-v1",
-            "status": "not-trained",
-        },
-        indent=2,
-        sort_keys=True,
-    ) + "\n",
-    encoding="utf-8",
-)
-PY
-  printf 'Qwen v8 training skipped because the frozen corpus gate did not pass.\n'
-  exit 0
-fi
+python3 "$repo_root/Scripts/build-qwen-human-gate.py" --root "$prepared_root" --check
 
 mkdir -p "$work_root"
 caffeinate -dimsu python3 "$repo_root/Tools/training/run_qwen_wispr_finetune.py" \
   --model "$model" \
   --baseline-adapter "$baseline_adapter" \
-  --resume-adapter-file "$baseline_adapter/adapters.safetensors" \
   --prepared-dataset "$dataset" \
   --evaluation-references "$references" \
   --work-root "$work_root" \

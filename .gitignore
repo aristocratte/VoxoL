@@ -29,3 +29,5 @@ runpod.pub
 
 # Transient local outputs.
 outputs/
+__pycache__/
+*.py[cod]

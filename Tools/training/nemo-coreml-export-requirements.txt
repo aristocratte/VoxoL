@@ -2,6 +2,8 @@ coremltools==9.0
 huggingface-hub==0.33.1
 nemo-toolkit[asr]==2.3.1
 numpy==1.26.4
+# PyArrow 26 requires NumPy 2 at import time; keep the NeMo export on NumPy 1.
+pyarrow==21.0.0
 scikit-learn==1.5.1
 soundfile==0.13.1
 torch==2.7.0

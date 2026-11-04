@@ -1,0 +1,519 @@
+{
+  "corpusSHA256": "63195843deb4f37620472ab4cc6c40443d57dc022016ce72637a6a8e1d12346e",
+  "duplicates": {
+    "duplicateIDs": [],
+    "exactPairGroups": [
+      [
+        "human-0f13a948-faithful",
+        "human-0f13a948-rewrite"
+      ],
+      [
+        "human-74e4adef-faithful",
+        "human-74e4adef-rewrite"
+      ],
+      [
+        "human-84f5b478-faithful",
+        "human-84f5b478-rewrite"
+      ],
+      [
+        "human-a1946790-faithful",
+        "human-a1946790-rewrite"
+      ],
+      [
+        "human-ec06d0e2-faithful",
+        "human-ec06d0e2-rewrite"
+      ],
+      [
+        "human-perso-20260810-151824-faithful",
+        "human-perso-20260810-151824-rewrite"
+      ],
+      [
+        "human-perso-20260810-162627-faithful",
+        "human-perso-20260810-162627-rewrite"
+      ]
+    ],
+    "sharedRawTranscriptGroups": [
+      [
+        "human-054e8285-faithful",
+        "human-054e8285-rewrite"
+      ],
+      [
+        "human-0580c6e0-faithful",
+        "human-0580c6e0-rewrite"
+      ],
+      [
+        "human-05b0aa3d-faithful",
+        "human-05b0aa3d-rewrite"
+      ],
+      [
+        "human-05c18496-faithful",
+        "human-05c18496-rewrite"
+      ],
+      [
+        "human-088d6eb5-faithful",
+        "human-088d6eb5-rewrite"
+      ],
+      [
+        "human-092752c4-faithful",
+        "human-092752c4-rewrite"
+      ],
+      [
+        "human-0d76deb1-faithful",
+        "human-0d76deb1-rewrite"
+      ],
+      [
+        "human-0dd8cde4-faithful",
+        "human-0dd8cde4-rewrite"
+      ],
+      [
+        "human-0f13a948-faithful",
+        "human-0f13a948-rewrite"
+      ],
+      [
+        "human-0f3eac3b-faithful",
+        "human-0f3eac3b-rewrite"
+      ],
+      [
+        "human-143e5e64-faithful",
+        "human-143e5e64-rewrite"
+      ],
+      [
+        "human-14ea5975-faithful",
+        "human-14ea5975-rewrite"
+      ],
+      [
+        "human-173413c9-faithful",
+        "human-173413c9-rewrite"
+      ],
+      [
+        "human-18347313-faithful",
+        "human-18347313-rewrite"
+      ],
+      [
+        "human-1f9436b4-faithful",
+        "human-1f9436b4-rewrite"
+      ],
+      [
+        "human-2780e112-faithful",
+        "human-2780e112-rewrite"
+      ],
+      [
+        "human-2a765fcc-faithful",
+        "human-2a765fcc-rewrite"
+      ],
+      [
+        "human-30feeedb-faithful",
+        "human-30feeedb-rewrite"
+      ],
+      [
+        "human-332d91e4-faithful",
+        "human-332d91e4-rewrite"
+      ],
+      [
+        "human-33ec8038-faithful",
+        "human-33ec8038-rewrite"
+      ],
+      [
+        "human-341fd52b-faithful",
+        "human-341fd52b-rewrite"
+      ],
+      [
+        "human-350972d7-faithful",
+        "human-350972d7-rewrite"
+      ],
+      [
+        "human-3cebce0c-faithful",
+        "human-3cebce0c-rewrite"
+      ],
+      [
+        "human-3d22daff-faithful",
+        "human-3d22daff-rewrite"
+      ],
+      [
+        "human-425cff93-faithful",
+        "human-425cff93-rewrite"
+      ],
+      [
+        "human-430d241b-faithful",
+        "human-430d241b-rewrite"
+      ],
+      [
+        "human-44a1a800-faithful",
+        "human-44a1a800-rewrite"
+      ],
+      [
+        "human-46eb08fc-faithful",
+        "human-46eb08fc-rewrite"
+      ],
+      [
+        "human-4746482c-faithful",
+        "human-4746482c-rewrite"
+      ],
+      [
+        "human-49605d6b-faithful",
+        "human-49605d6b-rewrite"
+      ],
+      [
+        "human-4bcc5cf0-faithful",
+        "human-4bcc5cf0-rewrite"
+      ],
+      [
+        "human-52c73e89-faithful",
+        "human-52c73e89-rewrite"
+      ],
+      [
+        "human-5521081c-faithful",
+        "human-5521081c-rewrite"
+      ],
+      [
+        "human-56094685-faithful",
+        "human-56094685-rewrite"
+      ],
+      [
+        "human-5c2f1103-faithful",
+        "human-5c2f1103-rewrite"
+      ],
+      [
+        "human-5f0e5767-faithful",
+        "human-5f0e5767-rewrite"
+      ],
+      [
+        "human-61d6c5ae-faithful",
+        "human-61d6c5ae-rewrite"
+      ],
+      [
+        "human-6853b488-faithful",
+        "human-6853b488-rewrite"
+      ],
+      [
+        "human-6c1023d4-faithful",
+        "human-6c1023d4-rewrite"
+      ],
+      [
+        "human-6e5c82f3-faithful",
+        "human-6e5c82f3-rewrite"
+      ],
+      [
+        "human-6fadd0ce-faithful",
+        "human-6fadd0ce-rewrite"
+      ],
+      [
+        "human-74e4adef-faithful",
+        "human-74e4adef-rewrite"
+      ],
+      [
+        "human-75205aa2-faithful",
+        "human-75205aa2-rewrite"
+      ],
+      [
+        "human-75a61e0b-faithful",
+        "human-75a61e0b-rewrite"
+      ],
+      [
+        "human-8364b328-faithful",
+        "human-8364b328-rewrite"
+      ],
+      [
+        "human-84f5b478-faithful",
+        "human-84f5b478-rewrite"
+      ],
+      [
+        "human-88b3dffa-faithful",
+        "human-88b3dffa-rewrite"
+      ],
+      [
+        "human-93c9d8df-faithful",
+        "human-93c9d8df-rewrite"
+      ],
+      [
+        "human-9661d02e-faithful",
+        "human-9661d02e-rewrite"
+      ],
+      [
+        "human-97509e7d-faithful",
+        "human-97509e7d-rewrite"
+      ],
+      [
+        "human-975ccacc-faithful",
+        "human-975ccacc-rewrite"
+      ],
+      [
+        "human-98da83df-faithful",
+        "human-98da83df-rewrite"
+      ],
+      [
+        "human-9c610618-faithful",
+        "human-9c610618-rewrite"
+      ],
+      [
+        "human-9d2d86db-faithful",
+        "human-9d2d86db-rewrite"
+      ],
+      [
+        "human-9f6c197e-faithful",
+        "human-9f6c197e-rewrite"
+      ],
+      [
+        "human-a1946790-faithful",
+        "human-a1946790-rewrite"
+      ],
+      [
+        "human-a2b699f0-faithful",
+        "human-a2b699f0-rewrite"
+      ],
+      [
+        "human-a3bccefd-faithful",
+        "human-a3bccefd-rewrite"
+      ],
+      [
+        "human-a447c41f-faithful",
+        "human-a447c41f-rewrite"
+      ],
+      [
+        "human-a75ae53f-faithful",
+        "human-a75ae53f-rewrite"
+      ],
+      [
+        "human-aeffd765-faithful",
+        "human-aeffd765-rewrite"
+      ],
+      [
+        "human-aff7fc9b-faithful",
+        "human-aff7fc9b-rewrite"
+      ],
+      [
+        "human-b1395f2c-faithful",
+        "human-b1395f2c-rewrite"
+      ],
+      [
+        "human-b66474da-faithful",
+        "human-b66474da-rewrite"
+      ],
+      [
+        "human-c270dc3d-faithful",
+        "human-c270dc3d-rewrite"
+      ],
+      [
+        "human-c46902fc-faithful",
+        "human-c46902fc-rewrite"
+      ],
+      [
+        "human-c660a6c9-faithful",
+        "human-c660a6c9-rewrite"
+      ],
+      [
+        "human-c6cfa15f-faithful",
+        "human-c6cfa15f-rewrite"
+      ],
+      [
+        "human-c86cf464-faithful",
+        "human-c86cf464-rewrite"
+      ],
+      [
+        "human-d0764263-faithful",
+        "human-d0764263-rewrite"
+      ],
+      [
+        "human-d35edd11-faithful",
+        "human-d35edd11-rewrite"
+      ],
+      [
+        "human-d3fcfe0b-faithful",
+        "human-d3fcfe0b-rewrite"
+      ],
+      [
+        "human-d5482fd6-faithful",
+        "human-d5482fd6-rewrite"
+      ],
+      [
+        "human-d7e0ce73-faithful",
+        "human-d7e0ce73-rewrite"
+      ],
+      [
+        "human-dae366db-faithful",
+        "human-dae366db-rewrite"
+      ],
+      [
+        "human-e4737aaf-faithful",
+        "human-e4737aaf-rewrite"
+      ],
+      [
+        "human-e6f2f8c0-faithful",
+        "human-e6f2f8c0-rewrite"
+      ],
+      [
+        "human-ec06d0e2-faithful",
+        "human-ec06d0e2-rewrite"
+      ],
+      [
+        "human-ec47c03f-faithful",
+        "human-ec47c03f-rewrite"
+      ],
+      [
+        "human-ef531a6f-faithful",
+        "human-ef531a6f-rewrite"
+      ],
+      [
+        "human-f78c4a92-faithful",
+        "human-f78c4a92-rewrite"
+      ],
+      [
+        "human-faeabf9e-faithful",
+        "human-faeabf9e-rewrite"
+      ],
+      [
+        "human-perso-20260809-231956-faithful",
+        "human-perso-20260809-231956-rewrite"
+      ],
+      [
+        "human-perso-20260809-232135-faithful",
+        "human-perso-20260809-232135-rewrite"
+      ],
+      [
+        "human-perso-20260809-232821-faithful",
+        "human-perso-20260809-232821-rewrite"
+      ],
+      [
+        "human-perso-20260809-233020-faithful",
+        "human-perso-20260809-233020-rewrite"
+      ],
+      [
+        "human-perso-20260810-151824-faithful",
+        "human-perso-20260810-151824-rewrite"
+      ],
+      [
+        "human-perso-20260810-152058-faithful",
+        "human-perso-20260810-152058-rewrite"
+      ],
+      [
+        "human-perso-20260810-152349-faithful",
+        "human-perso-20260810-152349-rewrite"
+      ],
+      [
+        "human-perso-20260810-154810-faithful",
+        "human-perso-20260810-154810-rewrite"
+      ],
+      [
+        "human-perso-20260810-155017-faithful",
+        "human-perso-20260810-155017-rewrite"
+      ],
+      [
+        "human-perso-20260810-162627-faithful",
+        "human-perso-20260810-162627-rewrite"
+      ]
+    ]
+  },
+  "frEnGate": {
+    "excludedIDs": [
+      "human-88b3dffa-faithful",
+      "human-88b3dffa-rewrite"
+    ],
+    "excludedRowCount": 2,
+    "includedRowCount": 182
+  },
+  "groupAwareSplits": {
+    "counts": {
+      "test": 24,
+      "train": 138,
+      "validation": 22
+    },
+    "leakingSplitGroups": []
+  },
+  "independentSourceCount": 92,
+  "languageCounts": {
+    "es": 2,
+    "fr": 182
+  },
+  "modeCounts": {
+    "faithful": 92,
+    "rewrite": 92
+  },
+  "naiveRowIDSplitWouldLeakGroups": [
+    "human-054e8285",
+    "human-0580c6e0",
+    "human-088d6eb5",
+    "human-0dd8cde4",
+    "human-143e5e64",
+    "human-1f9436b4",
+    "human-2a765fcc",
+    "human-30feeedb",
+    "human-332d91e4",
+    "human-33ec8038",
+    "human-341fd52b",
+    "human-350972d7",
+    "human-430d241b",
+    "human-44a1a800",
+    "human-46eb08fc",
+    "human-56094685",
+    "human-61d6c5ae",
+    "human-6853b488",
+    "human-6c1023d4",
+    "human-6fadd0ce",
+    "human-74e4adef",
+    "human-75205aa2",
+    "human-8364b328",
+    "human-84f5b478",
+    "human-88b3dffa",
+    "human-9661d02e",
+    "human-9f6c197e",
+    "human-a1946790",
+    "human-a447c41f",
+    "human-b1395f2c",
+    "human-b66474da",
+    "human-d5482fd6",
+    "human-dae366db",
+    "human-ec06d0e2",
+    "human-f78c4a92",
+    "human-perso-20260809-231956",
+    "human-perso-20260809-232821",
+    "human-perso-20260809-233020"
+  ],
+  "promotionEligible": false,
+  "role": "diagnostic-ai-labeled-v1",
+  "rowCount": 184,
+  "schemaVersion": 1,
+  "suspiciouslyShortTargets": [
+    {
+      "id": "human-d35edd11-rewrite",
+      "rawWords": 174,
+      "targetToRawRatio": 0.4023,
+      "targetWords": 70
+    },
+    {
+      "id": "human-44a1a800-faithful",
+      "rawWords": 342,
+      "targetToRawRatio": 0.2544,
+      "targetWords": 87
+    },
+    {
+      "id": "human-44a1a800-rewrite",
+      "rawWords": 342,
+      "targetToRawRatio": 0.1725,
+      "targetWords": 59
+    },
+    {
+      "id": "human-d7e0ce73-faithful",
+      "rawWords": 411,
+      "targetToRawRatio": 0.2457,
+      "targetWords": 101
+    },
+    {
+      "id": "human-d7e0ce73-rewrite",
+      "rawWords": 411,
+      "targetToRawRatio": 0.1606,
+      "targetWords": 66
+    },
+    {
+      "id": "human-a447c41f-faithful",
+      "rawWords": 661,
+      "targetToRawRatio": 0.1558,
+      "targetWords": 103
+    },
+    {
+      "id": "human-a447c41f-rewrite",
+      "rawWords": 661,
+      "targetToRawRatio": 0.0908,
+      "targetWords": 60
+    }
+  ]
+}

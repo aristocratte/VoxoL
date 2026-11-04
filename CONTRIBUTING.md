@@ -6,7 +6,8 @@ module interface. Add or update an ADR before a major architecture choice.
 Before submitting a change:
 
 ```sh
-./Scripts/verify.sh
+./Scripts/verify.sh --fast   # policy, formatting, Swift and Python tests: what CI runs
+./Scripts/verify.sh          # adds the benchmark, the app build, localization, signing and a launch smoke
 ```
 
 Do not commit model weights, generated Core ML/MLX artifacts, audio recordings, transcripts,

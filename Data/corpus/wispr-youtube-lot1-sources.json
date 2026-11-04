@@ -1,0 +1,182 @@
+{
+  "claim_status": "user-supplied Luna table; not independently verified live",
+  "schema_version": "voxol-wispr-youtube-sources-v1",
+  "source_table_sha256": "6dce4ef0cf666e1ee80991b31a4f9918d4812bf923dd1d22ef5d235b718796ad",
+  "videos": [
+    {
+      "language_hint": "fr",
+      "title_from_table": "Entretien avec Olivier Ezratty",
+      "trainability_claim_from_table": "All",
+      "url": "https://www.youtube.com/watch?v=o8QzXz5ky10",
+      "video_id": "o8QzXz5ky10"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Travailler en Suisse dans l’informatique : Mes entretiens les plus malaisants !",
+      "trainability_claim_from_table": "All",
+      "url": "https://www.youtube.com/watch?v=eG01ldGs7y0",
+      "video_id": "eG01ldGs7y0"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "AI Native Development: Live Coding avec Claude, Copilot et Packmind",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=V2AarNzNMBo",
+      "video_id": "V2AarNzNMBo"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Live Coding : D’où la difficulté d’estimer ses temps de dev",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=hJBlmJdgOu8",
+      "video_id": "hJBlmJdgOu8"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Le fonctionnel par la pratique : live coding d’un jeu web",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=qXMFq3YOHko",
+      "video_id": "qXMFq3YOHko"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Introduction au DDD - Live Coding avec Mathieu Eveillard",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=qH8aTyA9pDg",
+      "video_id": "qH8aTyA9pDg"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "csv2json - partie 1 - Live Coding en PHP et TDD",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=1Ph-vUQtbeU",
+      "video_id": "1Ph-vUQtbeU"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "On reçoit Arthur Mensch, PDG de Mistral AI",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=bzs0wFP_6ck",
+      "video_id": "bzs0wFP_6ck"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Yann Le Cun révèle les plus gros mensonges sur l’IA",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=l3m3RZNgDdw",
+      "video_id": "l3m3RZNgDdw"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "SRE, le métier DevOps par excellence !",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=WDA5JNCu2ug",
+      "video_id": "WDA5JNCu2ug"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "HTD Live Tour 2022 - Cybersécurité et souveraineté numérique",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=fqUgN5x3VvY",
+      "video_id": "fqUgN5x3VvY"
+    },
+    {
+      "language_hint": "fr",
+      "title_from_table": "Conférence @Arsouyes : L’histoire du Hacking, partie 1",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=uerlqRSVYEs",
+      "video_id": "uerlqRSVYEs"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "How to Set Up Local Area Network Part One (Practice Lab)",
+      "trainability_claim_from_table": "All",
+      "url": "https://www.youtube.com/watch?v=G9BUCd2nmZ4",
+      "video_id": "G9BUCd2nmZ4"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Live Game Dev Chat + Q&A",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=w1LkcfFXLuI",
+      "video_id": "w1LkcfFXLuI"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "C++ Game Development Live | Q&A, Lua/SFML/C++ Game Engine",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=hKUtK_KPzlM",
+      "video_id": "hKUtK_KPzlM"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Enterprise Networking at Home | Practical Lab for Engineers",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=lfiP-Zeb96o",
+      "video_id": "lfiP-Zeb96o"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Lab 1: Ansible for Network Engineers",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=CL5DcVm5j0Q",
+      "video_id": "CL5DcVm5j0Q"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Build a Network with Me Using Cisco Packet Tracer",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=jW5GhNhBReA",
+      "video_id": "jW5GhNhBReA"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Hck4G#11 Meetup – CTF Bootcamp: From Zero to Flag",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=Iewy3t8_EFs",
+      "video_id": "Iewy3t8_EFs"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "TryHackMe: CI/CD and Build Security",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=VaZUvZtqAiI",
+      "video_id": "VaZUvZtqAiI"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "How to Troubleshoot and Diagnose a Broken Desktop Computer | Live",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=RSuo1BYrlvg",
+      "video_id": "RSuo1BYrlvg"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Live Coding | Debugging & Building a Backend",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=tvY0q8L_12Y",
+      "video_id": "tvY0q8L_12Y"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "A Jane Street Software Engineering Mock Interview with Grace and Nolen",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=V8DGdPkBBxg",
+      "video_id": "V8DGdPkBBxg"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Sam Altman Talks ChatGPT, AI Agents and Superintelligence — Live at TED2025",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=5MWT_doo68k",
+      "video_id": "5MWT_doo68k"
+    },
+    {
+      "language_hint": "en",
+      "title_from_table": "Exploring Pieces for Developers & Impacts of AI Tools",
+      "trainability_claim_from_table": "None",
+      "url": "https://www.youtube.com/watch?v=Cq8C2kNjN4A",
+      "video_id": "Cq8C2kNjN4A"
+    }
+  ]
+}

@@ -47,6 +47,25 @@ class QuantizeVoxoLCoreMLCandidateTests(unittest.TestCase):
             "abc",
         )
 
+    def test_accepts_a_bounded_short_waveform_contract(self) -> None:
+        MODULE.validate_source_metadata(
+            {
+                "voxol.delta_sha256": "abc",
+                "voxol.runtime_contract": "waveform-320000-to-251x640-v3",
+            },
+            "abc",
+        )
+
+    def test_rejects_an_out_of_bounds_short_waveform_contract(self) -> None:
+        with self.assertRaisesRegex(ValueError, "runtime contract"):
+            MODULE.validate_source_metadata(
+                {
+                    "voxol.delta_sha256": "abc",
+                    "voxol.runtime_contract": "waveform-500000-to-391x640-v3",
+                },
+                "abc",
+            )
+
     def test_rejects_a_different_delta(self) -> None:
         with self.assertRaisesRegex(ValueError, "delta mismatch"):
             MODULE.validate_source_metadata(
