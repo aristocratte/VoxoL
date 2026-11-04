@@ -32,12 +32,6 @@ import SwiftUI
 struct NativeMeetingsView: View {
     private enum Page: String { case report, transcript, people }
 
-    private struct ReportSection: Identifiable {
-        let id: Int
-        let heading: String?
-        var body: [String]
-    }
-
     @Environment(VoxoLTheme.self) private var theme
     @Environment(MeetingsStore.self) private var meetings
     @Environment(ModelInstallationStore.self) private var models
@@ -47,32 +41,42 @@ struct NativeMeetingsView: View {
     private struct RecordingRequest: Identifiable {
         let id = UUID()
         let title: String
+        var event: MeetingCalendarLink? = nil
     }
     @State private var recordingRequest: RecordingRequest?
 
     @State private var page: Page = .report
-    @State private var editing = false
-    @State private var editingSection: Int?
-    @FocusState private var focusedSection: Int?
     @State private var search = ""
+    @State private var historyFilter = 0
+    @State private var recentOnly = false
+    @State private var includeExportSources = true
     @State private var names: [Int: String] = [:]
     @State private var copied = false
     @State private var confirmDeletion = false
-    @State private var confirmRegeneration = false
 
     private var french: Bool { locale.language.languageCode?.identifier == "fr" }
     private var speakerPrefix: String { s("Intervenant", "Speaker") }
     private var unknownLabel: String { s("Intervenant incertain", "Uncertain speaker") }
     private var filteredRecords: [SpeakerTranscript] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return meetings.records }
         return meetings.records.filter { record in
-            record.title.localizedStandardContains(query)
+            let report = meetings.reports[record.id]
+            let matchesState =
+                historyFilter == 0 || (historyFilter == 1 && report?.reviewedAt == nil)
+                || (historyFilter == 2 && report?.reviewedAt != nil)
+                || (historyFilter == 3 && record.favorite == true)
+            let matchesDate =
+                !recentOnly || record.occurredAt >= Date().addingTimeInterval(-30 * 86_400)
+            let matchesQuery =
+                query.isEmpty || record.title.localizedStandardContains(query)
                 || record.rawText.localizedStandardContains(query)
+                || (report?.content.plainText.localizedStandardContains(query) ?? false)
+                || (record.project?.localizedStandardContains(query) ?? false)
                 || record.speakerIDs.contains {
                     record.name(for: $0, prefix: speakerPrefix).localizedStandardContains(query)
                 }
-        }
+            return matchesState && matchesDate && matchesQuery
+        }.sorted { $0.occurredAt > $1.occurredAt }
     }
 
     var body: some View {
@@ -92,13 +96,11 @@ struct NativeMeetingsView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: meetings.phase)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: meetings.recorder.state)
         .sheet(item: $recordingRequest) { request in
-            MeetingRecordingSheet(title: request.title, french: french)
+            MeetingRecordingSheet(
+                title: request.title, french: french, calendarEvent: request.event)
         }
         .onChange(of: meetings.selection) { _, _ in
             page = .report
-            editing = false
-            editingSection = nil
-            focusedSection = nil
             copied = false
             names = meetings.selected?.names ?? [:]
         }
@@ -114,19 +116,6 @@ struct NativeMeetingsView: View {
                 verbatim: s(
                     "Le fichier audio d’origine restera sur votre Mac.",
                     "The original audio file stays on your Mac."))
-        }
-        .confirmationDialog(
-            s("Remplacer le compte rendu actuel ?", "Replace the current report?"),
-            isPresented: $confirmRegeneration, titleVisibility: .visible
-        ) {
-            Button(s("Générer un nouveau brouillon", "Generate a new draft")) {
-                if let id = meetings.selection { meetings.generateReport(for: id, french: french) }
-            }
-        } message: {
-            Text(
-                verbatim: s(
-                    "Vos modifications seront remplacées. La transcription restera disponible.",
-                    "Your edits will be replaced. The transcript stays available."))
         }
     }
 
@@ -163,8 +152,8 @@ struct NativeMeetingsView: View {
 
                     statusMessages
 
-                    MeetingAgendaView(french: french) { title in
-                        recordingRequest = RecordingRequest(title: title)
+                    MeetingAgendaView(french: french) { event in
+                        recordingRequest = RecordingRequest(title: event.title, event: event.link)
                     }
 
                     HStack(spacing: 14) {
@@ -195,6 +184,20 @@ struct NativeMeetingsView: View {
                         .overlay(RoundedRectangle(cornerRadius: 11).stroke(theme.line))
                     }
                     .padding(.bottom, 16)
+
+                    HStack(spacing: 10) {
+                        Picker(
+                            s("Filtrer les réunions", "Filter meetings"), selection: $historyFilter
+                        ) {
+                            Text(s("Toutes", "All")).tag(0)
+                            Text(s("À relire", "To review")).tag(1)
+                            Text(s("Relues", "Reviewed")).tag(2)
+                            Text(s("Favoris", "Favorites")).tag(3)
+                        }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+                        Spacer()
+                        Toggle(s("30 derniers jours", "Last 30 days"), isOn: $recentOnly)
+                            .toggleStyle(.checkbox).font(.system(size: 12))
+                    }.padding(.bottom, 20)
 
                     if meetings.records.isEmpty {
                         historyEmptyState
@@ -286,7 +289,7 @@ struct NativeMeetingsView: View {
                         .lineLimit(1)
                     HStack(spacing: 7) {
                         Text(
-                            verbatim: record.createdAt.formatted(
+                            verbatim: record.occurredAt.formatted(
                                 Date.FormatStyle(date: .abbreviated, time: .shortened).locale(
                                     locale)))
                         Text("·")
@@ -300,11 +303,25 @@ struct NativeMeetingsView: View {
                     }
                     .font(VoxoLTypography.font(size: 11.5))
                     .foregroundStyle(theme.secondaryInk)
+                    if let report = meetings.reports[record.id], !report.content.plainText.isEmpty {
+                        Text(
+                            report.content.blocks.first(where: { $0.kind == .paragraph })?.text
+                                ?? ""
+                        )
+                        .font(.system(size: 12)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
+                if record.favorite == true {
+                    Image(systemName: "star.fill").foregroundStyle(theme.warning)
+                }
                 Text(
-                    verbatim: meetings.reports[record.id]?.generator == nil
-                        ? s("À compléter", "To complete") : s("Compte rendu", "Report")
+                    verbatim: meetings.processingID == record.id && meetings.phase == .reporting
+                        ? s("En rédaction", "Writing")
+                        : meetings.reports[record.id]?.proposal != nil
+                            ? s("Nouvelle version", "New version")
+                            : meetings.reports[record.id]?.reviewedAt != nil
+                                ? s("Relue", "Reviewed") : s("À relire", "To review")
                 )
                 .font(VoxoLTypography.font(size: 11, weight: .medium))
                 .foregroundStyle(
@@ -374,25 +391,10 @@ struct NativeMeetingsView: View {
         VStack(spacing: 0) {
             meetingToolbar(document)
             Rectangle().fill(theme.line).frame(height: 1)
-            statusMessages
-                .padding(.horizontal, 24)
+            statusMessages.padding(.horizontal, 24)
                 .padding(.top, meetings.busy || meetings.failure != nil ? 12 : 0)
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    if geometry.size.width >= 880 {
-                        outline(document)
-                            .frame(width: 210)
-                        Rectangle().fill(theme.line).frame(width: 1)
-                    }
-                    VStack(spacing: 0) {
-                        if geometry.size.width < 880 {
-                            compactNavigation
-                        }
-                        documentContent(document)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
+            compactNavigation
+            documentContent(document).id(document.id)
         }
     }
 
@@ -413,89 +415,49 @@ struct NativeMeetingsView: View {
                 .lineLimit(1)
                 .foregroundStyle(theme.secondaryInk)
             Spacer(minLength: 6)
-            if let draft = meetings.reports[document.id] {
-                Button {
-                    meetings.exportWord(draft, title: document.title)
-                } label: {
-                    Label(s("Exporter Word", "Export Word"), systemImage: "doc.richtext")
-                }
-                .buttonStyle(SignalSecondaryButtonStyle())
-                Menu {
-                    Button(s("Modifier le Markdown source", "Edit Markdown source")) {
-                        editingSection = nil
-                        editing = true
-                    }
-                    Divider()
-                    Button(s("Exporter Markdown", "Export Markdown")) {
-                        meetings.exportReport(draft, title: document.title)
-                    }
-                    Button(s("Copier le Markdown", "Copy Markdown")) {
-                        meetings.copyReport(draft)
-                        copied = true
-                    }
-                    Divider()
-                    Button(s("Supprimer la réunion", "Delete meeting"), role: .destructive) {
-                        confirmDeletion = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.ink)
-                        .frame(width: 40, height: 40)
-                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(theme.line))
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help(s("Autres options", "More options"))
+            Button {
+                meetings.updateMeeting(document.id) { $0.favorite = !($0.favorite ?? false) }
+            } label: {
+                Image(systemName: document.favorite == true ? "star.fill" : "star")
             }
+            .buttonStyle(MeetingQuietButtonStyle()).help(s("Favori", "Favorite"))
+            if let draft = meetings.reports[document.id] {
+                Menu {
+                    Toggle(s("Inclure les sources", "Include sources"), isOn: $includeExportSources)
+                    Divider()
+                    Button("Word (.docx)") {
+                        meetings.exportWord(
+                            draft, title: document.title, includeSources: includeExportSources)
+                    }
+                    Button("PDF") {
+                        meetings.exportPDF(
+                            draft, title: document.title, includeSources: includeExportSources)
+                    }
+                    Button("Markdown") {
+                        meetings.exportReport(
+                            draft, title: document.title, includeSources: includeExportSources)
+                    }
+                    Divider()
+                    Button(s("Copier le document", "Copy document")) { meetings.copyReport(draft) }
+                } label: {
+                    Label(s("Exporter", "Export"), systemImage: "square.and.arrow.up")
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+                .padding(.horizontal, 13).padding(.vertical, 10)
+                .background(theme.canvas, in: RoundedRectangle(cornerRadius: 10))
+            }
+            Menu {
+                Button(s("Supprimer la réunion", "Delete meeting"), role: .destructive) {
+                    confirmDeletion = true
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .menuStyle(.borderlessButton).fixedSize().frame(width: 30)
         }
         .padding(.horizontal, 22)
         .frame(height: 68)
         .background(theme.surface)
-    }
-
-    private func outline(_ document: SpeakerTranscript) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            eyebrow(s("CETTE RÉUNION", "THIS MEETING"))
-                .padding(.horizontal, 16)
-                .padding(.top, 30)
-                .padding(.bottom, 12)
-            navigationButton(.report, title: s("Compte rendu", "Report"), icon: "text.alignleft")
-            navigationButton(.transcript, title: s("Transcription", "Transcript"), icon: "waveform")
-            navigationButton(.people, title: s("Intervenants", "Speakers"), icon: "person.2")
-            Rectangle().fill(theme.line).frame(height: 1).padding(.vertical, 18)
-            Text(verbatim: s("INFORMATIONS", "DETAILS"))
-                .font(VoxoLTypography.font(size: 10, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(theme.secondaryInk)
-                .padding(.horizontal, 16)
-            HStack(spacing: 8) {
-                Image(systemName: "calendar")
-                Text(
-                    verbatim: document.createdAt.formatted(
-                        Date.FormatStyle(date: .abbreviated).locale(locale)))
-            }
-            .font(VoxoLTypography.font(size: 12))
-            .foregroundStyle(theme.secondaryInk)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            HStack(spacing: 8) {
-                Image(systemName: "clock")
-                Text(verbatim: SpeakerTranscript.timestamp(document.duration))
-            }
-            .font(VoxoLTypography.font(size: 12))
-            .foregroundStyle(theme.secondaryInk)
-            .padding(.horizontal, 16)
-            Spacer(minLength: 8)
-            Label(s("Traitement sur ce Mac", "Processed on this Mac"), systemImage: "lock.shield")
-                .font(VoxoLTypography.font(size: 10))
-                .foregroundStyle(theme.secondaryInk)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 22)
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(theme.surface.opacity(0.66))
     }
 
     private var compactNavigation: some View {
@@ -512,8 +474,6 @@ struct NativeMeetingsView: View {
     private func navigationButton(_ target: Page, title: String, icon: String) -> some View {
         Button {
             page = target
-            editing = false
-            editingSection = nil
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon).frame(width: 17)
@@ -547,324 +507,7 @@ struct NativeMeetingsView: View {
     // MARK: Report document and editor
 
     private func reportPage(_ document: SpeakerTranscript) -> some View {
-        Group {
-            if let draft = meetings.reports[document.id] {
-                if editing {
-                    editorPage(draft, document: document)
-                } else {
-                    reportPreview(draft, document: document)
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        eyebrow(s("DOCUMENT", "DOCUMENT"))
-                        Text(
-                            verbatim: s(
-                                "Un document pour cette réunion", "A document for this meeting")
-                        )
-                        .font(VoxoLTypography.font(size: 29, weight: .semibold))
-                        Text(
-                            verbatim: s(
-                                "Créez un brouillon Markdown lié à la transcription, puis modifiez-le directement ici.",
-                                "Create a Markdown draft linked to the transcript, then edit it here."
-                            )
-                        )
-                        .font(VoxoLTypography.font(size: 14))
-                        .foregroundStyle(theme.secondaryInk)
-                        Button(s("Créer le brouillon", "Create draft")) {
-                            Task { await meetings.createReport(for: document.id, french: french) }
-                        }
-                        .buttonStyle(MeetingAccentButtonStyle())
-                    }
-                    .padding(40)
-                    .frame(maxWidth: 800, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .top)
-                }
-            }
-        }
-    }
-
-    private func reportPreview(_ draft: MeetingReportDraft, document: SpeakerTranscript)
-        -> some View
-    {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                documentTopline(document, label: s("COMPTE RENDU", "MEETING REPORT"))
-                HStack(spacing: 10) {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.cobalt)
-                    Text(
-                        verbatim: draft.generator == nil
-                            ? s("Brouillon à compléter", "Draft to complete")
-                            : s(
-                                "Brouillon généré · à relire",
-                                "Generated draft · review before sharing"))
-                    Spacer(minLength: 6)
-                    Button {
-                        let count = reportSections(draft.markdown).count
-                        editingSection = count > 1 ? 1 : 0
-                        focusedSection = editingSection
-                    } label: {
-                        Label(s("Modifier", "Edit"), systemImage: "pencil")
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle())
-                    Button {
-                        regenerate(draft, document: document)
-                    } label: {
-                        Label(s("Générer", "Generate"), systemImage: "sparkles")
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle())
-                    .disabled(meetings.busy || !meetings.reportModelAvailable)
-                }
-                .font(VoxoLTypography.font(size: 11.5))
-                .foregroundStyle(theme.secondaryInk)
-                .padding(.bottom, 18)
-                if !draft.isCurrent(for: document) {
-                    inlineNotice(
-                        s(
-                            "La transcription ou les noms ont changé depuis la génération. Relisez ce document avant de le partager.",
-                            "The transcript or names changed after generation. Review this document before sharing."
-                        ), tone: theme.coral)
-                }
-                if !meetings.reportModelAvailable {
-                    inlineNotice(
-                        s(
-                            "Le modèle local de compte rendu n’est pas disponible sur ce Mac. Vous pouvez toujours modifier et exporter le document.",
-                            "The local report model is unavailable on this Mac. You can still edit and export this document."
-                        ), tone: theme.secondaryInk)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(reportSections(draft.markdown)) { section in
-                        if let heading = section.heading {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(verbatim: String(heading.dropFirst(3)))
-                                    .font(VoxoLTypography.font(size: 19, weight: .semibold))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                Button {
-                                    editingSection = section.id
-                                    focusedSection = section.id
-                                } label: {
-                                    Image(systemName: "pencil")
-                                }
-                                .buttonStyle(MeetingQuietButtonStyle())
-                                .help(s("Modifier cette section", "Edit this section"))
-                            }
-                            .padding(.top, 22)
-                            .padding(.bottom, 7)
-                        }
-                        if editingSection == section.id {
-                            inlineSectionEditor(section, draft: draft, document: document)
-                        } else {
-                            ForEach(Array(section.body.enumerated()), id: \.offset) { _, line in
-                                reportLine(line)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Rectangle().fill(theme.line).frame(height: 1).padding(.vertical, 24)
-                Text(
-                    verbatim: s(
-                        "Document modifiable · enregistrement automatique · vérifiez les passages cités avant tout partage.",
-                        "Editable document · autosaved · check cited passages before sharing."
-                    )
-                )
-                .font(VoxoLTypography.font(size: 11))
-                .foregroundStyle(theme.secondaryInk)
-            }
-            .padding(.horizontal, 44)
-            .padding(.vertical, 36)
-            .frame(maxWidth: 840, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
-        }
-        .scrollIndicators(.hidden)
-        .background(theme.surface)
-    }
-
-    private func inlineSectionEditor(
-        _ section: ReportSection, draft: MeetingReportDraft, document: SpeakerTranscript
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Image(systemName: "pencil.line")
-                Text(verbatim: s("ÉDITION DE LA SECTION", "EDIT SECTION"))
-                    .tracking(1)
-                Spacer()
-                Text(verbatim: s("Enregistré automatiquement", "Autosaved"))
-                    .foregroundStyle(theme.secondaryInk)
-            }
-            .font(VoxoLTypography.font(size: 10, weight: .semibold))
-            .foregroundStyle(theme.cobalt)
-            TextField(
-                s("Rédiger cette section…", "Write this section…"),
-                text: Binding(
-                    get: {
-                        let current = meetings.reports[document.id]?.markdown ?? draft.markdown
-                        let sections = reportSections(current)
-                        guard sections.indices.contains(section.id) else { return "" }
-                        return sections[section.id].body.joined(separator: "\n")
-                            .trimmingCharacters(in: .newlines)
-                    },
-                    set: { updateSection($0, at: section.id, document: document.id) }
-                ), axis: .vertical
-            )
-            .textFieldStyle(.plain)
-            .font(VoxoLTypography.font(size: 14))
-            .lineSpacing(5)
-            .lineLimit(4...40)
-            .focused($focusedSection, equals: section.id)
-            .accessibilityLabel(s("Modifier la section", "Edit section"))
-            HStack {
-                Text(
-                    verbatim: s(
-                        "Vous pouvez utiliser des listes, du gras et des liens Markdown.",
-                        "Use Markdown lists, bold text and links."
-                    )
-                )
-                .font(VoxoLTypography.font(size: 10))
-                .foregroundStyle(theme.secondaryInk)
-                Spacer()
-                Button(s("Terminer", "Done")) {
-                    editingSection = nil
-                    focusedSection = nil
-                }
-                .buttonStyle(MeetingQuietButtonStyle())
-            }
-        }
-        .padding(17)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.canvas, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).stroke(theme.cobalt.opacity(0.34)))
-    }
-
-    private func reportSections(_ markdown: String) -> [ReportSection] {
-        var sections = [ReportSection(id: 0, heading: nil, body: [])]
-        for line in markdown.components(separatedBy: "\n") {
-            if line.hasPrefix("## ") {
-                sections.append(ReportSection(id: sections.count, heading: line, body: []))
-            } else {
-                sections[sections.count - 1].body.append(line)
-            }
-        }
-        return sections
-    }
-
-    private func updateSection(_ text: String, at index: Int, document id: UUID) {
-        guard let markdown = meetings.reports[id]?.markdown else { return }
-        var sections = reportSections(markdown)
-        guard sections.indices.contains(index) else { return }
-        sections[index].body = [""] + text.components(separatedBy: "\n") + [""]
-        let result = sections.flatMap { section -> [String] in
-            (section.heading.map { [$0] } ?? []) + section.body
-        }.joined(separator: "\n")
-        meetings.updateReport(result, for: id)
-    }
-
-    private func editorPage(_ draft: MeetingReportDraft, document: SpeakerTranscript) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "pencil.line")
-                    .foregroundStyle(theme.cobalt)
-                Text(verbatim: s("ÉDITION DU DOCUMENT", "EDIT DOCUMENT"))
-                    .font(VoxoLTypography.font(size: 10, weight: .semibold))
-                    .tracking(1.3)
-                Spacer()
-                Text(verbatim: s("Enregistrement automatique", "Autosaved"))
-                    .font(VoxoLTypography.font(size: 11))
-                    .foregroundStyle(theme.secondaryInk)
-                Button(s("Terminer", "Done")) { editing = false }
-                    .buttonStyle(MeetingQuietButtonStyle())
-            }
-            .padding(.bottom, 15)
-            Rectangle().fill(theme.line).frame(height: 1)
-            TextEditor(
-                text: Binding(
-                    get: { meetings.reports[document.id]?.markdown ?? draft.markdown },
-                    set: { meetings.updateReport($0, for: document.id) }
-                )
-            )
-            .font(VoxoLTypography.font(size: 16))
-            .lineSpacing(5)
-            .scrollContentBackground(.hidden)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel(
-                s("Éditeur Markdown du compte rendu", "Meeting report Markdown editor"))
-        }
-        .padding(.horizontal, 44)
-        .padding(.top, 30)
-        .frame(maxWidth: 840)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.surface)
-    }
-
-    private func regenerate(_ draft: MeetingReportDraft, document: SpeakerTranscript) {
-        let template = try? MeetingReportDraft.template(for: document, french: french)
-        if draft.markdown == template?.markdown {
-            meetings.generateReport(for: document.id, french: french)
-        } else {
-            confirmRegeneration = true
-        }
-    }
-
-    @ViewBuilder
-    private func reportLine(_ line: String) -> some View {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        if trimmed.hasPrefix("# ") {
-            Text(verbatim: String(trimmed.dropFirst(2)))
-                .font(VoxoLTypography.font(size: 31, weight: .semibold))
-                .tracking(-0.7)
-                .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-        } else if trimmed.hasPrefix("## ") {
-            Text(verbatim: String(trimmed.dropFirst(3)))
-                .font(VoxoLTypography.font(size: 19, weight: .semibold))
-                .padding(.top, 22)
-                .padding(.bottom, 7)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-        } else if trimmed.hasPrefix("### ") {
-            HStack(spacing: 9) {
-                Circle().fill(theme.cobalt).frame(width: 8, height: 8)
-                Text(verbatim: String(trimmed.dropFirst(4)))
-                    .font(VoxoLTypography.font(size: 15, weight: .semibold))
-            }
-            .padding(.top, 14)
-            .padding(.bottom, 5)
-        } else if trimmed.hasPrefix("- [ ] ") {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(theme.cobalt, lineWidth: 1.5)
-                    .frame(width: 14, height: 14)
-                richText(String(trimmed.dropFirst(6)))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .font(VoxoLTypography.font(size: 14))
-            .padding(.vertical, 2)
-        } else if trimmed.hasPrefix("- ") {
-            HStack(alignment: .firstTextBaseline, spacing: 11) {
-                Circle().fill(theme.cobalt).frame(width: 5, height: 5)
-                richText(String(trimmed.dropFirst(2)))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .font(VoxoLTypography.font(size: 14))
-            .padding(.vertical, 2)
-        } else if trimmed.isEmpty {
-            Color.clear.frame(height: 5)
-        } else {
-            richText(trimmed)
-                .font(VoxoLTypography.font(size: 14))
-                .lineSpacing(4)
-                .foregroundStyle(theme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 2)
-        }
-    }
-
-    private func richText(_ markdown: String) -> Text {
-        if let rich = try? AttributedString(markdown: markdown) { return Text(rich) }
-        return Text(verbatim: markdown)
+        MeetingDocumentWorkspace(transcript: document, french: french)
     }
 
     // MARK: Transcript and people

@@ -12,11 +12,49 @@ public struct MeetingReportDraft: Codable, Equatable, Identifiable, Sendable {
     /// Time of the latest edit.
     public var updatedAt: Date
     /// Hash of the transcript, speaker names, and corrections used as evidence.
-    public let sourceFingerprint: String
+    public var sourceFingerprint: String
     /// Nil for a report started from the empty template.
-    public let generator: String?
+    public var generator: String?
     /// Editable Markdown content.
     public var markdown: String
+    /// Semantic content used by the editor and exports.
+    public var document: MeetingDocument?
+    /// Previous snapshots available for explicit restoration.
+    public var versions: [MeetingReportVersion]?
+    /// Generated candidate awaiting acceptance, separate from the current document.
+    public var proposal: MeetingReportVersion?
+    /// Time of explicit human review, reset after edits.
+    public var reviewedAt: Date?
+    /// Lossless backup of the original Markdown before migration.
+    public var originalMarkdown: String?
+
+    /// Semantic document, with a lazy import for legacy drafts.
+    public var content: MeetingDocument { document ?? .migrating(markdown) }
+
+    /// Imports legacy content while retaining its original Markdown and resolving timestamp citations.
+    public mutating func migrate(transcript: SpeakerTranscript) {
+        guard document == nil else { return }
+        originalMarkdown = markdown
+        document = .migrating(markdown, transcript: transcript)
+    }
+
+    /// Preserves the current content before editing, replacement or restoration.
+    public mutating func checkpoint() {
+        var history = versions ?? []
+        history.append(
+            MeetingReportVersion(
+                document: content, sourceFingerprint: sourceFingerprint,
+                generator: generator, legacyMarkdown: originalMarkdown))
+        versions = history
+    }
+
+    /// Updates the semantic document and Markdown projection, resetting human review status.
+    public mutating func replaceContent(_ content: MeetingDocument) {
+        document = content
+        markdown = content.markdown()
+        updatedAt = Date()
+        reviewedAt = nil
+    }
 
     /// Creates a report draft with its source fingerprint and Markdown content.
     public init(
@@ -33,94 +71,48 @@ public struct MeetingReportDraft: Codable, Equatable, Identifiable, Sendable {
 
     /// Speaker corrections and names change the evidence used for a generated report.
     public static func fingerprint(of transcript: SpeakerTranscript) throws -> String {
+        struct Evidence: Encodable {
+            let rawText: String
+            let turns: [SpeakerTurn]
+            let names: [Int: String]
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let digest = SHA256.hash(data: try encoder.encode(transcript))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        let evidence = Evidence(
+            rawText: transcript.rawText, turns: transcript.turns, names: transcript.names)
+        return SHA256.hash(data: try encoder.encode(evidence)).map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private static func legacyFingerprint(of transcript: SpeakerTranscript) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return SHA256.hash(data: try encoder.encode(transcript)).map { String(format: "%02x", $0) }
+            .joined()
     }
 
     /// Returns whether the transcript still matches the evidence used by this draft.
     public func isCurrent(for transcript: SpeakerTranscript) -> Bool {
         (try? Self.fingerprint(of: transcript)) == sourceFingerprint
+            || (try? Self.legacyFingerprint(of: transcript)) == sourceFingerprint
     }
 
-    /// Creates an empty, editable report outline for a transcript.
+    /// Creates an editable prose-first outline for a transcript.
     public static func template(for transcript: SpeakerTranscript, french: Bool) throws -> Self {
-        let date = formattedMeetingDate(transcript.createdAt, french: french)
-        let speakers = transcript.speakerIDs.map {
-            transcript.name(for: $0, prefix: french ? "Intervenant" : "Speaker")
-        }.joined(separator: ", ")
-        let markdown: String
-        if french {
-            markdown = """
-                # Compte rendu — \(transcript.title)
-
-                **Date :** \(date)  
-                **Durée :** \(SpeakerTranscript.timestamp(transcript.duration))  
-                **Participants :** \(speakers.isEmpty ? "À confirmer" : speakers)
-
-                ## Synthèse
-
-                _À rédiger à partir de la transcription._
-
-                ## Par intervenant
-
-                _Résumez les contributions de chaque personne après vérification des voix._
-
-                ## Décisions confirmées
-
-                _Ajoutez uniquement les décisions effectivement prises._
-
-                ## Actions
-
-                _Indiquez pour chaque action son responsable et son échéance lorsqu'ils sont mentionnés._
-
-                ## Points ouverts
-
-                _Questions et éléments à confirmer._
-                """
-        } else {
-            markdown = """
-                # Meeting report — \(transcript.title)
-
-                **Date:** \(date)  
-                **Duration:** \(SpeakerTranscript.timestamp(transcript.duration))  
-                **Participants:** \(speakers.isEmpty ? "To confirm" : speakers)
-
-                ## Summary
-
-                _Write from the transcript._
-
-                ## By speaker
-
-                _Summarize each person's contribution after reviewing speaker assignments._
-
-                ## Confirmed decisions
-
-                _Include only decisions actually made._
-
-                ## Actions
-
-                _Name an owner and due date only when stated._
-
-                ## Open questions
-
-                _Questions and items to confirm._
-                """
-        }
-        return try Self(
+        let document = MeetingDocument(title: transcript.title)
+        var draft = try Self(
             transcriptID: transcript.id,
             sourceFingerprint: fingerprint(of: transcript),
-            generator: nil,
-            markdown: markdown
-        )
+            generator: nil, markdown: document.markdown())
+        draft.document = document
+        return draft
     }
 }
 
 /// Versioned report archive, separate from the immutable speaker transcript archive.
 public actor MeetingReportArchiveStore {
     private struct Archive: Codable {
-        var version = 1
+        var version = 2
         var reports: [MeetingReportDraft]
     }
 
@@ -133,7 +125,7 @@ public actor MeetingReportArchiveStore {
     public func load() throws -> [MeetingReportDraft] {
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
         let archive = try JSONDecoder().decode(Archive.self, from: Data(contentsOf: url))
-        guard archive.version == 1 else { throw SpeakerError.archiveVersion }
+        guard (1...2).contains(archive.version) else { throw SpeakerError.archiveVersion }
         return archive.reports
     }
 
@@ -141,6 +133,17 @@ public actor MeetingReportArchiveStore {
     public func save(_ reports: [MeetingReportDraft]) throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: url.path),
+            let previous = try? JSONDecoder().decode(Archive.self, from: Data(contentsOf: url)),
+            previous.version == 1
+        {
+            let backup = url.deletingPathExtension().appendingPathExtension("v1-backup.json")
+            if !FileManager.default.fileExists(atPath: backup.path) {
+                try FileManager.default.copyItem(at: url, to: backup)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o600], ofItemAtPath: backup.path)
+            }
+        }
         try JSONEncoder().encode(Archive(reports: reports)).write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
@@ -330,6 +333,16 @@ public struct MeetingReportExtraction: Decodable, Sendable {
     let actions: [Action]
     let openQuestions: [OpenQuestion]
 
+    /// Exact source fragments classified as explicit, settled decisions.
+    public var confirmedDecisionQuotes: Set<String> {
+        Set(decisions.map(\.approvalQuote))
+    }
+
+    /// Exact source fragments classified as explicit personal commitments.
+    public var confirmedActionQuotes: Set<String> {
+        Set(actions.map(\.commitmentQuote))
+    }
+
     private enum CodingKeys: String, CodingKey {
         case decisions, actions
         case topicQuote = "topic_quote"
@@ -420,8 +433,9 @@ public struct MeetingReportExtraction: Decodable, Sendable {
     public static func parseCompact(
         _ output: String, evidence: [Int: MeetingReportEvidence]
     ) throws -> Self {
-        guard let compact = try? JSONDecoder().decode(
-            CompactExtraction.self, from: Data(output.utf8)),
+        guard
+            let compact = try? JSONDecoder().decode(
+                CompactExtraction.self, from: Data(output.utf8)),
             compact.decisions.count <= 20,
             compact.actions.count <= 20,
             compact.questions.count <= 20,
@@ -524,13 +538,33 @@ public struct MeetingReportExtraction: Decodable, Sendable {
 
     /// The locally resolved part of a DAQ candidate set plus only the IDs that still need Qwen.
     public struct DeterministicDAQPartition: Equatable, Sendable {
+        /// DAQ JSON for evidence classified by deterministic rules.
         public let resolvedOutput: String
+        /// Evidence identifiers requiring model classification.
         public let unresolvedIDs: [Int]
 
+        /// Creates this value from explicit source data.
         public init(resolvedOutput: String, unresolvedIDs: [Int]) {
             self.resolvedOutput = resolvedOutput
             self.unresolvedIDs = unresolvedIDs
         }
+    }
+
+    /// Cheap prefilter for evidence that may contain a decision, commitment, or open question.
+    /// Keep this broader than the deterministic resolver, but avoid lexical fragments that are
+    /// common in ordinary prose (for example French "en question").
+    public static func isLikelyDAQCandidate(_ text: String) -> Bool {
+        let folded = classifierText(text)
+        let signals = [
+            "decid", "decision", "valide", "validated", "confirm", "approv", "accept",
+            "reject", "rejet", "commit", "engage", "prends en charge", "je vais ",
+            "je ferai", "je preparerai", "je terminerai", "je verifierai", "je publierai",
+            "i will ", "i'll", "i, ", "pending", "en attente", "pas encore",
+            "not decided", "not yet", "still have not", "still need to decide",
+            "remains to be decided", "undecid", "unanswered", "open question",
+            "question ouverte", "question en suspens", "question sans reponse", "?",
+        ]
+        return signals.contains { folded.contains($0) }
     }
 
     /// Resolves every low-ambiguity candidate locally while preserving ambiguous candidates for
@@ -685,14 +719,18 @@ public struct MeetingReportExtraction: Decodable, Sendable {
         if uncertaintyMarkers.contains(where: folded.contains) { return false }
         if folded.contains("je ne vais pas") || folded.contains("i will not") { return false }
 
+        // A cognitive future is not a task, but a separate commitment in the same fragment
+        // must remain visible. Shared-subject coordination stays unresolved for Qwen.
+        let taskText = removingCognitiveFutures(from: folded)
+
         let frenchMarkers = [
             "je m'engage", "je prends en charge", "je vais ",
             "je ferai", "je preparerai", "je terminerai", "je verifierai", "je publierai",
         ]
-        if frenchMarkers.contains(where: folded.contains) { return true }
-        if folded.contains("i commit ") || folded.contains("i will ") { return true }
-        if folded.hasPrefix("i, ")
-            && (folded.contains(", commit ") || folded.contains(", will "))
+        if frenchMarkers.contains(where: taskText.contains) { return true }
+        if taskText.contains("i commit ") || taskText.contains("i will ") { return true }
+        if taskText.hasPrefix("i, ")
+            && (taskText.contains(", commit ") || taskText.contains(", will "))
         {
             return true
         }
@@ -705,6 +743,22 @@ public struct MeetingReportExtraction: Decodable, Sendable {
             "i propose", "i suggest", "i would prefer", "we could",
         ]
         return proposalMarkers.contains(where: folded.contains)
+            || isNonActionFutureStatement(folded)
+    }
+
+    private static func isNonActionFutureStatement(_ folded: String) -> Bool {
+        guard removingCognitiveFutures(from: folded) != folded,
+            !isExplicitAction(folded)
+        else { return false }
+        let coordination = [" et ", " and ", " puis ", " then ", " mais ", " but ", ";"]
+        return !coordination.contains(where: folded.contains)
+    }
+
+    private static func removingCognitiveFutures(from folded: String) -> String {
+        folded.replacingOccurrences(
+            of:
+                #"\b(?:je vais (?:comprendre|savoir|penser|croire)|i will (?:understand|know|think|believe))\b"#,
+            with: "", options: .regularExpression)
     }
 
     private static func decodeDAQ(
@@ -753,7 +807,8 @@ public struct MeetingReportExtraction: Decodable, Sendable {
             "approbation", "pending", "still have not decided", "not yet decided",
             "still need to decide", "remains to be decided", "waiting for approval",
             "approval has not been given", "approval hasn't been given", "approval not given",
-            "undecid", "unanswered", "?",
+            "undecid", "unanswered", "open question", "question ouverte",
+            "question en suspens", "question sans reponse", "?",
         ]
         return markers.contains { folded.contains($0) }
     }
@@ -778,11 +833,12 @@ private struct ReportTurnReference: Decodable {
 
 /// Keeps the layout deterministic; source quotes remain visible beside model wording.
 public enum MeetingReportMarkdown {
-    /// Renders cited extracts into a stable, editable Markdown report.
+    /// Renders a prose report with citations; exact extracts remain available for review.
     public static func render(
         transcript: SpeakerTranscript,
         extractions: [MeetingReportExtraction],
-        french: Bool
+        french: Bool,
+        narratives: [MeetingReportNarrative] = []
     ) -> String {
         let date = formattedMeetingDate(transcript.createdAt, french: french)
         let speakers = transcript.speakerIDs.map {
@@ -793,7 +849,6 @@ public enum MeetingReportMarkdown {
         let actions = unique(extractions.flatMap(\.actions), key: { $0.commitmentQuote })
         let questions = unique(extractions.flatMap(\.openQuestions), key: { $0.openQuote })
         let summaries = unique(extractions.flatMap(\.summaryPoints), key: { $0.quote })
-        let contributions = unique(extractions.flatMap(\.speakerPoints), key: { $0.quote })
         var lines = [
             "# \(french ? "Compte rendu" : "Meeting report") — \(title)",
             "",
@@ -804,105 +859,103 @@ public enum MeetingReportMarkdown {
             "## \(french ? "Synthèse" : "Summary")",
             "",
         ]
-        for extraction in extractions {
-            lines.append(
-                "**\(french ? "Sujet abordé" : "Topic discussed") :** « \(inline(extraction.topicQuote)) » \(citation(extraction.topicSourceID, in: transcript))"
-            )
-        }
-        if !summaries.isEmpty { lines.append("") }
-        for point in summaries {
-            let category: String
-            if decisions.contains(where: {
-                $0.approvalQuote.localizedCaseInsensitiveContains(point.quote)
-            }) {
-                category = french ? "Accord exprimé" : "Agreement stated"
-            } else if actions.contains(where: {
-                $0.commitmentQuote.localizedCaseInsensitiveContains(point.quote)
-            }) {
-                category = french ? "Engagement" : "Commitment"
-            } else if questions.contains(where: {
-                $0.openQuote.localizedCaseInsensitiveContains(point.quote)
-            }) {
-                category = french ? "À confirmer" : "To confirm"
-            } else {
-                category = french ? "Point évoqué" : "Point discussed"
-            }
-            lines.append(
-                "- **\(category) :** « \(inline(point.quote)) » \(citation(point.turnID, in: transcript))"
-            )
-        }
 
-        lines += ["", "## \(french ? "Par intervenant" : "By speaker")", ""]
-        for speaker in transcript.speakerIDs {
-            let points = contributions.filter { point in
-                transcript.turns.first(where: { $0.id == point.turnID })?
-                    .displayedSpeakerIDs == [speaker]
-            }
-            lines.append(
-                "### \(inline(transcript.name(for: speaker, prefix: french ? "Intervenant" : "Speaker")))"
-            )
+        let prose = narratives.flatMap(\.paragraphs)
+        if prose.isEmpty {
+            let points =
+                summaries.isEmpty
+                ? extractions.map { ($0.topicQuote, $0.topicSourceID) }
+                : summaries.map { ($0.quote, $0.turnID) }
             if points.isEmpty {
-                let sourceQuotes = summaries.filter { point in
-                    transcript.turns.first(where: { $0.id == point.turnID })?
-                        .displayedSpeakerIDs == [speaker]
-                }
-                if !sourceQuotes.isEmpty {
-                    lines += sourceQuotes.prefix(2).map { point in
-                        "- **\(french ? "Passage clé" : "Key excerpt") :** « \(inline(point.quote)) » \(citation(point.turnID, in: transcript))"
-                    }
-                } else if let turn = transcript.turns.filter({ $0.displayedSpeakerIDs == [speaker] }
-                )
-                .max(by: { $0.text.count < $1.text.count }) {
-                    let excerpt = String(turn.text.prefix(220))
-                    lines.append(
-                        "- **\(french ? "Passage à relire" : "Excerpt to review") :** « \(inline(excerpt)) » \(citation(turn.id, in: transcript))"
-                    )
-                } else {
-                    lines.append(
-                        french
-                            ? "_Aucun passage attribué avec certitude à cette personne._"
-                            : "_No passage attributed to this speaker with confidence._")
-                }
+                lines.append(
+                    french
+                        ? "La transcription ne contient aucun échange à résumer."
+                        : "The transcript contains no discussion to summarize.")
             } else {
-                lines += points.map { point in
-                    "- \(inline(point.text ?? point.quote)) \(citation(point.turnID, in: transcript))  \n  _« \(inline(point.quote)) »_"
+                let passages = points.prefix(4).map { point in
+                    "« \(inline(point.0)) » \(citation(point.1, in: transcript))"
                 }
+                lines.append(
+                    (french
+                        ? "Les échanges ont notamment porté sur les passages suivants : "
+                        : "The discussion included these passages: ")
+                        + passages.joined(separator: " ; ") + ".")
             }
-            lines.append("")
+        } else {
+            for paragraph in prose {
+                let sources = paragraph.sourceTurnIDs.map { citation($0, in: transcript) }
+                    .filter { !$0.isEmpty }.joined(separator: " · ")
+                lines.append(inline(paragraph.text))
+                if !sources.isEmpty { lines.append("_Sources : \(sources)_") }
+                lines.append("")
+            }
         }
 
-        lines += ["", "## \(french ? "Décisions à vérifier" : "Decisions to review")", ""]
-        lines +=
-            decisions.isEmpty
-            ? [french ? "_Aucune décision extraite._" : "_No decision extracted._"]
-            : decisions.map {
-                "- « \(inline($0.approvalQuote)) » \(citation($0.approvalTurnID, in: transcript))"
+        if !decisions.isEmpty {
+            lines += ["", "## \(french ? "Décisions" : "Decisions")", ""]
+            for decision in decisions {
+                lines.append(
+                    (french
+                        ? "Une décision a été relevée dans la transcription : « "
+                        : "The transcript records a decision: “")
+                        + inline(decision.approvalQuote)
+                        + (french ? " » " : "” ")
+                        + citation(decision.approvalTurnID, in: transcript))
+                lines.append("")
             }
+        }
 
-        lines += ["", "## \(french ? "Actions" : "Actions")", ""]
-        lines +=
-            actions.isEmpty
-            ? [french ? "_Aucune action extraite._" : "_No action extracted._"]
-            : actions.map { action in
+        if !actions.isEmpty {
+            lines += ["", "## \(french ? "Suites à donner" : "Next steps")", ""]
+            for action in actions {
                 let turn = transcript.turns.first { $0.id == action.commitmentTurnID }
                 let evidence = turn.map { transcript.label(for: $0) + " " + $0.text } ?? ""
-                let owner =
-                    supported(action.owner, by: evidence) ?? (french ? "à confirmer" : "to confirm")
-                let due =
-                    supported(action.due, by: action.commitmentQuote)
-                    ?? (french ? "à confirmer" : "to confirm")
-                let source = citation(action.commitmentTurnID, in: transcript)
-                return
-                    "- [ ] **\(inline(action.task))** — \(french ? "Responsable" : "Owner") : \(owner) · \(french ? "Échéance" : "Due") : \(due) \(source)  \n  _\(french ? "Passage" : "Source") : « \(inline(action.commitmentQuote)) »_"
+                let owner = supported(action.owner, by: evidence)
+                let due = supported(action.due, by: action.commitmentQuote)
+                var sentence =
+                    (french
+                        ? "Un engagement a été formulé : « "
+                        : "A commitment was made: “")
+                    + inline(action.commitmentQuote)
+                    + (french ? " » " : "” ")
+                    + citation(action.commitmentTurnID, in: transcript)
+                if let owner {
+                    sentence +=
+                        french
+                        ? " La personne indiquée est \(owner)."
+                        : " The stated owner is \(owner)."
+                }
+                if let due {
+                    sentence +=
+                        french
+                        ? " L'échéance mentionnée est \(due)."
+                        : " The stated deadline is \(due)."
+                }
+                lines += [sentence, ""]
             }
+        }
 
-        lines += ["", "## \(french ? "Points ouverts" : "Open questions")", ""]
-        lines +=
-            questions.isEmpty
-            ? [french ? "_Aucun point ouvert extrait._" : "_No open question extracted._"]
-            : questions.map {
-                "- « \(inline($0.openQuote)) » \(citation($0.openTurnID, in: transcript))"
+        if !questions.isEmpty {
+            lines += ["", "## \(french ? "Points à clarifier" : "Open points")", ""]
+            for question in questions {
+                lines.append(
+                    (french
+                        ? "Le point suivant reste ouvert : « "
+                        : "The following point remains open: “")
+                        + inline(question.openQuote)
+                        + (french ? " » " : "” ")
+                        + citation(question.openTurnID, in: transcript))
+                lines.append("")
             }
+        }
+        if narratives.contains(where: \.usesVerbatimFallback) {
+            lines += [
+                "",
+                french
+                    ? "_Certains passages sont repris mot pour mot : relisez-les dans la transcription avant de partager ce document._"
+                    : "_Some passages are quoted verbatim: review them in the transcript before sharing this document._",
+            ]
+        }
         lines += [
             "",
             french

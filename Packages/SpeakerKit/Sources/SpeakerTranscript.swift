@@ -37,6 +37,20 @@ public struct SpeakerTurn: Codable, Equatable, Identifiable, Sendable {
     public var displayedOverlap: Bool { correctedSpeakerIDs.map { $0.count > 1 } ?? overlapping }
     /// Unmodified text belonging to this turn, including punctuation.
     public var text: String
+
+    /// Creates a timed, attributed passage without changing its source text.
+    public init(
+        id: Int, start: Double, end: Double, speakerIDs: [Int], overlapping: Bool,
+        text: String, correctedSpeakerIDs: [Int]? = nil
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.speakerIDs = speakerIDs
+        self.overlapping = overlapping
+        self.text = text
+        self.correctedSpeakerIDs = correctedSpeakerIDs
+    }
 }
 
 /// A local, editable speaker-labelled transcript.
@@ -57,6 +71,23 @@ public struct SpeakerTranscript: Codable, Equatable, Identifiable, Sendable {
     public var names: [Int: String]
     /// Immutable revision of the diarization weights used.
     public let diarizationRevision: String
+    /// Actual meeting date, independent of transcription creation time.
+    public var meetingDate: Date?
+    /// Optional snapshot of the calendar occurrence linked by the user.
+    public var calendarEvent: MeetingCalendarLink?
+    /// Local playback bookmark, excluded from transcript exports.
+    public var audioReference: MeetingAudioReference?
+    /// User-authored notes kept separate from spoken evidence.
+    public var personalNotes: String?
+    /// Personal timestamp bookmarks captured during the meeting.
+    public var markers: [MeetingMarker]?
+    /// Optional user-defined project grouping.
+    public var project: String?
+    /// Whether the user has starred this meeting.
+    public var favorite: Bool?
+
+    /// Meeting date for display, falling back to the event and archive creation date.
+    public var occurredAt: Date { meetingDate ?? calendarEvent?.start ?? createdAt }
 
     /// Creates a new value with the supplied local data.
     public init(
@@ -136,7 +167,8 @@ public enum SpeakerAttribution {
         text: String, words: [SpeakerWord], probabilities: [Float], frameCount: Int,
         duration: Double, speakerCount: Int = 8
     ) throws -> [SpeakerTurn] {
-        guard duration.isFinite, duration > 0, duration <= 3600, speakerCount > 0,
+        guard duration.isFinite, duration > 0,
+            duration <= SpeakerAudio.maximumDurationSeconds, speakerCount > 0,
             speakerCount <= 8,
             frameCount >= 0, frameCount <= Int.max / speakerCount,
             probabilities.count == frameCount * speakerCount,

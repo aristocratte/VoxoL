@@ -71,10 +71,13 @@ struct MeetingProgressCard: View {
                         .font(VoxoLTypography.font(size: 17, weight: .semibold))
                         .contentTransition(.opacity)
                     Text(
-                        verbatim: meetings.processingTitle.isEmpty
-                            ? (french
-                                ? "Tout se passe sur votre Mac." : "Everything stays on your Mac.")
-                            : meetings.processingTitle
+                        verbatim: meetings.phase == .reporting && !meetings.reportStage.isEmpty
+                            ? meetings.reportStage
+                            : meetings.processingTitle.isEmpty
+                                ? (french
+                                    ? "Tout se passe sur votre Mac."
+                                    : "Everything stays on your Mac.")
+                                : meetings.processingTitle
                     )
                     .font(VoxoLTypography.font(size: 12))
                     .foregroundStyle(theme.secondaryInk)
@@ -151,6 +154,7 @@ struct MeetingRecordingSheet: View {
     @State var title: String
     @State private var source: MeetingRecorder.Source = .microphone
     let french: Bool
+    var calendarEvent: MeetingCalendarLink? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -212,7 +216,8 @@ struct MeetingRecordingSheet: View {
                 if meetings.recorder.state == .preparing { ProgressView().controlSize(.small) }
                 Button(french ? "Choisir le fichier et démarrer" : "Choose file & start") {
                     Task {
-                        await meetings.recorder.start(title: title, source: source)
+                        await meetings.recorder.start(
+                            title: title, source: source, event: calendarEvent)
                         if meetings.recorder.state == .recording { dismiss() }
                     }
                 }
@@ -297,6 +302,27 @@ struct MeetingCaptureCard: View {
                     ProgressView().controlSize(.small)
                 }
             }
+            if recorder.state == .recording || recorder.state == .paused {
+                HStack(spacing: 12) {
+                    TextField(
+                        french ? "Une note pour vous…" : "A note for yourself…",
+                        text: Binding(
+                            get: { recorder.notes }, set: { recorder.notes = $0 }), axis: .vertical
+                    )
+                    .textFieldStyle(.plain).font(.system(size: 13)).lineLimit(1...4)
+                    Button {
+                        recorder.markMoment()
+                    } label: {
+                        Label(
+                            french ? "Marquer ce moment" : "Bookmark moment",
+                            systemImage: "bookmark")
+                    }.buttonStyle(MeetingQuietButtonStyle())
+                    if !recorder.markers.isEmpty {
+                        Text("\(recorder.markers.count)").font(.system(size: 11)).foregroundStyle(
+                            theme.secondaryInk)
+                    }
+                }.padding(12).background(theme.canvas, in: RoundedRectangle(cornerRadius: 10))
+            }
             if let error = recorder.failure {
                 Text(verbatim: error).font(VoxoLTypography.font(size: 12)).foregroundStyle(
                     theme.recording)
@@ -356,144 +382,5 @@ struct MeetingCaptureCard: View {
         else { return }
         meetings.transcribe(
             url: url, asrDirectory: root, french: french, title: meetings.recorder.title)
-    }
-}
-
-struct MeetingAgendaView: View {
-    @Environment(VoxoLTheme.self) private var theme
-    @Environment(MeetingsStore.self) private var meetings
-    let french: Bool
-    let record: (String) -> Void
-    @State private var expanded = false
-
-    var body: some View {
-        let calendar = meetings.calendar
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
-                Image(systemName: "calendar").foregroundStyle(theme.cobalt)
-                    .font(.system(size: 19)).frame(width: 40, height: 40)
-                    .background(
-                        theme.cobaltSoft.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(french ? "À l’agenda" : "On your calendar").font(
-                        VoxoLTypography.font(size: 18, weight: .semibold))
-                    Text(
-                        french
-                            ? "Vos rendez-vous des 7 prochains jours"
-                            : "Your meetings over the next 7 days"
-                    )
-                    .font(VoxoLTypography.font(size: 12)).foregroundStyle(theme.secondaryInk)
-                }
-                Spacer()
-                if calendar.loading {
-                    ProgressView().controlSize(.small)
-                } else if calendar.connected {
-                    Button {
-                        calendar.refresh()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle()).accessibilityLabel(
-                        french ? "Actualiser l’agenda" : "Refresh calendar")
-                } else if calendar.denied {
-                    Button(french ? "Autoriser dans Réglages" : "Allow in Settings") {
-                        calendar.openSettings()
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle())
-                } else {
-                    Button(french ? "Connecter mon calendrier" : "Connect my calendar") {
-                        Task { await calendar.connect() }
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle())
-                }
-            }
-            if calendar.connected {
-                if calendar.events.isEmpty {
-                    Text(
-                        french
-                            ? "Votre agenda est libre. Lancez une réunion quand vous voulez."
-                            : "Your calendar is clear. Start a meeting whenever you like."
-                    )
-                    .font(VoxoLTypography.font(size: 13)).foregroundStyle(theme.secondaryInk)
-                    .padding(.vertical, 6)
-                } else {
-                    ForEach(Array(calendar.events.prefix(expanded ? 12 : 3))) { event in
-                        HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(event.start, format: .dateTime.hour().minute()).font(
-                                    VoxoLTypography.font(size: 16, weight: .semibold))
-                                Text(event.start, format: .dateTime.day().month(.abbreviated)).font(
-                                    VoxoLTypography.font(size: 11)
-                                ).foregroundStyle(theme.secondaryInk)
-                            }.frame(width: 72, alignment: .leading)
-                            RoundedRectangle(cornerRadius: 2).fill(theme.cobalt.opacity(0.4)).frame(
-                                width: 3, height: 34)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(verbatim: event.title).font(
-                                    VoxoLTypography.font(size: 14, weight: .medium)
-                                ).lineLimit(1)
-                                Text(
-                                    verbatim:
-                                        "\(event.calendar) · \(max(1, Int(event.end.timeIntervalSince(event.start) / 60))) min"
-                                )
-                                .font(VoxoLTypography.font(size: 11)).foregroundStyle(
-                                    theme.secondaryInk)
-                            }
-                            Spacer()
-                            if let url = event.joinURL {
-                                Link(destination: url) {
-                                    Label(french ? "Rejoindre" : "Join", systemImage: "video")
-                                }
-                                .buttonStyle(MeetingQuietButtonStyle())
-                            }
-                            Button {
-                                record(event.title)
-                            } label: {
-                                Image(systemName: "record.circle")
-                            }
-                            .buttonStyle(MeetingQuietButtonStyle())
-                            .accessibilityLabel((french ? "Enregistrer " : "Record ") + event.title)
-                            .disabled(meetings.busy || meetings.recorder.completedURL != nil)
-                        }
-                        if event.id != calendar.events.prefix(expanded ? 12 : 3).last?.id {
-                            Divider().overlay(theme.line)
-                        }
-                    }
-                    if calendar.events.count > 3 {
-                        Button(
-                            expanded
-                                ? (french ? "Réduire" : "Show less")
-                                : (french
-                                    ? "Voir les \(calendar.events.count) rendez-vous"
-                                    : "View all \(calendar.events.count) events")
-                        ) {
-                            expanded.toggle()
-                        }.buttonStyle(MeetingQuietButtonStyle())
-                    }
-                }
-            } else {
-                Text(
-                    french
-                        ? "Retrouvez ici vos réunions iCloud, Google ou Exchange synchronisées dans Calendrier sur ce Mac. L’accès se fait à votre demande."
-                        : "See your iCloud, Google or Exchange meetings synced with Calendar on this Mac. Access is requested only when you connect."
-                )
-                .font(VoxoLTypography.font(size: 13)).foregroundStyle(theme.secondaryInk)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if let error = calendar.failure {
-                Text(verbatim: error).font(VoxoLTypography.font(size: 12)).foregroundStyle(
-                    theme.recording)
-            }
-        }
-        .padding(22).background(theme.surface, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(theme.line))
-        .padding(.bottom, 30)
-        .task { calendar.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
-            calendar.refresh()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-        ) { _ in calendar.refresh() }
     }
 }

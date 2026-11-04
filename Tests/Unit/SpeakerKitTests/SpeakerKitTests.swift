@@ -89,6 +89,19 @@ struct SpeakerKitTests {
         }
     }
 
+    @Test func speakerAttributionUsesTheTwoHourImportContract() throws {
+        let turns = try SpeakerAttribution.turns(
+            text: "long", words: [], probabilities: [], frameCount: 0, duration: 7_200)
+        #expect(turns.count == 1)
+        #expect(turns[0].start == 0)
+        #expect(turns[0].end == 7_200)
+        #expect(throws: SpeakerError.self) {
+            try SpeakerAttribution.turns(
+                text: "too long", words: [], probabilities: [], frameCount: 0,
+                duration: 7_201)
+        }
+    }
+
     @Test func renamedSpeakersSurviveSaveAndAllExports() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString)
@@ -162,7 +175,8 @@ struct SpeakerKitTests {
             ],
             diarizationRevision: "test")
         var draft = try MeetingReportDraft.template(for: document, french: true)
-        #expect(draft.markdown.contains("## Décisions confirmées"))
+        #expect(draft.markdown.hasPrefix("# Réunion projet\n"))
+        #expect(draft.document?.title == document.title)
         #expect(draft.isCurrent(for: document))
         draft.markdown += "\n- Décision à relire [00:00:01]"
         try await store.save([draft])
@@ -199,9 +213,9 @@ struct SpeakerKitTests {
             output, sourceTurns: [4: document.turns[0].text])
         let markdown = MeetingReportMarkdown.render(
             transcript: document, extractions: [extracted], french: true)
-        #expect(markdown.contains("**Envoyer les journaux**"))
-        #expect(markdown.contains("Responsable : Hugo"))
-        #expect(markdown.contains("Échéance : à confirmer"))
+        #expect(markdown.contains("Un engagement a été formulé"))
+        #expect(markdown.contains("La personne indiquée est Hugo."))
+        #expect(!markdown.contains("vendredi"))
         #expect(markdown.contains("[00:00:12]"))
         #expect(throws: MeetingReportGenerationError.self) {
             try MeetingReportExtraction.parse(output, sourceTurns: [3: document.turns[0].text])
@@ -251,8 +265,8 @@ struct SpeakerKitTests {
         #expect(markdown.contains("« D'accord pour planifier après l'audit, »"))
         #expect(markdown.contains("« mais pas de date. »"))
         #expect(markdown.contains("« Je t'enverrai les journaux demain matin. »"))
-        #expect(markdown.contains("**Envoyer les journaux**"))
-        #expect(markdown.contains("Échéance : demain matin"))
+        #expect(markdown.contains("Un engagement a été formulé"))
+        #expect(markdown.contains("L'échéance mentionnée est demain matin."))
 
         let invented = output.replacingOccurrences(of: "\"q\":[1]", with: "\"q\":[99]")
         #expect(throws: MeetingReportGenerationError.self) {
@@ -461,7 +475,88 @@ struct SpeakerKitTests {
         #expect(partition?.resolvedOutput == "{\"d\":[\"E4\"],\"a\":[],\"q\":[]}")
     }
 
-    @Test func reportIncludesEvidenceBoundGeneralAndPerSpeakerSummaries() throws {
+    @Test func daqCandidatePrefilterRejectsIncidentalQuestionAndIncompleteCommitmentFragments() {
+        for text in [
+            "Le nom de l'avatar en question.",
+            "On affiche ensuite l'élément en question",
+            "D'après ce que je vais",
+            "que je vais",
+            "The component in question is already visible.",
+        ] {
+            #expect(!MeetingReportExtraction.isLikelyDAQCandidate(text))
+        }
+
+        for text in [
+            "Je vais publier le rapport demain.",
+            "I will publish the report tomorrow.",
+            "On n'a pas encore décidé qui fera la démonstration.",
+            "This remains to be decided.",
+            "Open question: faut-il conserver ce comportement ?",
+            "Est-ce qu'on garde ce comportement ?",
+        ] {
+            #expect(MeetingReportExtraction.isLikelyDAQCandidate(text))
+        }
+    }
+
+    @Test func deterministicDAQPreservesTasksBesideCognitiveFutureStatements() throws {
+        let texts = [
+            "Je vais comprendre le tableau et je publierai les notes demain.",
+            "I will know more after the demo and I will publish the notes tomorrow.",
+        ]
+        let evidence = Dictionary(
+            uniqueKeysWithValues: texts.enumerated().map { id, text in
+                (id, MeetingReportEvidence(id: id, turnID: id, text: text))
+            })
+        let partition = try #require(
+            MeetingReportExtraction.deterministicDAQPartition(
+                candidateIDs: [0, 1], evidence: evidence))
+        let extraction = try MeetingReportExtraction.parseDAQ(
+            partition.resolvedOutput, evidence: evidence)
+        #expect(extraction.actions.map(\.commitmentQuote) == texts)
+        #expect(partition.unresolvedIDs.isEmpty)
+
+        let sharedSubject = [
+            0: MeetingReportEvidence(
+                id: 0, turnID: 0, text: "Je vais comprendre le tableau et publier les notes.")
+        ]
+        #expect(
+            MeetingReportExtraction.deterministicDAQPartition(
+                candidateIDs: [0], evidence: sharedSubject)?.unresolvedIDs == [0])
+    }
+
+    @Test func daqPreservesExplicitOpenQuestionsWithoutQuestionMarks() throws {
+        for text in [
+            "Question ouverte : qui prendra en charge la maintenance.",
+            "Cette question reste une question en suspens.",
+            "Open question: who will maintain the service.",
+        ] {
+            #expect(MeetingReportExtraction.isLikelyDAQCandidate(text))
+            let evidence = [0: MeetingReportEvidence(id: 0, turnID: 0, text: text)]
+            let output = try #require(
+                MeetingReportExtraction.deterministicDAQOutput(
+                    candidateIDs: [0], evidence: evidence))
+            let extraction = try MeetingReportExtraction.parseDAQ(output, evidence: evidence)
+            #expect(extraction.openQuestions.map(\.openQuote) == [text])
+        }
+    }
+
+    @Test func deterministicDAQDoesNotPromoteCognitiveFutureStatementsToActions() throws {
+        let evidence = [
+            0: MeetingReportEvidence(
+                id: 0, turnID: 1,
+                text: "Ce que je vais comprendre après la démonstration."),
+            1: MeetingReportEvidence(
+                id: 1, turnID: 2,
+                text: "I will know more after the demo."),
+        ]
+        let output = MeetingReportExtraction.deterministicDAQOutput(
+            candidateIDs: [0, 1], evidence: evidence)
+        #expect(output == "{\"d\":[],\"a\":[],\"q\":[]}")
+        let extraction = try MeetingReportExtraction.parseDAQ(output ?? "", evidence: evidence)
+        #expect(extraction.actions.isEmpty)
+    }
+
+    @Test func reportRendersGroundedParagraphsInsteadOfBulletSummaries() throws {
         let document = SpeakerTranscript(
             title: "Atlas", duration: 20,
             rawText: "Le prototype fonctionne. Je prépare les chiffres.",
@@ -478,22 +573,160 @@ struct SpeakerKitTests {
             """
         let extracted = try MeetingReportExtraction.parse(
             output, sourceTurns: [0: document.turns[0].text, 1: document.turns[1].text])
+        let evidence = [
+            0: MeetingReportEvidence(id: 0, turnID: 0, text: document.turns[0].text),
+            1: MeetingReportEvidence(id: 1, turnID: 1, text: document.turns[1].text),
+        ]
+        let narrative = try MeetingReportNarrative.parse(
+            """
+            {"p":[{"t":"Le prototype fonctionne. Une autre intervention porte sur la préparation des chiffres.","e":[0,1]}]}
+            """, evidence: evidence, transcript: document)
         let markdown = MeetingReportMarkdown.render(
-            transcript: document, extractions: [extracted], french: true)
+            transcript: document, extractions: [extracted], french: true,
+            narratives: [narrative])
         #expect(markdown.contains("## Synthèse"))
-        #expect(markdown.contains("**Sujet abordé :** « Le prototype fonctionne. »"))
-        #expect(markdown.contains("**Point évoqué :** « Le prototype fonctionne. »"))
+        #expect(markdown.contains("Le prototype fonctionne. Une autre intervention porte sur la préparation des chiffres.\n_Sources : [00:00:01] · [00:00:08]_"))
+        #expect(!markdown.contains("\n- "))
         #expect(!markdown.contains("Le prototype a été approuvé."))
-        #expect(markdown.contains("### Intervenant 1"))
-        #expect(markdown.contains("### Intervenant 2"))
-        #expect(markdown.contains("**Passage clé :** « Le prototype fonctionne. »"))
-        #expect(markdown.contains("Prépare les chiffres. [00:00:08]"))
         let invented = output.replacingOccurrences(
             of: "Je prépare les chiffres.", with: "Le devis est validé.")
         #expect(throws: MeetingReportGenerationError.self) {
             try MeetingReportExtraction.parse(
                 invented, sourceTurns: [0: document.turns[0].text, 1: document.turns[1].text])
         }
+    }
+
+    @Test func reportNarrativeRejectsUncitedFactsAndUnsupportedApproval() throws {
+        let document = SpeakerTranscript(
+            title: "Budget", duration: 12, rawText: "Le budget de 40 euros reste à confirmer.",
+            turns: [.init(id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
+                          text: "Le budget de 40 euros reste à confirmer.")],
+            diarizationRevision: "test")
+        let evidence = [
+            0: MeetingReportEvidence(id: 0, turnID: 3,
+                                     text: "Le budget de 40 euros reste à confirmer.")
+        ]
+        for output in [
+            #"{"p":[{"t":"Le budget de 50 euros reste à confirmer.","e":[0]}]}"#,
+            #"{"p":[{"t":"Le budget de 40 euros a été approuvé.","e":[0]}]}"#,
+            #"{"p":[{"t":"Le budget de 40 euros reste à confirmer.","e":[9]}]}"#,
+            #"{"p":[{"t":"- Le budget de 40 euros reste à confirmer.","e":[0]}]}"#,
+        ] {
+            #expect(throws: MeetingReportGenerationError.self) {
+                try MeetingReportNarrative.parse(output, evidence: evidence, transcript: document)
+            }
+        }
+        let fallback = MeetingReportNarrative.verbatimFallback(
+            evidence: evidence, transcript: document, french: true)
+        #expect(fallback.usesVerbatimFallback)
+        #expect(fallback.paragraphs[0].text.contains("Le budget de 40 euros reste à confirmer."))
+
+        let settled = SpeakerTranscript(
+            title: "Budget", duration: 12,
+            rawText: "Le budget est approuvé. La date reste à confirmer.",
+            turns: [.init(id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
+                          text: "Le budget est approuvé. La date reste à confirmer.")],
+            diarizationRevision: "test")
+        let mixedEvidence = [
+            0: MeetingReportEvidence(id: 0, turnID: 3, text: "Le budget est approuvé."),
+            1: MeetingReportEvidence(id: 1, turnID: 3, text: "La date reste à confirmer."),
+        ]
+        let claimedApproval = #"{"p":[{"t":"La date a été approuvée pendant la réunion.","e":[1]}]}"#
+        #expect(throws: MeetingReportGenerationError.self) {
+            try MeetingReportNarrative.parse(
+                claimedApproval, evidence: mixedEvidence, transcript: settled,
+                allowedDecisionEvidenceIDs: [0])
+        }
+    }
+
+    @Test func reportNarrativeAcceptsOneAccidentalEvidenceArrayWrapper() throws {
+        let document = SpeakerTranscript(
+            title: "Test", duration: 2, rawText: "Le tableau doit être plus lisible.",
+            turns: [
+                .init(
+                    id: 0, start: 0, end: 2, speakerIDs: [0], overlapping: false,
+                    text: "Le tableau doit être plus lisible.")
+            ],
+            diarizationRevision: "test")
+        let evidence = [
+            0: MeetingReportEvidence(
+                id: 0, turnID: 0, text: "Le tableau doit être plus lisible.")
+        ]
+        for ids in ["[0]", "[[0]]", #"["E0"]"#] {
+            let narrative = try MeetingReportNarrative.parse(
+                "{\"p\":[{\"t\":\"Le tableau doit être plus lisible.\",\"e\":\(ids)}]}",
+                evidence: evidence,
+                transcript: document)
+            #expect(narrative.paragraphs.count == 1)
+            #expect(narrative.paragraphs[0].sourceTurnIDs == [0])
+        }
+        for ids in [
+            #"["E00"]"#, #"["0"]"#, #"["E-1"]"#, #"["E99"]"#,
+            #"["E0","E0"]"#, "[[[0]]]",
+        ] {
+            #expect(throws: MeetingReportGenerationError.self) {
+                try MeetingReportNarrative.parse(
+                    "{\"p\":[{\"t\":\"Le tableau doit être plus lisible.\",\"e\":\(ids)}]}",
+                    evidence: evidence, transcript: document)
+            }
+        }
+    }
+
+    @Test func transcriptNarrativePromptUsesExactFragmentsAndCorrectedSpeakerNames() throws {
+        let text = "Le budget est approuvé. Je vais envoyer le rapport demain."
+        var document = SpeakerTranscript(
+            title: "Rapport", duration: 10, rawText: text,
+            turns: [
+                .init(
+                    id: 7, start: 0, end: 10, speakerIDs: [1], overlapping: false,
+                    text: text, correctedSpeakerIDs: [0])
+            ],
+            diarizationRevision: "test")
+        document.names[0] = "Alice"
+        let evidence = MeetingReportNarrative.boundedEvidence(from: document)
+        let fragments = MeetingReportEvidenceBuilder.fragments(in: text)
+        #expect(evidence.values.sorted { $0.id < $1.id }.map(\.text) == fragments)
+        let prompt = MeetingReportNarrative.prompt(
+            evidence: evidence, transcript: document, french: true)
+        for source in evidence.values {
+            #expect(source.turnID == 7)
+            #expect(prompt.contains("[E\(source.id)] Alice: \(source.text)"))
+        }
+        let narrative = try MeetingReportNarrative.parse(
+            #"{"p":[{"t":"Alice enverra le rapport demain.","e":[1]}]}"#,
+            evidence: evidence, transcript: document)
+        #expect(narrative.paragraphs.first?.sourceTurnIDs == [7])
+    }
+
+    @Test func boundedNarrativeEvidenceKeepsPriorityAndTimelineCoverage() throws {
+        let sources = (0..<200).map { index in
+            MeetingReportNarrative.Source(
+                turnID: index,
+                text: "Fragment \(index) about the meeting and its current state.",
+                prioritized: index == 50 || index == 150
+            )
+        }
+        let evidence = MeetingReportNarrative.boundedEvidence(
+            from: sources, maximumCharacters: 1_200, maximumCount: 12)
+        let selected = evidence.values.sorted { $0.id < $1.id }
+        #expect(selected.count <= 12)
+        #expect(selected.contains(where: { $0.turnID == 50 }))
+        #expect(selected.contains(where: { $0.turnID == 150 }))
+        #expect(selected.contains(where: { $0.turnID < 20 }))
+        #expect(selected.contains(where: { $0.turnID > 180 }))
+        #expect(selected.map(\.turnID) == selected.map(\.turnID).sorted())
+    }
+
+    @Test func boundedNarrativeEvidenceCollapsesRepeatedText() throws {
+        let sources = (0..<20).map { index in
+            MeetingReportNarrative.Source(
+                turnID: index,
+                text: index.isMultiple(of: 2) ? "Même passage répété." : "Passage unique \(index)."
+            )
+        }
+        let evidence = MeetingReportNarrative.boundedEvidence(
+            from: sources, maximumCharacters: 4_000, maximumCount: 64)
+        #expect(evidence.values.filter { $0.text == "Même passage répété." }.count == 1)
     }
 
     @Test func wordExportIsAReadableDocumentWithEditedUnicodeContent() throws {

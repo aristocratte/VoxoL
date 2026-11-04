@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B27090000000000000000005 /* MeetingDocumentExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27090000000000000000069 /* MeetingDocumentExport.swift */; };
+		B27090000000000000000004 /* MeetingAgendaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27090000000000000000068 /* MeetingAgendaView.swift */; };
+		B27090000000000000000003 /* MeetingSourcePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27090000000000000000067 /* MeetingSourcePanel.swift */; };
+		B27090000000000000000002 /* MeetingDocumentWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27090000000000000000066 /* MeetingDocumentWorkspace.swift */; };
+		B27090000000000000000001 /* MeetingRichEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27090000000000000000065 /* MeetingRichEditor.swift */; };
 		B24090000000000000000005 /* MeetingSessionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24090000000000000000006 /* MeetingSessionViews.swift */; };
 		B24090000000000000000003 /* MeetingRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24090000000000000000004 /* MeetingRecorder.swift */; };
 		B24090000000000000000001 /* MeetingCalendarStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24090000000000000000002 /* MeetingCalendarStore.swift */; };
@@ -98,6 +103,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B27090000000000000000069 /* MeetingDocumentExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Services/MeetingDocumentExport.swift; sourceTree = SOURCE_ROOT; };
+		B27090000000000000000068 /* MeetingAgendaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Hub/MeetingAgendaView.swift; sourceTree = SOURCE_ROOT; };
+		B27090000000000000000067 /* MeetingSourcePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Hub/MeetingSourcePanel.swift; sourceTree = SOURCE_ROOT; };
+		B27090000000000000000066 /* MeetingDocumentWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Hub/MeetingDocumentWorkspace.swift; sourceTree = SOURCE_ROOT; };
+		B27090000000000000000065 /* MeetingRichEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Hub/MeetingRichEditor.swift; sourceTree = SOURCE_ROOT; };
 		B24090000000000000000006 /* MeetingSessionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Hub/MeetingSessionViews.swift; sourceTree = SOURCE_ROOT; };
 		B24090000000000000000004 /* MeetingRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Services/MeetingRecorder.swift; sourceTree = SOURCE_ROOT; };
 		B24090000000000000000002 /* MeetingCalendarStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/Services/MeetingCalendarStore.swift; sourceTree = SOURCE_ROOT; };
@@ -369,7 +379,12 @@
 				B24090000000000000000004 /* MeetingRecorder.swift */,
 				B24090000000000000000006 /* MeetingSessionViews.swift */,
 				B23090000000000000000004 /* MeetingsStore.swift */,
+				B27090000000000000000069 /* MeetingDocumentExport.swift */,
 				B23090000000000000000002 /* NativeMeetingsView.swift */,
+				B27090000000000000000068 /* MeetingAgendaView.swift */,
+				B27090000000000000000067 /* MeetingSourcePanel.swift */,
+				B27090000000000000000066 /* MeetingDocumentWorkspace.swift */,
+				B27090000000000000000065 /* MeetingRichEditor.swift */,
 				F317804A57A948BA90100102 /* TokenSeamAlignment.swift */,
 				000000000000000000000075 /* Tokenizer.swift */,
 				000000000000000000000077 /* ParakeetTranscriber.swift */,
@@ -534,6 +549,11 @@
 				B24090000000000000000005 /* MeetingSessionViews.swift in Sources */,
 				B23090000000000000000003 /* MeetingsStore.swift in Sources */,
 				B23090000000000000000001 /* NativeMeetingsView.swift in Sources */,
+				B27090000000000000000005 /* MeetingDocumentExport.swift in Sources */,
+				B27090000000000000000004 /* MeetingAgendaView.swift in Sources */,
+				B27090000000000000000003 /* MeetingSourcePanel.swift in Sources */,
+				B27090000000000000000002 /* MeetingDocumentWorkspace.swift in Sources */,
+				B27090000000000000000001 /* MeetingRichEditor.swift in Sources */,
 				F317804A57A948BA90100101 /* TokenSeamAlignment.swift in Sources */,
 				000000000000000000000074 /* Tokenizer.swift in Sources */,
 				000000000000000000000076 /* ParakeetTranscriber.swift in Sources */,

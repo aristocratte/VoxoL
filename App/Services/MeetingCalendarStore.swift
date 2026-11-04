@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import EventKit
 import Observation
+import SpeakerKit
 
 /// EventKit stays on the main actor; views receive small value snapshots only.
 @MainActor @Observable
@@ -11,8 +12,30 @@ final class MeetingCalendarStore {
         let start: Date
         let end: Date
         let calendar: String
+        let calendarID: String
+        let timeZone: String
         let location: String?
         let joinURL: URL?
+        var link: MeetingCalendarLink {
+            .init(
+                eventID: id, title: title, start: start, end: end, calendar: calendar,
+                timeZone: timeZone)
+        }
+    }
+
+    struct CalendarChoice: Identifiable { let id: String; let title: String }
+    private(set) var calendars: [CalendarChoice] = []
+    private(set) var hiddenCalendars = Set(
+        UserDefaults.standard.stringArray(forKey: "voxol.meetings.hiddenCalendars") ?? [])
+
+    func toggleCalendar(_ id: String) {
+        if hiddenCalendars.contains(id) {
+            hiddenCalendars.remove(id)
+        } else {
+            hiddenCalendars.insert(id)
+        }
+        UserDefaults.standard.set(Array(hiddenCalendars), forKey: "voxol.meetings.hiddenCalendars")
+        refresh()
     }
 
     private(set) var events: [Event] = []
@@ -39,18 +62,27 @@ final class MeetingCalendarStore {
         events = []
         guard connected else { return }
         failure = nil
+        calendars = store.calendars(for: .event).map {
+            CalendarChoice(id: $0.calendarIdentifier, title: $0.title)
+        }
         let now = Date()
+        let since = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
         let until = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
-        let predicate = store.predicateForEvents(withStart: now, end: until, calendars: nil)
+        let predicate = store.predicateForEvents(withStart: since, end: until, calendars: nil)
         events = store.events(matching: predicate)
-            .filter { !$0.isAllDay && $0.endDate > now && $0.status != .canceled }
+            .filter {
+                !$0.isAllDay && $0.endDate > since && $0.status != .canceled
+                    && !hiddenCalendars.contains($0.calendar.calendarIdentifier)
+            }
             .sorted { $0.startDate < $1.startDate }
-            .prefix(12)
+            .prefix(250)
             .map { event in
                 Event(
                     id: "\(event.calendarItemIdentifier)-\(event.startDate.timeIntervalSince1970)",
                     title: event.title ?? String(localized: "Meeting"),
                     start: event.startDate, end: event.endDate, calendar: event.calendar.title,
+                    calendarID: event.calendar.calendarIdentifier,
+                    timeZone: event.timeZone?.identifier ?? TimeZone.current.identifier,
                     location: event.location,
                     joinURL: Self.conferenceURL(
                         event.url, location: event.location, notes: event.notes))

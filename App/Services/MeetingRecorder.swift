@@ -1,6 +1,7 @@
 import AppKit
 @preconcurrency import AVFoundation
 import Observation
+import SpeakerKit
 @preconcurrency import ScreenCaptureKit
 import UniformTypeIdentifiers
 
@@ -15,6 +16,16 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
     private(set) var completedURL: URL?
     private(set) var title = ""
     var failure: String?
+    private(set) var calendarEvent: MeetingCalendarLink?
+    private(set) var startedAt: Date?
+    var notes = ""
+    private(set) var markers: [MeetingMarker] = []
+
+    func markMoment() {
+        guard state == .recording || state == .paused else { return }
+        markers.append(MeetingMarker(time: elapsed))
+    }
+
     @ObservationIgnored private var microphone: AVAudioRecorder?
     @ObservationIgnored private var stream: SCStream?
     @ObservationIgnored private var output: MeetingCallOutput?
@@ -23,7 +34,7 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
 
     var active: Bool { state != .idle }
 
-    func start(title: String, source: Source) async {
+    func start(title: String, source: Source, event: MeetingCalendarLink? = nil) async {
         guard !active, completedURL == nil else { return }
         failure = nil
         let panel = NSSavePanel()
@@ -39,6 +50,10 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
         state = .preparing
         Self.activeRecorder = self
         elapsed = 0
+        calendarEvent = event
+        notes = ""
+        markers = []
+        startedAt = nil
         do {
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
                 throw RecordingError.microphonePermission
@@ -88,6 +103,7 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
                 try await capture.startCapture()
             }
             state = .recording
+            startedAt = Date()
             meterTask = Task { [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(100))
