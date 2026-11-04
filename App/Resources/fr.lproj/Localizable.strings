@@ -1520,3 +1520,14 @@
 "À relire" = "À relire";
 "À venir" = "À venir";
 "Écarter" = "Écarter";
+
+/* Notes de version 0.1.7 */
+"A meeting becomes a document you can edit." = "Une réunion devient un document que vous modifiez.";
+"Meeting notes you can edit" = "Un compte rendu modifiable";
+"Headings, lists, checkable tasks and links. A new draft appears beside the current one before it replaces anything, and earlier versions can be restored." = "Titres, listes, tâches à cocher et liens. Un nouveau brouillon s’affiche à côté de la version actuelle avant de remplacer quoi que ce soit, et les versions précédentes se restaurent.";
+"Every passage shows its sources" = "Chaque passage montre ses sources";
+"Each passage links back to the exchanges it came from, with timestamped audio and search across the whole conversation." = "Chaque passage renvoie aux échanges dont il vient, avec l’audio horodaté et une recherche dans toute la conversation.";
+"History can no longer be wiped" = "L’historique ne peut plus être effacé";
+"If the history can’t be read, VoxoL says so, lets you retry or export a recovery copy, and no longer overwrites it with the next dictation." = "Si l’historique ne peut pas être lu, VoxoL le signale, propose de réessayer ou d’exporter une copie de secours, et ne l’écrase plus à la dictée suivante.";
+"Update checks tell the truth" = "Des vérifications de mise à jour honnêtes";
+"A check that fails now says so and offers to retry, instead of claiming you’re up to date." = "Une vérification qui échoue le dit et propose de réessayer, au lieu d’annoncer que tout est à jour.";

@@ -25,6 +25,32 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.7",
+                headline: "A meeting becomes a document you can edit.",
+                items: [
+                    Item(
+                        title: "Meeting notes you can edit",
+                        detail:
+                            "Headings, lists, checkable tasks and links. A new draft appears beside the current one before it replaces anything, and earlier versions can be restored."
+                    ),
+                    Item(
+                        title: "Every passage shows its sources",
+                        detail:
+                            "Each passage links back to the exchanges it came from, with timestamped audio and search across the whole conversation."
+                    ),
+                    Item(
+                        title: "History can no longer be wiped",
+                        detail:
+                            "If the history can’t be read, VoxoL says so, lets you retry or export a recovery copy, and no longer overwrites it with the next dictation."
+                    ),
+                    Item(
+                        title: "Update checks tell the truth",
+                        detail:
+                            "A check that fails now says so and offers to retry, instead of claiming you’re up to date."
+                    ),
+                ]
+            ),
+            Entry(
                 version: "0.1.4",
                 headline: "One bad sentence no longer costs the good ones.",
                 items: [
