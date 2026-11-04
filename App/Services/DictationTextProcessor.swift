@@ -62,7 +62,7 @@ actor DictationTextProcessor {
         modelRoot: URL?,
         adapterRoot: URL? = nil,
         useInstalledAdapter: Bool = true,
-        generationConfiguration: QwenPolisherGenerationConfiguration = .init()
+        generationConfiguration: QwenPolisherGenerationConfiguration = .dictation
     ) {
         runtime = modelRoot.map {
             QwenPolisherRuntime(

@@ -282,6 +282,7 @@ private extension PolisherSmokeRunner {
             guard arguments.contains(flag) else { continue }
             guard let value = value(after: flag, in: arguments),
                 (flag == "--mlx-cache-mb" && value == "unlimited")
+                    || (flag == "--prompt-lookup-tokens" && value == "off")
                     || Int(value).map({ range.contains($0) }) == true
             else {
                 write("Invalid or missing value for \(flag)\n", to: .standardError)
@@ -475,8 +476,11 @@ private extension PolisherSmokeRunner {
             prefillStepSize: prefillStepSize,
             usesPromptPrefixCache: !arguments.contains("--no-prompt-prefix-cache"),
             fusesAdapter: !arguments.contains("--no-fuse-adapter"),
+            // Absent, the dictation default, so a run measures what ships; "off" is the
+            // streamed path.
             promptLookupTokenCount: value(after: "--prompt-lookup-tokens", in: arguments)
-                .flatMap(Int.init),
+                .map { $0 == "off" ? nil : Int($0) }
+                ?? QwenPolisherGenerationConfiguration.dictation.promptLookupTokenCount,
             maximumBufferCacheBytes: maximumBufferCacheBytes,
             promptStyle: value(after: "--prompt-style", in: arguments)
                 .flatMap(PolishingPromptStyle.init(rawValue:)) ?? .production

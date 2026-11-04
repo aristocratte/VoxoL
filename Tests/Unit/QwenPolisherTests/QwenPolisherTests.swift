@@ -56,6 +56,18 @@ final class QwenPolisherTests: XCTestCase {
         XCTAssertNil(configuration.promptLookupTokenCount)
     }
 
+    func testDictationVerifiesTranscriptDraftsWhileReportsKeepTheStreamedPath() {
+        let dictation = QwenPolisherGenerationConfiguration.dictation
+
+        XCTAssertEqual(dictation.promptLookupTokenCount, 16)
+        XCTAssertEqual(dictation.prefillStepSize, 512)
+        XCTAssertTrue(dictation.usesPromptPrefixCache)
+        XCTAssertTrue(dictation.fusesAdapter)
+        XCTAssertNil(dictation.maximumKVCacheSize)
+        // Only the streamed path stops after the first JSON object a report asks for.
+        XCTAssertNil(QwenPolisherGenerationConfiguration.meetingReport.promptLookupTokenCount)
+    }
+
     func testExperimentalDraftBudgetIsBoundedAndExplicit() {
         XCTAssertEqual(
             QwenPolisherGenerationConfiguration(promptLookupTokenCount: -1).promptLookupTokenCount,

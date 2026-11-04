@@ -1213,7 +1213,13 @@ private extension DictationSessionCoordinator {
                     route: processed.route.rawValue,
                     releaseToTextMilliseconds: lastReport?.releaseToPasteDurationSeconds
                         .map { Int($0 * 1_000) },
+                    releaseToASRMilliseconds: lastReport?.releaseToASRDurationSeconds
+                        .map { Int($0 * 1_000) },
+                    insertionMilliseconds: lastReport?.insertionDurationSeconds
+                        .map { Int($0 * 1_000) },
                     polishingMilliseconds: Int(processed.polishingDurationSeconds * 1_000),
+                    qwenGeneratedCalls: processed.generatedCallCount,
+                    qwenReusedCalls: processed.reusedCallCount,
                     fallback: processed.failure?.rawValue,
                     rejection: processed.rejectionReason?.rawValue,
                     polisherOutcome: processed.polisherOutcome.rawValue,

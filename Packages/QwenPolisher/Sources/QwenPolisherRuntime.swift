@@ -87,8 +87,14 @@ public struct QwenPolisherResult: Equatable, Sendable {
 /// Low-level MLX generation knobs kept explicit for repeatable performance testing.
 public struct QwenPolisherGenerationConfiguration: Equatable, Sendable {
     /// Meeting-report prefill trades a small throughput cost for lower transient MLX memory.
-    /// Retained after the September 25 report A/B/B/A; interactive dictation uses the initializer.
+    /// Retained after the September 25 report A/B/B/A. It keeps the streamed path, the only
+    /// one that stops after the first JSON object a report asks for.
     public static let meetingReport = Self(prefillStepSize: 128)
+
+    /// A cleaned dictation mostly repeats its transcript, so dictation verifies drafts copied
+    /// from it. November 4 A/B/B/A on 106 real dictations: median polish 1.7 s → 0.52 s; 5
+    /// finals moved by one token each, none toward more edits; 48/48 synthetic finals identical.
+    public static let dictation = Self(promptLookupTokenCount: 16)
 
     /// Explicit text-quality experiment; production remains the default.
     public let promptStyle: PolishingPromptStyle

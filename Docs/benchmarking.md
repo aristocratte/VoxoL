@@ -3,12 +3,34 @@
 Tous les résultats sont des observations associées à un environnement, un commit et un schéma;
 ils ne deviennent jamais des promesses produit sans corpus et protocole publiés.
 
+## Décodage par brouillons de la transcription — 4 novembre 2026
+
+La dictée active maintenant `promptLookupTokenCount = 16` (`QwenPolisherGenerationConfiguration.dictation`).
+Les comptes rendus de réunion gardent le chemin en flux, le seul qui s'arrête après le premier
+objet JSON. Mesure Release en ordre O D D O, avec le modèle et l'adaptateur de production
+(`f5a0d9dd…`, `9df7372a…`), à travers le processeur complet, sur 106 dictées réelles (entrées ASR
+brutes, train et validation) et 48 cas synthétiques :
+
+- dictées réelles : médiane 1 178 → 618 ms, p95 6,5 → 5,5 s, rapport apparié médian 0,54 ;
+  20 à 50 mots 554 → 219 ms ; plus de 70 mots 2,6 → 1,6 s, avec un maximum de 11,8 s : le chemin
+  long reste à traiter ;
+- sorties : chaque configuration reproduit ses textes à l'identique. 6 finales réelles sur 106
+  diffèrent, chacune d'un seul token (ponctuation, mot-outil ou mot plein), et 5 fois sur 6 le
+  nouveau chemin reste plus près de la source. Le chemin en flux varie lui-même d'un candidat entre
+  deux exécutions, et d'une finale entre Debug et Release : l'écart est numérique ;
+- synthétique : 48/48 finales identiques, 35 références propres et 0 témoin modifié des deux côtés.
+
+Ce n'est pas une mesure microphone-vers-insertion. Pour la vérifier en usage réel,
+`dictations.jsonl` enregistre désormais `asrMs`, `insertMs`, `qwenCalls` et `qwenReusedCalls`.
+`--prompt-lookup-tokens off` mesure l'ancien chemin.
+
 ## Réduction de l'attente après dictée — 7 septembre 2026
 
 Le chemin natif prépare maintenant des corrections pendant la capture, puis ne réutilise que
 les calculs correspondant exactement aux entrées finales. Aucun poids, prompt de correction,
 seuil de fidélité, découpage texte de 45 mots ou budget final de 14 secondes n'est assoupli.
-Le décodage spéculatif `promptLookupTokenCount` reste désactivé par défaut.
+Le décodage spéculatif `promptLookupTokenCount` reste désactivé par défaut (activé pour la dictée
+le 4 novembre 2026).
 
 ### Diagnostic de capture et précision — 7 septembre 2026
 
@@ -242,7 +264,8 @@ Le microbenchmark d'annulation utilise deux enregistrements locaux et des sous-e
 La latence annulation-vers-finale moyenne passe de 245,2 à 167,7 ms ; les 20 empreintes de texte
 et de jetons sont identiques. Ce n'est pas une mesure microphone-vers-insertion ni un score WER.
 
-**Expérience conservée désactivée :** `promptLookupTokenCount` reste `nil` en production.
+**Expérience conservée désactivée (promue pour la dictée le 4 novembre 2026) :**
+`promptLookupTokenCount` reste `nil` en production.
 `PromptLookupDecoder.swift` propose des tokens issus de la transcription, les vérifie par Qwen,
 et restaure/rejoue l'état hybride complet lorsqu'un suffixe est rejeté. Il n'ajoute aucun modèle.
 Le lot de 16 tokens réduit la médiane diagnostique de 412,5 à 193 ms, mais change 22 sorties
@@ -276,7 +299,7 @@ BIN=.build/ReleaseBuild/Build/Products/Release/VoxoL.app/Contents/MacOS/VoxoL
 MODEL="$HOME/Library/Application Support/VoxoL/Models/polisher/2fc06364715b967f1860aea9cf38778875588b17"
 SUITE=Tests/Performance/Fixtures/polisher-inference-regression-v1.json
 
-# Deux processus distincts : contrôle puis plafond de buffers, sans décodage expérimental.
+# Deux processus distincts : contrôle puis plafond de buffers, décodage de production.
 /usr/bin/time -l "$BIN" --polisher-smoke --model "$MODEL" --suite "$SUITE" \
   --mlx-cache-mb unlimited > .build/polisher-unlimited.json
 /usr/bin/time -l "$BIN" --polisher-smoke --model "$MODEL" --suite "$SUITE" \
@@ -284,7 +307,7 @@ SUITE=Tests/Performance/Fixtures/polisher-inference-regression-v1.json
 python3 Scripts/compare-polisher-runs.py \
   .build/polisher-unlimited.json .build/polisher-cache64.json
 
-# Recherche uniquement : 0 = greedy direct, 1..16 = vérification par blocs.
+# off = chemin en flux, 0 = greedy direct, 1..16 = vérification par blocs (16 par défaut).
 "$BIN" --polisher-smoke --model "$MODEL" --suite "$SUITE" \
   --prompt-lookup-tokens 16 > .build/polisher-lookup16.json
 ```
