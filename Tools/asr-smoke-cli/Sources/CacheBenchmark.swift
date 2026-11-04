@@ -38,9 +38,21 @@ enum CacheBenchmark {
         guard decoderWorkers == nil || (1...8).contains(decoderWorkers!) else {
             throw Failure.usage
         }
+        let computeUnitsEnvironmentKey = "VOXOL_ASR_CACHE_BENCHMARK_COMPUTE_UNITS"
+        let requestedComputeUnits =
+            ProcessInfo.processInfo.environment[computeUnitsEnvironmentKey] ?? "all"
+        guard let computeUnits = ParakeetComputeUnits(rawValue: requestedComputeUnits) else {
+            throw Failure.usage
+        }
+        let referenceOnly =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_CACHE_BENCHMARK_REFERENCE_ONLY"] == "1"
+        let emitReferenceText =
+            referenceOnly
+            || ProcessInfo.processInfo.environment["VOXOL_ASR_CACHE_BENCHMARK_EMIT_REFERENCE_TEXT"]
+                == "1"
         let runtime = ParakeetRuntime(
             modelRoot: URL(fileURLWithPath: arguments[1]),
-            computeUnits: .all,
+            computeUnits: computeUnits,
             decoderWorkers: decoderWorkers,
             segmentation: segmentation
         )
@@ -72,6 +84,7 @@ enum CacheBenchmark {
             "milliseconds": milliseconds(loadStart.duration(to: clock.now)),
             "thermalState": ProcessInfo.processInfo.thermalState.rawValue,
             "lowPowerMode": ProcessInfo.processInfo.isLowPowerModeEnabled,
+            "computeUnits": requestedComputeUnits,
             "maximumWaveformSampleCount": maximumWaveformSampleCount ?? 0,
             "maximumSegmentSeconds": segmentation.maximumSegmentDurationSeconds,
             "overlapSeconds": segmentation.overlapDurationSeconds,
@@ -107,6 +120,20 @@ enum CacheBenchmark {
             let reference = try await runtime.transcribe(samples: audio)
             let referenceHash = digest(Data(reference.text.utf8))
             let referenceEvidenceHash = try evidenceDigest(reference)
+            if emitReferenceText {
+                emit([
+                    "type": "reference", "id": sample.id,
+                    "sourceGroup": sample.sourceGroup, "language": sample.language,
+                    "audioSHA256": sample.sha256,
+                    "audioSeconds": Double(audio.count) / 16_000,
+                    "text": reference.text,
+                    "textSHA256": referenceHash,
+                    "evidenceSHA256": referenceEvidenceHash,
+                    "attempts": reference.inferenceAttemptCount,
+                    "fallback": reference.usedFallbackSegmentation,
+                ])
+            }
+            if referenceOnly { continue }
             await runtime.beginDictationSession(session)
             if let prefixes = sample.primePrefixSeconds {
                 for seconds in prefixes {

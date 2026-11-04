@@ -117,7 +117,8 @@ private enum CLIError: LocalizedError {
         [--compute-units ane|gpu|cpu|all] <audio-file>
 
         Optional environment: VOXOL_ASR_SEGMENT_SECONDS, VOXOL_ASR_OVERLAP_SECONDS,
-        VOXOL_ASR_SEGMENTATION_THRESHOLD_SECONDS, VOXOL_ASR_CONFIDENCE_RETRY=0
+        VOXOL_ASR_SEGMENTATION_THRESHOLD_SECONDS, VOXOL_ASR_CONFIDENCE_RETRY=0,
+        VOXOL_ASR_CACHE_BENCHMARK_COMPUTE_UNITS=ane|gpu|cpu|all
         """
     }
 }

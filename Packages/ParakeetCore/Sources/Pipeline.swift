@@ -43,7 +43,7 @@ enum Pipeline {
     }
 
     static func run(
-        chunks: [AudioSegment],
+        chunks: AudioSegmentPlan,
         featureExtractor: MelFeatureExtractor,
         runner: ModelRunner,
         sourceCompatibleFeatures: Bool = false,
@@ -112,7 +112,8 @@ enum Pipeline {
                 stages.leave()
             }
             do {
-                for (i, chunk) in chunks.enumerated() {
+                for i in 0..<chunks.count {
+                    let chunk = chunks[i]
                     try cancellationCheck()
                     if globalError.hasError { break }
                     let earlyKey =
@@ -326,7 +327,7 @@ enum Pipeline {
         var totalFrameOffset = 0
         var previousChunk: ChunkResult?
         var orderedChunks = results.ordered(count: chunks.count)
-        if ProcessInfo.processInfo.environment["VOXOL_ASR_SEAM_ALIGNMENT"] == "1",
+        if ProcessInfo.processInfo.environment["VOXOL_ASR_SEAM_ALIGNMENT"] != "0",
             orderedChunks.count > 1
         {
             for index in 1..<orderedChunks.count {

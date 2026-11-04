@@ -287,14 +287,17 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         let decCompiled = try cache.compiledURL(for: decoderURL)
         let joiCompiled = try cache.compiledURL(for: jointURL)
 
-        let encoderConfiguration = MLModelConfiguration()
-        encoderConfiguration.computeUnits = computeUnits.mlComputeUnits
-        if computeUnits == .all {
-            // Amortize additional Core ML specialization during model preparation
-            // to reduce warm encoder latency on the validated all-devices path.
-            var hints = encoderConfiguration.optimizationHints
-            hints.specializationStrategy = .fastPrediction
-            encoderConfiguration.optimizationHints = hints
+        func makeEncoderConfiguration() -> MLModelConfiguration {
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = computeUnits.mlComputeUnits
+            if computeUnits == .all {
+                // Amortize additional Core ML specialization during model preparation
+                // to reduce warm encoder latency on the validated all-devices path.
+                var hints = configuration.optimizationHints
+                hints.specializationStrategy = .fastPrediction
+                configuration.optimizationHints = hints
+            }
+            return configuration
         }
         let decoderConfiguration = MLModelConfiguration()
         let decoderComputeUnits = ProcessInfo.processInfo.environment[
@@ -309,8 +312,28 @@ public final class ParakeetTranscriber: @unchecked Sendable {
 
         let encoder = try MLModel(
             contentsOf: encCompiled,
-            configuration: encoderConfiguration
+            configuration: makeEncoderConfiguration()
         )
+        let useStaticEncoderVariants =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_ENCODER_STATIC_VARIANTS"] == "1"
+        let additionalWaveformEncoders: [MLModel]
+        if useStaticEncoderVariants {
+            let variantSources = ["encoder-20s", "encoder-25s"].compactMap { name in
+                try? ParakeetTranscriber.resolveModel(under: modelsRoot, named: name)
+            }
+            guard !variantSources.isEmpty else {
+                throw ParakeetError.runtimeUnavailable
+            }
+            additionalWaveformEncoders = try variantSources.map { source in
+                let compiled = try cache.compiledURL(for: source)
+                return try MLModel(
+                    contentsOf: compiled,
+                    configuration: makeEncoderConfiguration()
+                )
+            }
+        } else {
+            additionalWaveformEncoders = []
+        }
         let decoder = try MLModel(contentsOf: decCompiled, configuration: decoderConfiguration)
         let joint = try MLModel(contentsOf: joiCompiled, configuration: decoderConfiguration)
         let fusedDecoderJoint: MLModel? = try {
@@ -361,6 +384,7 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             decoder: decoder,
             joint: joint,
             fusedDecoderJoint: fusedDecoderJoint,
+            additionalWaveformEncoders: additionalWaveformEncoders,
             encoderShapes: ModelRunner.EncoderShapes(
                 batch: 1, maxTime: chunkMelFrames, numMelBins: 128
             ),
@@ -397,8 +421,17 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         cancellationCheck: @escaping @Sendable () throws -> Void = {}
     ) throws -> Transcription {
         try cancellationCheck()
-        let audio = try AudioLoader.loadMono16k(at: audioURL)
-        return try transcribe(samples: audio, cancellationCheck: cancellationCheck)
+        let audio = try AudioLoader.mapMono16k(
+            at: audioURL,
+            cancellationCheck: cancellationCheck
+        )
+        return try transcribe(
+            storage: .mappedPCM(audio.data, sampleCount: audio.sampleCount),
+            sampleCount: audio.sampleCount,
+            cancellationCheck: cancellationCheck,
+            encoderCache: nil,
+            sessionID: nil
+        )
     }
 
     /// Transcribe an already-loaded mono `Float` buffer at ``sampleRate``.
@@ -430,9 +463,30 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         collectLogitMargins: Bool = true,
         retryLongForm: Bool = true
     ) throws -> Transcription {
+        try transcribe(
+            storage: .memory(samples),
+            sampleCount: samples.count,
+            cancellationCheck: cancellationCheck,
+            encoderCache: encoderCache,
+            sessionID: sessionID,
+            collectLogitMargins: collectLogitMargins,
+            retryLongForm: retryLongForm
+        )
+    }
+
+    private func transcribe(
+        storage: AudioSampleStorage,
+        sampleCount: Int,
+        cancellationCheck: @escaping @Sendable () throws -> Void,
+        encoderCache: EncoderResultCache?,
+        sessionID: UUID?,
+        collectLogitMargins: Bool = true,
+        retryLongForm: Bool = true
+    ) throws -> Transcription {
         try cancellationCheck()
         let primary = try transcribeSinglePass(
-            samples: samples,
+            storage: storage,
+            sampleCount: sampleCount,
             segmentation: segmentation,
             cancellationCheck: cancellationCheck,
             encoderCache: encoderCache,
@@ -453,7 +507,8 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         }
 
         let fallback = try transcribeSinglePass(
-            samples: samples,
+            storage: storage,
+            sampleCount: sampleCount,
             segmentation: retryConfiguration.fallbackSegmentation,
             cancellationCheck: cancellationCheck,
             encoderCache: encoderCache,
@@ -475,14 +530,15 @@ public final class ParakeetTranscriber: @unchecked Sendable {
     }
 
     private func transcribeSinglePass(
-        samples: [Float],
+        storage: AudioSampleStorage,
+        sampleCount: Int,
         segmentation: ParakeetSegmentationConfiguration,
         cancellationCheck: @escaping @Sendable () throws -> Void,
         encoderCache: EncoderResultCache?,
         sessionID: UUID?,
         collectLogitMargins: Bool
     ) throws -> Transcription {
-        let audioDuration = Double(samples.count) / Double(sampleRate)
+        let audioDuration = Double(sampleCount) / Double(sampleRate)
         // The direct-waveform runtime declares its exact sample capacity.
         // Feature-input runtimes retain the centered-STFT frame calculation.
         let modelWindowSamples = AudioSegmenter.modelWindowSampleCount(
@@ -494,15 +550,12 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         // exactly one 10 ms hop. Trimming only that final hop avoids a costly
         // two-window decode and its overlap ambiguity.
         let singlePassSampleCount = AudioSegmenter.singlePassSampleCount(
-            inputSampleCount: samples.count,
+            inputSampleCount: sampleCount,
             maximumSampleCount: modelWindowSamples,
             overflowToleranceSampleCount:
                 runner.maximumWaveformSampleCount == nil
                 ? 0 : featureExtractor.hopLength
         )
-        let inferenceSamples =
-            singlePassSampleCount == samples.count
-            ? samples : Array(samples.prefix(singlePassSampleCount))
         let configuredMaximumSamples = Int(
             segmentation.maximumSegmentDurationSeconds * Double(sampleRate)
         )
@@ -524,8 +577,9 @@ public final class ParakeetTranscriber: @unchecked Sendable {
                 )
             )
         )
-        let chunks = AudioSegmenter.makeSegments(
-            samples: inferenceSamples,
+        let chunks = AudioSegmenter.makeSegmentPlan(
+            storage: storage,
+            sampleCount: singlePassSampleCount,
             maximumSamples: maximumSegmentSamples,
             overlapSamples: overlapSamples,
             segmentationThresholdSamples: segmentationThresholdSamples

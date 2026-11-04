@@ -161,6 +161,30 @@ public actor ParakeetRuntime {
         )
     }
 
+    /// Runs one final transcription from a file without retaining the complete
+    /// resampled waveform in heap memory. Intended for long-form imports; live
+    /// dictation continues to use the already-captured sample buffer path.
+    public func transcribe(audioURL: URL) async throws -> Transcription {
+        try Task.checkCancellation()
+        try await prepare()
+        guard let transcriber else {
+            throw ParakeetError.runtimeUnavailable
+        }
+
+        let cancellation = InferenceCancellation()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            let result = try transcriber.transcribe(
+                audioURL: audioURL,
+                cancellationCheck: { try cancellation.check() }
+            )
+            try Task.checkCancellation()
+            return result
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+
     /// Runs a provisional live preview. The app only consumes its text, so avoid
     /// confidence-margin scans and long-form retry work that is repeated by the
     /// evidence-bearing final transcription on release.

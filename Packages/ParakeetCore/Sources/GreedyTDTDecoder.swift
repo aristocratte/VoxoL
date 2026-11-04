@@ -89,6 +89,8 @@ enum GreedyTDTDecoder {
         let inputIds = worker.inputIds
         let jointEncFrame = worker.encoderFrame
         let jointDecState = worker.decoderState
+        let useSharedDecoderStateBacking =
+            useOutputBackings && worker.usesSharedDecoderStateBacking
         zero(hidden)
         zero(cell)
         zero(candidateHidden)
@@ -149,17 +151,19 @@ enum GreedyTDTDecoder {
             nextHidden: MLMultiArray,
             nextCell: MLMultiArray
         ) {
-            let decShape = decoderHidden.shape.map(\.intValue)
-            let decU = decShape.count >= 3 ? decShape[decShape.count - 2] : 1
-            let lastT = decU - 1
-            let outPtr = decoderHidden.dataPointer.bindMemory(
-                to: Float32.self, capacity: decoderHidden.count
-            )
-            memcpy(
-                decStatePtr,
-                outPtr.advanced(by: lastT * hiddenSize),
-                hiddenSize * MemoryLayout<Float32>.size
-            )
+            if !useSharedDecoderStateBacking {
+                let decShape = decoderHidden.shape.map(\.intValue)
+                let decU = decShape.count >= 3 ? decShape[decShape.count - 2] : 1
+                let lastT = decU - 1
+                let outPtr = decoderHidden.dataPointer.bindMemory(
+                    to: Float32.self, capacity: decoderHidden.count
+                )
+                memcpy(
+                    decStatePtr,
+                    outPtr.advanced(by: lastT * hiddenSize),
+                    hiddenSize * MemoryLayout<Float32>.size
+                )
+            }
             copyMultiArray(from: nextHidden, to: candidateHidden)
             copyMultiArray(from: nextCell, to: candidateCell)
         }

@@ -12,6 +12,15 @@ final class TokenSeamAlignmentTests: XCTestCase {
         XCTAssertEqual(result, .init(previousEnd: 2, currentStart: 0))
     }
 
+    func testAlignedAnchorDropsDuplicatedCurrentPrefix() {
+        let result = TokenSeamAlignment.select(
+            previousTokens: [10, 11, 12, 13, 14, 15],
+            previousFrames: [0, 20, 40, 45, 50, 55], previousValidFrames: 60,
+            minimumPreviousIndex: 0, currentTokens: [999, 12, 13, 14, 15, 16],
+            currentFrames: [0, 0, 5, 10, 15, 20], overlapFrames: 20)
+        XCTAssertEqual(result, .init(previousEnd: 2, currentStart: 1))
+    }
+
     func testNoOverlapDoesNotChangeASeam() {
         XCTAssertNil(
             TokenSeamAlignment.select(

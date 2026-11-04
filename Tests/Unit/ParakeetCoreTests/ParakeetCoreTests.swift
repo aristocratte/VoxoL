@@ -65,6 +65,44 @@ final class ParakeetCoreTests: XCTestCase {
         )
     }
 
+    func testWaveformEncoderCapacityChoosesSmallestSufficientFunction() {
+        let capacities = [480_000, 320_000, 400_000]
+        XCTAssertEqual(
+            ModelRunner.waveformEncoderCapacity(
+                sampleCount: 160_000,
+                availableCapacities: capacities
+            ),
+            320_000
+        )
+        XCTAssertEqual(
+            ModelRunner.waveformEncoderCapacity(
+                sampleCount: 320_000,
+                availableCapacities: capacities
+            ),
+            320_000
+        )
+        XCTAssertEqual(
+            ModelRunner.waveformEncoderCapacity(
+                sampleCount: 320_001,
+                availableCapacities: capacities
+            ),
+            400_000
+        )
+        XCTAssertEqual(
+            ModelRunner.waveformEncoderCapacity(
+                sampleCount: 400_001,
+                availableCapacities: capacities
+            ),
+            480_000
+        )
+        XCTAssertNil(
+            ModelRunner.waveformEncoderCapacity(
+                sampleCount: 480_001,
+                availableCapacities: capacities
+            )
+        )
+    }
+
     func testWaveformRuntimeUsesItsExactThirtySecondCapacity() {
         XCTAssertEqual(
             AudioSegmenter.modelWindowSampleCount(
@@ -156,6 +194,49 @@ final class ParakeetCoreTests: XCTestCase {
         )
     }
 
+    func testLazyAudioSegmentPlanMatchesMaterializedSegments() {
+        let samples = (0..<37).map(Float.init)
+        let eager = AudioSegmenter.makeSegments(
+            samples: samples,
+            maximumSamples: 10,
+            overlapSamples: 3,
+            segmentationThresholdSamples: 12
+        )
+        let plan = AudioSegmenter.makeSegmentPlan(
+            samples: samples,
+            maximumSamples: 10,
+            overlapSamples: 3,
+            segmentationThresholdSamples: 12
+        )
+
+        XCTAssertEqual(plan.count, eager.count)
+        XCTAssertEqual((0..<plan.count).map { plan[$0] }, eager)
+    }
+
+    func testMappedAudioSegmentPlanMatchesMemoryStorage() {
+        let samples = (0..<37).map(Float.init)
+        let data = samples.withUnsafeBytes { Data($0) }
+        let memory = AudioSegmenter.makeSegmentPlan(
+            samples: samples,
+            maximumSamples: 10,
+            overlapSamples: 3,
+            segmentationThresholdSamples: 12
+        )
+        let mapped = AudioSegmenter.makeSegmentPlan(
+            storage: .mappedPCM(data, sampleCount: samples.count),
+            sampleCount: samples.count,
+            maximumSamples: 10,
+            overlapSamples: 3,
+            segmentationThresholdSamples: 12
+        )
+
+        XCTAssertEqual(mapped.count, memory.count)
+        XCTAssertEqual(
+            (0..<mapped.count).map { mapped[$0] },
+            (0..<memory.count).map { memory[$0] }
+        )
+    }
+
     func testAudioSegmenterLeavesShortInputUntouched() {
         let samples = (0..<5).map(Float.init)
 
@@ -185,6 +266,29 @@ final class ParakeetCoreTests: XCTestCase {
             segments,
             [AudioSegment(samples: samples, discardPrefixSamples: 0)]
         )
+    }
+
+    func testTwentySecondWaveformWindowReconstructsTwentyOneSecondInput() {
+        let sampleRate = 16_000
+        let samples = (0..<(21 * sampleRate)).map(Float.init)
+
+        let segments = AudioSegmenter.makeSegments(
+            samples: samples,
+            maximumSamples: 20 * sampleRate,
+            overlapSamples: Int(2.5 * Double(sampleRate)),
+            segmentationThresholdSamples: 20 * sampleRate
+        )
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertEqual(segments[0].samples.count, 320_000)
+        XCTAssertEqual(segments[0].discardPrefixSamples, 0)
+        XCTAssertEqual(segments[1].samples.count, 56_000)
+        XCTAssertEqual(segments[1].discardPrefixSamples, 40_000)
+
+        let reconstructed = segments.enumerated().flatMap { index, segment in
+            Array(segment.samples.dropFirst(index == 0 ? 0 : segment.discardPrefixSamples))
+        }
+        XCTAssertEqual(reconstructed, samples)
     }
 
     func testAudioSegmenterMapsRepeatedSamplesToEncoderFrames() {

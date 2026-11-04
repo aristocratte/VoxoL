@@ -28,6 +28,8 @@ final class DecoderWorker: @unchecked Sendable {
 
     let decoderInputs: FeatureBag
     let jointInputs: FeatureBag
+    private let sharedDecoderState: MLMultiArray?
+    private let sharedJointInputs: FeatureBag?
     private lazy var fusedDecoderJointInputs: FeatureBag? = {
         guard fusedDecoderJoint != nil else { return nil }
         return FeatureBag([
@@ -45,6 +47,7 @@ final class DecoderWorker: @unchecked Sendable {
     private let nextCellBacking: MLMultiArray?
     private let tokenLogitsBacking: MLMultiArray?
     private let durationLogitsBacking: MLMultiArray?
+    private let useSharedDecoderStateBacking: Bool
     private let traceDecoderStages =
         ProcessInfo.processInfo.environment["VOXOL_ASR_DECODER_STAGE_TRACE"] == "1"
     private let traceOutputBackings =
@@ -99,48 +102,63 @@ final class DecoderWorker: @unchecked Sendable {
             ],
             dataType: .float32
         )
-        self.encoderFrame = try MLMultiArray(
+        let encoderFrame = try MLMultiArray(
             shape: [1, NSNumber(value: decoderHiddenSize)],
             dataType: .float32
         )
-        self.decoderState = try MLMultiArray(
+        self.encoderFrame = encoderFrame
+        let decoderState = try MLMultiArray(
             shape: [1, NSNumber(value: decoderHiddenSize)],
             dataType: .float32
         )
+        self.decoderState = decoderState
 
-        self.decoderHiddenBacking = try Self.makeOutputBacking(
+        let decoderHiddenBacking = try Self.makeOutputBacking(
             for: decoder, outputName: "decoder_hidden"
         )
-        self.nextHiddenBacking = try Self.makeOutputBacking(
+        self.decoderHiddenBacking = decoderHiddenBacking
+        let nextHiddenBacking = try Self.makeOutputBacking(
             for: decoder, outputName: "next_hidden"
         )
-        self.nextCellBacking = try Self.makeOutputBacking(
+        self.nextHiddenBacking = nextHiddenBacking
+        let nextCellBacking = try Self.makeOutputBacking(
             for: decoder, outputName: "next_cell"
         )
-        self.tokenLogitsBacking = try Self.makeOutputBacking(
+        self.nextCellBacking = nextCellBacking
+        let tokenLogitsBacking = try Self.makeOutputBacking(
             for: joint, outputName: "token_logits"
         )
-        self.durationLogitsBacking = try Self.makeOutputBacking(
+        self.tokenLogitsBacking = tokenLogitsBacking
+        let durationLogitsBacking = try Self.makeOutputBacking(
             for: joint, outputName: "duration_logits"
         )
+        self.durationLogitsBacking = durationLogitsBacking
+
+        let useSharedDecoderStateBacking =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_SHARED_DECODER_STATE_BACKING"] == "1"
+        self.useSharedDecoderStateBacking = useSharedDecoderStateBacking
+        let sharedDecoderState = useSharedDecoderStateBacking
+            ? try Self.makeSharedDecoderState(
+                decoderHiddenBacking: decoderHiddenBacking,
+                joint: joint,
+                decoderHiddenSize: decoderHiddenSize
+            )
+            : nil
+        self.sharedDecoderState = sharedDecoderState
 
         let decoderPredictionOptions = MLPredictionOptions()
-        if let decoderHiddenBacking, let nextHiddenBacking, let nextCellBacking {
-            decoderPredictionOptions.outputBackings = [
-                "decoder_hidden": decoderHiddenBacking,
-                "next_hidden": nextHiddenBacking,
-                "next_cell": nextCellBacking,
-            ]
-        }
+        decoderPredictionOptions.outputBackings = [
+            "decoder_hidden": decoderHiddenBacking,
+            "next_hidden": nextHiddenBacking,
+            "next_cell": nextCellBacking,
+        ]
         self.decoderPredictionOptions = decoderPredictionOptions
 
         let jointPredictionOptions = MLPredictionOptions()
-        if let tokenLogitsBacking, let durationLogitsBacking {
-            jointPredictionOptions.outputBackings = [
-                "token_logits": tokenLogitsBacking,
-                "duration_logits": durationLogitsBacking,
-            ]
-        }
+        jointPredictionOptions.outputBackings = [
+            "token_logits": tokenLogitsBacking,
+            "duration_logits": durationLogitsBacking,
+        ]
         self.jointPredictionOptions = jointPredictionOptions
 
         self.decoderInputs = FeatureBag([
@@ -152,10 +170,20 @@ final class DecoderWorker: @unchecked Sendable {
             "encoder_frame": MLFeatureValue(multiArray: encoderFrame),
             "decoder_state": MLFeatureValue(multiArray: decoderState),
         ])
+        self.sharedJointInputs = sharedDecoderState.map {
+            FeatureBag([
+                "encoder_frame": MLFeatureValue(multiArray: encoderFrame),
+                "decoder_state": MLFeatureValue(multiArray: $0),
+            ])
+        }
     }
 
     var hasFusedDecoderJoint: Bool {
         fusedDecoderJoint != nil
+    }
+
+    var usesSharedDecoderStateBacking: Bool {
+        useSharedDecoderStateBacking && sharedJointInputs != nil && fusedDecoderJoint == nil
     }
 
     func runDecoderStep(useOutputBackings: Bool = false) throws -> (
@@ -233,8 +261,11 @@ final class DecoderWorker: @unchecked Sendable {
             return try runJointTraced(useOutputBackings: useOutputBackings)
         }
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
+        let inputs = useOutputBackings && usesSharedDecoderStateBacking
+            ? sharedJointInputs!
+            : jointInputs
         let out = try joint.prediction(
-            from: jointInputs, options: options
+            from: inputs, options: options
         )
         if useOutputBackings, useDirectOutputBackings, !traceOutputBackings,
            let tl = tokenLogitsBacking,
@@ -259,8 +290,11 @@ final class DecoderWorker: @unchecked Sendable {
         let clock = ContinuousClock()
         let predictionStart = clock.now
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
+        let inputs = useOutputBackings && usesSharedDecoderStateBacking
+            ? sharedJointInputs!
+            : jointInputs
         let out = try joint.prediction(
-            from: jointInputs, options: options
+            from: inputs, options: options
         )
         let outputStart = clock.now
         guard let tl = out.featureValue(for: "token_logits")?.multiArrayValue
@@ -337,6 +371,30 @@ final class DecoderWorker: @unchecked Sendable {
             throw ParakeetError.runtimeUnavailable
         }
         return backing
+    }
+
+    private static func makeSharedDecoderState(
+        decoderHiddenBacking: MLMultiArray,
+        joint: MLModel,
+        decoderHiddenSize: Int
+    ) throws -> MLMultiArray {
+        guard decoderHiddenBacking.dataType == .float32,
+              decoderHiddenBacking.count == decoderHiddenSize,
+              let description = joint.modelDescription.inputDescriptionsByName["decoder_state"]
+        else {
+            throw ParakeetError.runtimeUnavailable
+        }
+        let shared = try MLMultiArray(
+            dataPointer: decoderHiddenBacking.dataPointer,
+            shape: [1, NSNumber(value: decoderHiddenSize)],
+            dataType: decoderHiddenBacking.dataType,
+            strides: [NSNumber(value: decoderHiddenSize), 1],
+            deallocator: nil
+        )
+        guard description.isAllowedValue(MLFeatureValue(multiArray: shared)) else {
+            throw ParakeetError.runtimeUnavailable
+        }
+        return shared
     }
 
     private func traceDecoderOutputBackingIdentity(

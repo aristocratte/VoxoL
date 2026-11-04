@@ -32,6 +32,14 @@ final class ModelRunner: @unchecked Sendable {
         )
     }
 
+    private struct WaveformEncoderVariant {
+        let model: MLModel
+        let audio: MLMultiArray
+        let length: MLMultiArray
+        let inputs: FeatureBag
+        let maximumSampleCount: Int
+    }
+
     private let encoder: MLModel
     private let decoder: MLModel
     private let joint: MLModel
@@ -53,6 +61,7 @@ final class ModelRunner: @unchecked Sendable {
     // MARK: - Encoder inputs (single-instance)
 
     private let encoderInputs: EncoderInputStorage
+    private let waveformEncoderVariants: [WaveformEncoderVariant]
     let predictionOptions = MLPredictionOptions()
     private let traceEncoderStages =
         ProcessInfo.processInfo.environment["VOXOL_ASR_ENCODER_STAGE_TRACE"] == "1"
@@ -70,6 +79,7 @@ final class ModelRunner: @unchecked Sendable {
         decoder: MLModel,
         joint: MLModel,
         fusedDecoderJoint: MLModel? = nil,
+        additionalWaveformEncoders: [MLModel] = [],
         encoderShapes: EncoderShapes,
         decoderHiddenLayers: Int,
         decoderHiddenSize: Int,
@@ -94,6 +104,9 @@ final class ModelRunner: @unchecked Sendable {
         let inputDescriptions = encoder.modelDescription.inputDescriptionsByName
         switch try Self.encoderInputKind(inputNames: Set(inputDescriptions.keys)) {
         case .features:
+            guard additionalWaveformEncoders.isEmpty else {
+                throw ParakeetError.runtimeUnavailable
+            }
             let features = try MLMultiArray(
                 shape: [
                     NSNumber(value: 1),
@@ -114,32 +127,27 @@ final class ModelRunner: @unchecked Sendable {
                     "attention_mask": MLFeatureValue(multiArray: mask),
                 ])
             )
+            waveformEncoderVariants = []
         case .waveform:
-            guard
-                let audioDescription = inputDescriptions["audio_signal"],
-                let audioConstraint = audioDescription.multiArrayConstraint,
-                audioConstraint.shape.count == 2
-            else {
+            let primary = try Self.makeWaveformEncoderVariant(model: encoder)
+            encoderInputs = .waveform(
+                audio: primary.audio,
+                length: primary.length,
+                bag: primary.inputs,
+                maximumSampleCount: primary.maximumSampleCount
+            )
+            var variants = [primary]
+            variants.append(
+                contentsOf: try additionalWaveformEncoders.map {
+                    try Self.makeWaveformEncoderVariant(model: $0)
+                }
+            )
+            variants.sort { $0.maximumSampleCount < $1.maximumSampleCount }
+            let capacities = variants.map(\.maximumSampleCount)
+            guard Set(capacities).count == capacities.count else {
                 throw ParakeetError.runtimeUnavailable
             }
-            let maximumSampleCount = audioConstraint.shape[1].intValue
-            let audio = try MLMultiArray(
-                shape: [NSNumber(value: 1), NSNumber(value: maximumSampleCount)],
-                dataType: .float32
-            )
-            let length = try MLMultiArray(
-                shape: [NSNumber(value: 1)],
-                dataType: .int32
-            )
-            encoderInputs = .waveform(
-                audio: audio,
-                length: length,
-                bag: FeatureBag([
-                    "audio_signal": MLFeatureValue(multiArray: audio),
-                    "audio_length": MLFeatureValue(multiArray: length),
-                ]),
-                maximumSampleCount: maximumSampleCount
-            )
+            waveformEncoderVariants = variants
         }
 
         // --- Decoder worker pool ---
@@ -171,10 +179,10 @@ final class ModelRunner: @unchecked Sendable {
     }
 
     var maximumWaveformSampleCount: Int? {
-        guard case .waveform(_, _, _, let maximumSampleCount) = encoderInputs else {
+        guard case .waveform = encoderInputs else {
             return nil
         }
-        return maximumSampleCount
+        return waveformEncoderVariants.last?.maximumSampleCount
     }
 
     /// Runs one throwaway encoder prediction so Core ML can finish any first-use
@@ -183,10 +191,22 @@ final class ModelRunner: @unchecked Sendable {
         switch encoderInputs {
         case .features:
             _ = try runEncoder(features: [], mask: [])
-        case .waveform(_, _, _, let maximumSampleCount):
-            let sampleCount = min(maximumSampleCount, 16_000)
-            _ = try runEncoder(samples: [Float](repeating: 0, count: sampleCount))
+        case .waveform:
+            for variant in waveformEncoderVariants {
+                let sampleCount = min(variant.maximumSampleCount, 16_000)
+                _ = try runEncoder(
+                    samples: [Float](repeating: 0, count: sampleCount),
+                    using: variant
+                )
+            }
         }
+    }
+
+    static func waveformEncoderCapacity(
+        sampleCount: Int,
+        availableCapacities: [Int]
+    ) -> Int? {
+        availableCapacities.sorted().first { sampleCount <= $0 }
     }
 
     static func encoderInputKind(inputNames: Set<String>) throws -> EncoderInputKind {
@@ -248,12 +268,28 @@ final class ModelRunner: @unchecked Sendable {
         samples: [Float]
     ) throws -> (hidden: MLMultiArray, mask: MLMultiArray) {
         guard
-            case .waveform(let audio, let length, let inputs, let maximumSampleCount) =
-                encoderInputs,
-            samples.count <= maximumSampleCount
+            case .waveform = encoderInputs,
+            let capacity = Self.waveformEncoderCapacity(
+                sampleCount: samples.count,
+                availableCapacities: waveformEncoderVariants.map(\.maximumSampleCount)
+            ),
+            let variant = waveformEncoderVariants.first(where: {
+                $0.maximumSampleCount == capacity
+            })
         else {
             throw ParakeetError.runtimeUnavailable
         }
+        return try runEncoder(samples: samples, using: variant)
+    }
+
+    private func runEncoder(
+        samples: [Float],
+        using variant: WaveformEncoderVariant
+    ) throws -> (hidden: MLMultiArray, mask: MLMultiArray) {
+        let audio = variant.audio
+        let length = variant.length
+        let inputs = variant.inputs
+        let maximumSampleCount = variant.maximumSampleCount
         let clock = ContinuousClock()
         let prepareStart = clock.now
         let audioPointer = audio.dataPointer.bindMemory(
@@ -276,7 +312,7 @@ final class ModelRunner: @unchecked Sendable {
         length.dataPointer.bindMemory(to: Int32.self, capacity: 1)[0] =
             Int32(samples.count)
         let predictionStart = clock.now
-        let out = try encoder.prediction(
+        let out = try variant.model.prediction(
             from: inputs,
             options: predictionOptions
         )
@@ -293,6 +329,39 @@ final class ModelRunner: @unchecked Sendable {
             )
         }
         return outputs
+    }
+
+    private static func makeWaveformEncoderVariant(
+        model: MLModel
+    ) throws -> WaveformEncoderVariant {
+        let inputDescriptions = model.modelDescription.inputDescriptionsByName
+        guard
+            try encoderInputKind(inputNames: Set(inputDescriptions.keys)) == .waveform,
+            let audioDescription = inputDescriptions["audio_signal"],
+            let audioConstraint = audioDescription.multiArrayConstraint,
+            audioConstraint.shape.count == 2
+        else {
+            throw ParakeetError.runtimeUnavailable
+        }
+        let maximumSampleCount = audioConstraint.shape[1].intValue
+        let audio = try MLMultiArray(
+            shape: [NSNumber(value: 1), NSNumber(value: maximumSampleCount)],
+            dataType: .float32
+        )
+        let length = try MLMultiArray(
+            shape: [NSNumber(value: 1)],
+            dataType: .int32
+        )
+        return WaveformEncoderVariant(
+            model: model,
+            audio: audio,
+            length: length,
+            inputs: FeatureBag([
+                "audio_signal": MLFeatureValue(multiArray: audio),
+                "audio_length": MLFeatureValue(multiArray: length),
+            ]),
+            maximumSampleCount: maximumSampleCount
+        )
     }
 
     private func encoderOutputs(
