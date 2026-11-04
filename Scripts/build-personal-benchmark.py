@@ -8,9 +8,9 @@ including the numbers, the punctuation and the technical vocabulary the public
 scorers normalise away or never contain.
 
 The app's "Personal benchmark capture" setting stores each dictation as a
-session directory: `audio.wav`, `meta.json`, and a `corrected.txt` pre-filled
-with what was inserted. Reviewing a session means fixing that file; an
-untouched file records "the output was right", which is itself signal.
+session directory with audio, metadata and four review references. The
+faithful reference is used for the clean benchmark; legacy `corrected.txt`
+files remain supported.
 
 This builds a frozen benchmark from the sessions and scores what the app
 actually inserted against the corrected references. With `--rerun-asr` it also
@@ -24,11 +24,48 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 
 LANGUAGES = {"fr": "french", "en": "english"}
+CRITICAL_PATTERNS = (
+    ("url", re.compile(r"https?://\S+", re.IGNORECASE)),
+    ("email", re.compile(r"\b\S+@\S+\.\S+\b")),
+    ("path", re.compile(r"(?<!\w)(?:~?/|/)[\w./~-]+")),
+    ("command", re.compile(r"(?<!\w)--?[A-Za-z][\w-]*")),
+    ("number", re.compile(r"(?<!\w)\d[\d.,:/%-]*(?!\w)")),
+    (
+        "code",
+        re.compile(
+            r"\b(?:[A-Z]{2,}[A-Za-z0-9]*|[a-z]+[A-Z][A-Za-z0-9]*|[A-Z][a-z]+[A-Z0-9][A-Za-z0-9]*)\b"
+        ),
+    ),
+    (
+        "negation",
+        re.compile(
+            r"\b(?:no|not|never|without|ne|pas|jamais|sans|aucun|aucune)\b|\bn['’]",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+
+def critical_spans(text: str) -> list[dict[str, object]]:
+    matches: list[tuple[int, int, str, str]] = []
+    for kind, pattern in CRITICAL_PATTERNS:
+        for match in pattern.finditer(text):
+            expected = match.group(0).rstrip(".,;:!?")
+            matches.append((match.start(), match.start() + len(expected), kind, expected))
+    result = []
+    occupied: list[tuple[int, int]] = []
+    for start, end, kind, expected in sorted(matches, key=lambda item: (item[0], -(item[1] - item[0]))):
+        if not expected or any(start < used_end and end > used_start for used_start, used_end in occupied):
+            continue
+        occupied.append((start, end))
+        result.append({"kind": kind, "expected": expected, "acceptedAlternatives": []})
+    return result
 
 
 def sessions_in(root: Path) -> list[dict]:
@@ -37,21 +74,48 @@ def sessions_in(root: Path) -> list[dict]:
         meta_path = directory / "meta.json"
         audio = directory / "audio.wav"
         corrected = directory / "corrected.txt"
+        faithful = directory / "faithful.txt"
         if not (meta_path.is_file() and audio.is_file()):
             continue
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        if not corrected.is_file():
-            # A session captured before the review file existed, or deleted by
-            # hand: re-seed it from the inserted text so it can be reviewed.
-            corrected.write_text(meta.get("finalText", ""), encoding="utf-8")
-        reference = corrected.read_text(encoding="utf-8").strip()
+        reference_path = faithful if faithful.is_file() else corrected
+        reference = (
+            reference_path.read_text(encoding="utf-8").strip()
+            if reference_path.is_file() else ""
+        )
         if not reference:
             continue
+        verbatim_path = directory / "verbatim.txt"
+        verbatim_reference = (
+            verbatim_path.read_text(encoding="utf-8").strip()
+            if verbatim_path.is_file()
+            else ""
+        )
+        review_path = directory / "review.json"
+        review = (
+            json.loads(review_path.read_text(encoding="utf-8"))
+            if review_path.is_file()
+            else {}
+        )
+        accepted = review.get("status") == "accepted" and bool(verbatim_reference)
+        provenance = review.get("provenance", {})
+        reference_tier = (
+            str(provenance.get("tier", "ensemble-candidate"))
+            if accepted
+            else "unverified-capture"
+        )
         result.append(
             {
                 "name": directory.name,
                 "meta": meta,
                 "reference": reference,
+                "verbatim_reference": verbatim_reference,
+                "clean_reference": reference,
+                "reference_tier": reference_tier,
+                "reference_ready": accepted,
+                "human_reviewed": provenance.get("human_reviewed") is True
+                if accepted
+                else False,
                 "audioPath": f"sessions/{directory.name}/audio.wav",
             }
         )
@@ -72,12 +136,16 @@ def manifest_for(sessions: list[dict]) -> dict:
                 "language": LANGUAGES.get(meta.get("language", ""), "mixed"),
                 "microphone": "owner-microphone",
                 "environment": "owner-environment",
-                "tags": ["personal", str(meta.get("engine", "unknown"))],
+                "tags": [
+                    "personal",
+                    str(meta.get("engine", "unknown")),
+                    f"reference-{session['reference_tier']}",
+                ],
                 "reference": {
-                    "verbatim": session["reference"],
-                    "clean": session["reference"],
-                    "criticalSpans": [],
-                    "reviewed": True,
+                    "verbatim": session["verbatim_reference"],
+                    "clean": session["clean_reference"],
+                    "criticalSpans": critical_spans(session["clean_reference"]),
+                    "reviewed": session["reference_ready"],
                 },
             }
         )
@@ -89,8 +157,8 @@ def manifest_for(sessions: list[dict]) -> dict:
     }
 
 
-def wer_of(report: Path) -> float:
-    counts = json.loads(report.read_text())["finalClean"]["wordErrors"]
+def wer_of(report: Path, stage: str = "finalClean") -> float:
+    counts = json.loads(report.read_text())[stage]["wordErrors"]
     total = counts["substitutions"] + counts["deletions"] + counts["insertions"]
     return 100 * total / max(counts["referenceUnitCount"], 1)
 
@@ -124,12 +192,15 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    sessions = sessions_in(arguments.root)
+    captured = sessions_in(arguments.root)
+    sessions = [session for session in captured if session["reference_ready"]]
+    if len(captured) != len(sessions):
+        print(f"Excluded {len(captured) - len(sessions)} sessions without accepted, separate references.")
     if not sessions:
         print(
-            "Aucune session capturée.\n"
+            "Aucune session avec deux références acceptées.\n"
             "Active « Personal benchmark capture » dans les réglages, dicte "
-            "normalement, corrige les corrected.txt fautifs, puis relance."
+            "normalement, révise les références dans Training Studio, puis relance."
         )
         return 0
 
@@ -257,7 +328,7 @@ def main() -> int:
             check=True,
             capture_output=True,
         )
-        print(f"WER ASR (modèle actuel rejoué) : {wer_of(asr_report):.2f}%")
+        print(f"WER ASR verbatim (modèle actuel rejoué) : {wer_of(asr_report, 'rawVerbatim'):.2f}%")
 
     return 0
 

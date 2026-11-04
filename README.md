@@ -46,7 +46,8 @@ techniques réels sans simuler le moteur :
 - une identité VoxoL monochrome déclinée dans l'app, la barre des menus et l'icône macOS ;
 - un aperçu « Coming soon » du futur mode réunion, encore inaccessible ;
 - le contrat local des deux modèles autorisés, sans poids ;
-- les contrôles CI de build, tests, formatage, localisation et politique du dépôt.
+- les contrôles CI de politique du dépôt, formatage, build et tests ; la localisation, la
+  signature et le lancement se vérifient localement avec `./Scripts/verify.sh`.
 
 La dictée Parakeet fonctionne jusqu'à l'insertion et à l'historique. Le nettoyage Qwen via MLX est
 branché derrière un prétraitement déterministe et un validateur de fidélité ; le mode instantané

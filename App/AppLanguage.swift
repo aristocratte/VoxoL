@@ -82,6 +82,9 @@ enum DictationLanguagePreference: String, CaseIterable, Identifiable {
     }
 
     static var preferred: DictationLanguagePreference {
-        AppLanguage.preferred == .french ? .french : .english
+        // A UI language is not a promise that every spoken span uses that language.
+        // Starting in explicit French loads a decoder penalty against English-heavy
+        // tokens, which damages ordinary French sentences containing English terms.
+        .automatic
     }
 }

@@ -10,7 +10,7 @@ final class VoxoLTheme {
     let surface = Color(nsColor: .voxol(light: 0xFFFDF8, dark: 0x22201D))
     let raisedSurface = Color(nsColor: .voxol(light: 0xFFFFFF, dark: 0x292621))
     let ink = Color(nsColor: .voxol(light: 0x171713, dark: 0xF5F1E9))
-    let secondaryInk = Color(nsColor: .voxol(light: 0x77736A, dark: 0xB8B1A6))
+    let secondaryInk = Color(nsColor: .voxol(light: 0x69655D, dark: 0xB8B1A6))
     let line = Color(nsColor: .voxol(light: 0xE8E8E2, dark: 0x3A3631))
     let selection = Color(nsColor: .voxol(light: 0xEEEBE2, dark: 0x34302B))
     let recording = Color(nsColor: .voxol(light: 0xC84D45, dark: 0xE06A62))

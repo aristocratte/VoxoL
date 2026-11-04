@@ -206,6 +206,9 @@ def copy_runtime_support(template_root: Path, destination: Path) -> None:
     if not tokenizer.is_file():
         raise FileNotFoundError(f"Missing runtime tokenizer: {tokenizer}")
     shutil.copy2(tokenizer, destination / tokenizer.name)
+    language_penalty = template_root / "language-penalty.json"
+    if language_penalty.is_file():
+        shutil.copy2(language_penalty, destination / language_penalty.name)
 
 
 def directory_size(path: Path) -> int:

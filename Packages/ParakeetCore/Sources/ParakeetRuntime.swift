@@ -10,6 +10,17 @@ public actor ParakeetRuntime {
 
     private var transcriber: ParakeetTranscriber?
     private var preparationTask: Task<ParakeetTranscriber, Error>?
+    private let encoderCache = EncoderResultCache()
+
+    /// Enables exact encoder-input reuse during one recording; no model load is required.
+    public func beginDictationSession(_ id: UUID) {
+        encoderCache.begin(id)
+    }
+
+    /// Releases that recording's retained samples and encoder outputs.
+    public func endDictationSession(_ id: UUID) {
+        encoderCache.end(id)
+    }
 
     /// Creates a runtime for one verified, revision-scoped model directory.
     public init(
@@ -29,6 +40,15 @@ public actor ParakeetRuntime {
     /// Whether the three Core ML submodels are loaded and ready.
     public var isReady: Bool {
         transcriber != nil
+    }
+
+    /// Exact waveform capacity declared by the loaded encoder, when applicable.
+    ///
+    /// Exposed for runtime diagnostics and benchmarks so a shorter-window
+    /// encoder experiment can prove that Core ML actually loaded the intended
+    /// model shape instead of relying only on package metadata or filenames.
+    public var maximumWaveformSampleCount: Int? {
+        transcriber?.runner.maximumWaveformSampleCount
     }
 
     /// Decoding bias to apply, kept across model preparation.
@@ -80,6 +100,11 @@ public actor ParakeetRuntime {
         transcriber?.wordConfidences(for: transcription) ?? []
     }
 
+    /// Per-word tokens, frames and margins for downstream evidence-aware validation.
+    public func wordEvidence(for transcription: Transcription) -> [ParakeetWordEvidence] {
+        transcriber?.wordEvidence(for: transcription) ?? []
+    }
+
     /// A bias requested before the model finished loading.
     private var pendingBiasRequest: (terms: [String], languageCode: String?)?
 
@@ -105,7 +130,8 @@ public actor ParakeetRuntime {
                 computeUnits: computeUnits,
                 decoderWorkers: decoderWorkers,
                 segmentation: segmentation,
-                retryConfiguration: retryConfiguration
+                retryConfiguration: retryConfiguration,
+                warmUpEncoder: computeUnits == .all
             )
         }
         preparationTask = task
@@ -126,7 +152,60 @@ public actor ParakeetRuntime {
     }
 
     /// Runs one final transcription at user-initiated priority.
-    public func transcribe(samples: [Float]) async throws -> Transcription {
+    public func transcribe(samples: [Float], sessionID: UUID? = nil) async throws -> Transcription {
+        try await transcribe(
+            samples: samples,
+            sessionID: sessionID,
+            collectLogitMargins: true,
+            retryLongForm: true
+        )
+    }
+
+    /// Runs one final transcription from a file without retaining the complete
+    /// resampled waveform in heap memory. Intended for long-form imports; live
+    /// dictation continues to use the already-captured sample buffer path.
+    public func transcribe(audioURL: URL) async throws -> Transcription {
+        try Task.checkCancellation()
+        try await prepare()
+        guard let transcriber else {
+            throw ParakeetError.runtimeUnavailable
+        }
+
+        let cancellation = InferenceCancellation()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            let result = try transcriber.transcribe(
+                audioURL: audioURL,
+                cancellationCheck: { try cancellation.check() }
+            )
+            try Task.checkCancellation()
+            return result
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+
+    /// Runs a provisional live preview. The app only consumes its text, so avoid
+    /// confidence-margin scans and long-form retry work that is repeated by the
+    /// evidence-bearing final transcription on release.
+    public func transcribePreview(
+        samples: [Float],
+        sessionID: UUID? = nil
+    ) async throws -> Transcription {
+        try await transcribe(
+            samples: samples,
+            sessionID: sessionID,
+            collectLogitMargins: false,
+            retryLongForm: false
+        )
+    }
+
+    private func transcribe(
+        samples: [Float],
+        sessionID: UUID?,
+        collectLogitMargins: Bool,
+        retryLongForm: Bool
+    ) async throws -> Transcription {
         try Task.checkCancellation()
         try await prepare()
         guard let transcriber else {
@@ -136,8 +215,41 @@ public actor ParakeetRuntime {
         // Keep the synchronous Core ML pipeline actor-isolated. Actor methods may re-enter at an
         // `await`; wrapping this call in a detached task allowed a final decode to overlap a
         // cancelled partial decode on the same transcriber.
-        let result = try transcriber.transcribe(samples: samples)
-        try Task.checkCancellation()
-        return result
+        let cancellation = InferenceCancellation()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            let result = try transcriber.transcribe(
+                samples: samples,
+                cancellationCheck: { try cancellation.check() },
+                encoderCache: encoderCache,
+                sessionID: sessionID,
+                collectLogitMargins: collectLogitMargins,
+                retryLongForm: retryLongForm
+            )
+            try Task.checkCancellation()
+            return result
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+}
+
+/// Bridges Swift task cancellation into synchronous Core ML/GCD stages.
+/// Core ML predictions finish normally; subsequent stages and decoder steps stop.
+final class InferenceCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+
+    func check() throws {
+        lock.lock()
+        let shouldStop = cancelled
+        lock.unlock()
+        if shouldStop { throw CancellationError() }
     }
 }

@@ -627,9 +627,10 @@ struct TranscriptDiffLegend: View {
 
 /// Picks which microphone VoxoL records from.
 ///
-/// The list is read when the menu opens rather than cached, so a headset plugged in a second ago
-/// is there and one unplugged a second ago is not. An empty selection means "follow the system
-/// default", and a stored device that has since disappeared says so instead of pretending.
+/// The list is read when the view appears and again when the menu opens, so a headset plugged in
+/// a second ago is there and one unplugged a second ago is not. An empty selection means "follow
+/// the system default", and a stored device that has since disappeared says so instead of
+/// pretending.
 struct AudioInputPicker: View {
     @Environment(VoxoLTheme.self) private var theme
 
@@ -637,8 +638,11 @@ struct AudioInputPicker: View {
     /// Compact hides the leading label, for placement beside a primary action.
     var compact = false
 
+    /// Reading this in `body` meant a CoreAudio walk of every device on every redraw of the page
+    /// — three times over, once per property that asked — which is most of what made Today lag.
+    @State private var devices: [AudioInputDevice] = []
+
     var body: some View {
-        let devices = AudioInputDevices.available()
         var options = [
             EditorialDropdownOption(id: "", "System default")
         ]
@@ -662,20 +666,25 @@ struct AudioInputPicker: View {
             select: { selectedUID = $0 },
             systemImage: "mic",
             maximumLabelWidth: compact ? 196 : 260,
-            warns: isMissing
+            warns: isMissing,
+            willOpen: refreshDevices
         )
         .help(Text("Input device"))
         .accessibilityLabel(Text("Input device"))
+        .onAppear(perform: refreshDevices)
+    }
+
+    private func refreshDevices() {
+        devices = AudioInputDevices.available()
     }
 
     /// What the button shows: the chosen device, or the one macOS is currently defaulting to.
     private var title: String {
         guard !selectedUID.isEmpty else {
-            let devices = AudioInputDevices.available()
             let fallback = devices.first { $0.isDefault } ?? devices.first
             return fallback?.name ?? String(localized: "System default")
         }
-        guard let device = AudioInputDevices.available().first(where: { $0.id == selectedUID })
+        guard let device = devices.first(where: { $0.id == selectedUID })
         else {
             return String(localized: "Microphone disconnected")
         }
@@ -683,8 +692,7 @@ struct AudioInputPicker: View {
     }
 
     private var isMissing: Bool {
-        !selectedUID.isEmpty
-            && !AudioInputDevices.available().contains { $0.id == selectedUID }
+        !selectedUID.isEmpty && !devices.contains { $0.id == selectedUID }
     }
 
     @ViewBuilder
@@ -758,6 +766,8 @@ struct EditorialDropdown: View {
     var systemImage: String?
     var maximumLabelWidth: CGFloat?
     var warns = false
+    /// Called just before the menu opens, for callers whose options are worth refreshing then.
+    var willOpen: (() -> Void)?
 
     @Environment(VoxoLTheme.self) private var theme
     @State private var isOpen = false
@@ -765,6 +775,7 @@ struct EditorialDropdown: View {
 
     var body: some View {
         Button {
+            if !isOpen { willOpen?() }
             withAnimation(.easeOut(duration: 0.14)) { isOpen.toggle() }
         } label: {
             HStack(spacing: 6) {

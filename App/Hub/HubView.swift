@@ -12,21 +12,13 @@ enum HubDestination: String, CaseIterable, Identifiable {
 
     /// Destinations the sidebar offers.
     ///
-    /// `meetings` is deliberately absent. Its screen is a mock-up with no
-    /// engine behind it, and the competitor ships a real meeting mode with
-    /// calendar detection and note-taking integrations. An empty tab beside
-    /// theirs advertises the gap rather than hiding it. The view and its enum
-    /// case stay so the v2 work resumes from where it stopped; only the door
-    /// is closed. Restore it here once transcription and diarisation are
-    /// measured on a real meeting corpus.
-    ///
     /// `dictation` is absent for the opposite reason: everything it showed now
     /// exists elsewhere. The live before/after belongs to a result and lives in
     /// Today, the history lives in Today and Library, and its three controls
     /// moved into Settings › Dictation. A tab that only repeats other tabs
     /// makes the app look bigger than it is.
     static var navigable: [HubDestination] {
-        allCases.filter { $0 != .meetings && $0 != .dictation }
+        allCases.filter { $0 != .dictation }
     }
 
     var title: LocalizedStringKey {
@@ -86,8 +78,10 @@ struct HubView: View {
     let replayPreflight: () -> Void
 
     @AppStorage("voxol.openSetupOnNextHub") private var openSetupOnNextHub = false
+    @AppStorage("voxol.activationMode") private var activationMode = ActivationMode.hold
+    @AppStorage("voxol.dictationShortcut") private var shortcut = DictationShortcut.optionSpace
 
-    @State private var selection = HubDestination.today
+    @State private var selection = HubView.initialDestination
     @State private var settingsSection = EditorialSettingsSection.general
     @State private var toastVisible = false
     @Namespace private var sidebarNamespace
@@ -140,18 +134,21 @@ struct HubView: View {
             settingsSection = .setup
             selection = .settings
         }
-        .onChange(of: transcripts.toast) { _, toast in
-            guard toast != nil else { return }
+        .task(id: transcripts.toastID) {
+            guard transcripts.toast != nil else { return }
             withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
                 toastVisible = true
             }
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.6))
-                withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
-                    toastVisible = false
-                }
-                transcripts.dismissToast()
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
             }
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
+                toastVisible = false
+            }
+            transcripts.dismissToast()
         }
     }
 
@@ -191,100 +188,248 @@ struct HubView: View {
 
             Spacer(minLength: 12)
 
-            // Sits above the readiness row on purpose: an update is news, and
-            // news belongs where the eye already goes to check that things are
-            // fine. It stays until the version is actually installed rather
-            // than until it is acknowledged.
-            if let update = UpdateNotifier.shared.available {
+            if transcripts.historyIssue != nil {
                 Button {
-                    UpdateNotifier.shared.installAvailableUpdate()
+                    select(.today)
                 } label: {
-                    HStack(spacing: 8) {
-                        // Cobalt rather than coral: an update is news, not a
-                        // fault, and coral is already what "something is wrong"
-                        // looks like one row below.
-                        EditorialIcon(name: "download-simple", size: 13)
-                            .foregroundStyle(theme.cobalt)
-                            .frame(width: compact ? 24 : 26, height: compact ? 24 : 26)
-                            .background(theme.cobaltSoft)
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("Update available")
-                                .font(
-                                    VoxoLTypography.font(
-                                        size: 11,
-                                        weight: .semibold,
-                                        relativeTo: .caption
-                                    )
-                                )
-                                .foregroundStyle(theme.ink)
-                                .lineLimit(1)
-                            Text(verbatim: "VoxoL \(update.version)")
-                                .font(VoxoLTypography.font(size: 10.5, relativeTo: .caption))
-                                .foregroundStyle(theme.secondaryInk)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        EditorialIcon(name: "caret-right", size: 16)
-                            .foregroundStyle(theme.secondaryInk)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, minHeight: compact ? 64 : 58)
-                    .background(theme.cobaltSoft.opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    sidebarRow(
+                        compact: compact,
+                        icon: Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 13)),
+                        tint: theme.warning,
+                        tintSoft: theme.selection,
+                        title: "History needs attention",
+                        detail: Text("Review and retry")
+                    )
                 }
                 .buttonStyle(SignalPressButtonStyle())
                 .padding(.bottom, 8)
             }
 
-            Button {
-                if systemReady {
-                    settingsSection = .general
-                    select(.settings)
-                } else {
-                    openSetup()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    EditorialIcon(name: "shield-check", size: 13)
-                        .foregroundStyle(systemReady ? theme.success : theme.coral)
-                        .frame(width: compact ? 24 : 26, height: compact ? 24 : 26)
-                        .background(systemReady ? theme.sageSoft : theme.coralSoft)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            // The runtime, on every screen: its state, the shortcut, and a place to hold and
+            // dictate without going back to Today first.
+            dictationCard(compact: compact)
+                .padding(.bottom, 8)
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(systemReady ? "Everything works" : "Finish setup")
-                            .font(
-                                VoxoLTypography.font(
-                                    size: 11,
-                                    weight: .semibold,
-                                    relativeTo: .caption
-                                )
-                            )
-                            .foregroundStyle(theme.ink)
-                            .lineLimit(compact ? 2 : 1)
-                        Text(localStatusDetail)
-                            .font(VoxoLTypography.font(size: 10.5, relativeTo: .caption))
-                            .foregroundStyle(theme.secondaryInk)
-                            .lineLimit(compact ? 2 : 1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    EditorialIcon(name: "caret-right", size: 16)
-                        .foregroundStyle(theme.secondaryInk)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, minHeight: compact ? 64 : 58)
-                .background(theme.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            // The update row sits above the readiness row on purpose: an update is news, and
+            // news belongs where the eye already goes to check that things are fine. Once the
+            // setup is complete the readiness row has nothing left to say, so the corner becomes
+            // the one place to ask for a new version instead of repeating that everything works.
+            if systemReady || UpdateNotifier.shared.state.phase != .idle {
+                updateRow(compact: compact)
             }
-            .buttonStyle(SignalPressButtonStyle())
+
+            if !systemReady {
+                Button(action: openSetup) {
+                    sidebarRow(
+                        compact: compact,
+                        icon: EditorialIcon(name: "shield-check", size: 13),
+                        tint: theme.coral,
+                        tintSoft: theme.coralSoft,
+                        title: "Finish setup",
+                        detail: Text(verbatim: localStatusDetail)
+                    )
+                }
+                .buttonStyle(SignalPressButtonStyle())
+                .padding(.top, 8)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.top, compact ? 12 : 18)
         .padding(.bottom, 10)
+    }
+
+    /// One corner for the version: it names the running build, checks the feed on a click, and
+    /// turns into the install button for as long as a newer version is waiting.
+    private func updateRow(compact: Bool) -> some View {
+        let notifier = UpdateNotifier.shared
+        return Button {
+            if notifier.available != nil {
+                notifier.installAvailableUpdate()
+            } else {
+                Task {
+                    await notifier.check(announce: false)
+                }
+            }
+        } label: {
+            if let update = notifier.available {
+                // Cobalt rather than coral: an update is news, not a fault, and coral is
+                // already what "something is wrong" looks like one row below.
+                sidebarRow(
+                    compact: compact,
+                    icon: EditorialIcon(name: "download-simple", size: 13),
+                    tint: theme.cobalt,
+                    tintSoft: theme.cobaltSoft,
+                    background: theme.cobaltSoft.opacity(0.5),
+                    title: "Update available",
+                    detail: Text(verbatim: "VoxoL \(update.version)")
+                )
+            } else if notifier.isChecking {
+                sidebarRow(
+                    compact: compact,
+                    icon: updateGlyph,
+                    tint: theme.secondaryInk,
+                    tintSoft: theme.selection,
+                    title: LocalizedStringKey(versionTitle),
+                    detail: Text("Checking…")
+                )
+            } else if notifier.state.phase == .failed {
+                sidebarRow(
+                    compact: compact,
+                    icon: updateGlyph,
+                    tint: theme.warning,
+                    tintSoft: theme.selection,
+                    title: "Could not check for updates",
+                    detail: Text("Retry")
+                )
+            } else if notifier.state.phase == .current {
+                sidebarRow(
+                    compact: compact,
+                    icon: EditorialIcon(name: "check", size: 13),
+                    tint: theme.success,
+                    tintSoft: theme.sageSoft,
+                    title: LocalizedStringKey(versionTitle),
+                    detail: Text("Up to date")
+                )
+            } else {
+                sidebarRow(
+                    compact: compact,
+                    icon: updateGlyph,
+                    tint: theme.ink,
+                    tintSoft: theme.selection,
+                    title: LocalizedStringKey(versionTitle),
+                    detail: Text("Check for updates")
+                )
+            }
+        }
+        .buttonStyle(SignalPressButtonStyle())
+        .disabled(notifier.isChecking)
+    }
+
+    private var updateGlyph: some View {
+        Image(systemName: "arrow.triangle.2.circlepath")
+            .font(.system(size: 11, weight: .semibold))
+    }
+
+    /// Verbatim: a version number has nothing to translate, and wrapping it in a key would
+    /// only send the localization check looking for one.
+    private var versionTitle: String {
+        "VoxoL \(BugReportComposer.Environment.current().applicationVersion)"
+    }
+
+    private func sidebarRow(
+        compact: Bool,
+        icon: some View,
+        tint: Color,
+        tintSoft: Color,
+        background: Color? = nil,
+        title: LocalizedStringKey,
+        detail: Text
+    ) -> some View {
+        HStack(spacing: 8) {
+            icon
+                .foregroundStyle(tint)
+                .frame(width: compact ? 24 : 26, height: compact ? 24 : 26)
+                .background(tintSoft)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(VoxoLTypography.font(size: 11, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(compact ? 2 : 1)
+                detail
+                    .font(VoxoLTypography.font(size: 10.5, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            EditorialIcon(name: "caret-right", size: 16)
+                .foregroundStyle(theme.secondaryInk)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: compact ? 64 : 58)
+        .background(background ?? theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// What the day has produced so far, and where attention is still needed.
+    @ViewBuilder
+    private func navigationBadge(_ destination: HubDestination) -> some View {
+        switch destination {
+        case .today where todayCount > 0:
+            Text(verbatim: todayCount.formatted())
+                .font(VoxoLTypography.font(size: 10.5, weight: .semibold, relativeTo: .caption))
+                .monospacedDigit()
+                .foregroundStyle(theme.secondaryInk)
+                .padding(.horizontal, 7)
+                .frame(minWidth: 22, minHeight: 20)
+                .background(theme.ink.opacity(0.06))
+                .clipShape(Capsule())
+                .accessibilityLabel(Text(LocalizedStringKey("\(todayCount) dictations")))
+        case .settings where !systemReady:
+            Circle()
+                .fill(theme.coral)
+                .frame(width: 7, height: 7)
+                .accessibilityLabel(Text("Setup required"))
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Dictations retained today. Records are newest first, so the count stops at the first
+    /// older one instead of walking the whole history.
+    private var todayCount: Int {
+        let calendar = Calendar.current
+        return transcripts.records.prefix { calendar.isDateInToday($0.createdAt) }.count
+    }
+
+    /// The runtime in the sidebar, and a trigger: hold it to dictate from any screen.
+    private func dictationCard(compact: Bool) -> some View {
+        let runtime = EditorialRuntimePresentation(dictationSession)
+        let tone = runtime.tone(theme)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(systemReady ? tone : theme.warning)
+                    .frame(width: 7, height: 7)
+                Text(systemReady ? runtime.title : LocalizedStringKey("Setup required"))
+                    .font(
+                        VoxoLTypography.font(size: 11.5, weight: .semibold, relativeTo: .caption)
+                    )
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if runtime.isListening {
+                    EditorialWaveMini()
+                }
+            }
+            HStack(spacing: 6) {
+                Text(verbatim: shortcut.label)
+                    .font(VoxoLTypography.font(size: 10.5, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(theme.ink)
+                    .padding(.horizontal, 6)
+                    .frame(height: 20)
+                    .background(theme.selection)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(activationMode == .hold ? "Hold to dictate" : "Press to dictate")
+                    .font(VoxoLTypography.font(size: 10.5, relativeTo: .caption))
+                    .foregroundStyle(theme.secondaryInk)
+                    .lineLimit(1)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(runtime.isActive ? tone.opacity(0.5) : Color.clear, lineWidth: 1)
+        }
+        .editorialDictationTrigger(setupReady: systemReady, openSetup: openSetup)
+        .help(systemReady ? Text("Hold to dictate from any screen") : Text("Open guided setup"))
+        .accessibilityLabel(systemReady ? Text(runtime.title) : Text("Setup required"))
     }
 
     private func navigationButton(_ destination: HubDestination, compact: Bool) -> some View {
@@ -311,6 +456,7 @@ struct HubView: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                     Spacer(minLength: 0)
+                    navigationBadge(destination)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -368,7 +514,7 @@ struct HubView: View {
         case .insights:
             EditorialInsightsView()
         case .meetings:
-            EditorialMeetingsView()
+            NativeMeetingsView()
         case .library:
             EditorialLibraryView()
         case .settings:
@@ -378,6 +524,19 @@ struct HubView: View {
                 replayPreflight: replayPreflight
             )
         }
+    }
+
+    /// Debug builds can open straight onto a destination — `-voxol.debugHubDestination insights` —
+    /// so a screen can be captured from a fresh launch without driving the interface.
+    private static var initialDestination: HubDestination {
+        #if DEBUG
+            if let raw = UserDefaults.standard.string(forKey: "voxol.debugHubDestination"),
+                let destination = HubDestination(rawValue: raw)
+            {
+                return destination
+            }
+        #endif
+        return .today
     }
 
     private func openSetup() {
@@ -418,6 +577,8 @@ struct HubView: View {
 
     private func toastTitle(_ toast: TranscriptToast) -> LocalizedStringKey {
         switch toast {
+        case .recoveryExported: "Recovery copy exported"
+        case .recoveryExportFailed: "Recovery copy could not be exported"
         case .copied: "Copied to clipboard"
         case .previousVersionRestored: "Previous version restored"
         case .laterVersionRestored: "Later version restored"

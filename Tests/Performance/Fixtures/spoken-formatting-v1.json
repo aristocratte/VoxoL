@@ -1,0 +1,245 @@
+{
+  "purpose": "Synthetic author-written command and non-command regression fixtures. No human-reviewed audio labels; not an ASR or competitor quality ranking.",
+  "cases": [
+    {
+      "id": "fr-question",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Tu viens demain point d’interrogation",
+      "expected": "Tu viens demain ?"
+    },
+    {
+      "id": "fr-exclamation",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Bravo point d’exclamation",
+      "expected": "Bravo !"
+    },
+    {
+      "id": "fr-period",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Le rapport est prêt point final",
+      "expected": "Le rapport est prêt."
+    },
+    {
+      "id": "fr-paragraph",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Bonjour nouveau paragraphe merci pour ton aide",
+      "expected": "Bonjour\n\nMerci pour ton aide"
+    },
+    {
+      "id": "fr-newline",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Bonjour à la ligne merci",
+      "expected": "Bonjour\nMerci"
+    },
+    {
+      "id": "fr-parentheses",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Le rendez-vous ouvre la parenthèse mardi matin ferme la parenthèse est confirmé",
+      "expected": "Le rendez-vous (mardi matin) est confirmé"
+    },
+    {
+      "id": "fr-bold",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Ce message est début du gras important fin du gras",
+      "expected": "Ce message est **important**"
+    },
+    {
+      "id": "fr-retro-bold",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Le rapport est urgent. Mets le mot urgent en gras.",
+      "expected": "Le rapport est **urgent**."
+    },
+    {
+      "id": "fr-retro-parentheses",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Le rendez-vous demain est confirmé. Mets le mot demain entre parenthèses.",
+      "expected": "Le rendez-vous (demain) est confirmé."
+    },
+    {
+      "id": "fr-emoji",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Merci ajoute un emoji cœur",
+      "expected": "Merci ❤️"
+    },
+    {
+      "id": "fr-unknown-emoji",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Merci ajoute un emoji ornithorynque",
+      "expected": "Merci ajoute un emoji ornithorynque"
+    },
+    {
+      "id": "fr-meta-question",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Je veux mettre un point d’interrogation dans cette phrase",
+      "expected": "Je veux mettre un point d’interrogation dans cette phrase"
+    },
+    {
+      "id": "fr-meta-paragraph",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Ce nouveau paragraphe explique la méthode",
+      "expected": "Ce nouveau paragraphe explique la méthode"
+    },
+    {
+      "id": "fr-quoted-command",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Il a écrit « point final » dans le document",
+      "expected": "Il a écrit « point final » dans le document"
+    },
+    {
+      "id": "fr-code-literal",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Garde `point final` dans le code",
+      "expected": "Garde `point final` dans le code"
+    },
+    {
+      "id": "fr-unclosed-bold",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Le mot début du gras important",
+      "expected": "Le mot début du gras important"
+    },
+    {
+      "id": "fr-ambiguous-bold",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Urgent puis urgent. Mets le mot urgent en gras.",
+      "expected": "Urgent puis urgent. Mets le mot urgent en gras."
+    },
+    {
+      "id": "fr-repair-date",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "On se voit lundi, non, mardi",
+      "expected": "On se voit mardi"
+    },
+    {
+      "id": "fr-repair-chain",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "On se voit lundi, non, mardi, pardon, mercredi",
+      "expected": "On se voit mercredi"
+    },
+    {
+      "id": "fr-repair-name",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Envoie à Paul, pardon, Pierre",
+      "expected": "Envoie à Pierre"
+    },
+    {
+      "id": "fr-finally-literal",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Nous sommes arrivés, enfin, ensemble",
+      "expected": "Nous sommes arrivés, enfin, ensemble"
+    },
+    {
+      "id": "fr-rather-literal",
+      "language": "fr",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Un ton calme, plutôt, posé",
+      "expected": "Un ton calme, plutôt, posé"
+    },
+    {
+      "id": "en-question",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Are you ready question mark",
+      "expected": "Are you ready?"
+    },
+    {
+      "id": "en-newline",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Hello new line thanks",
+      "expected": "Hello\nThanks"
+    },
+    {
+      "id": "en-parentheses",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "The meeting open parenthesis Tuesday close parenthesis is confirmed",
+      "expected": "The meeting (Tuesday) is confirmed"
+    },
+    {
+      "id": "en-bold",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "This is start bold important end bold",
+      "expected": "This is **important**"
+    },
+    {
+      "id": "en-emoji",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Thank you add a thumbs up emoji",
+      "expected": "Thank you 👍"
+    },
+    {
+      "id": "en-meta-question",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "A question mark ends a question",
+      "expected": "A question mark ends a question"
+    },
+    {
+      "id": "en-actually-literal",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "It was quiet, actually, peaceful",
+      "expected": "It was quiet, actually, peaceful"
+    },
+    {
+      "id": "en-repair-date",
+      "language": "en",
+      "profile": "chat",
+      "mode": "faithful",
+      "transcript": "Meet on Monday, no, Tuesday",
+      "expected": "Meet on Tuesday"
+    }
+  ]
+}

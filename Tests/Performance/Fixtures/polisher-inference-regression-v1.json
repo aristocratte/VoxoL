@@ -1,0 +1,70 @@
+{
+  "purpose": "Synthetic FR/EN runtime regression cases, including timeout recovery. Not a human-labeled quality benchmark.",
+  "cases": [
+    {
+      "id": "en-long-faithful",
+      "language": "en",
+      "mode": "faithful",
+      "transcript": "Before we publish the release please check that the application still works without an internet connection the microphone permission should only be requested when the user starts recording and we must not send any audio to an external service I would also like to compare the new decoder with the previous version using exactly the same recordings keep the original text whenever the correction is uncertain and do not replace unfamiliar names simply because another spelling looks more common",
+      "expected": "Before we publish the release, please check that the application still works without an internet connection. The microphone permission should only be requested when the user starts recording, and we must not send any audio to an external service. I would also like to compare the new decoder with the previous version using exactly the same recordings. Keep the original text whenever the correction is uncertain, and do not replace unfamiliar names simply because another spelling looks more common."
+    },
+    {
+      "id": "en-long-rewrite",
+      "language": "en",
+      "mode": "rewrite",
+      "transcript": "I wanted to ask about the results actually before that can you check the test configuration because yesterday we used the small model and today we might be loading a different adapter the comparison would not be fair otherwise what I need is a table with the same audio files the same output constraints and separate measurements for cold startup and warm inference please keep the unsuccessful cases in the report as well",
+      "expected": "Please check the test configuration before comparing the results. Yesterday we used the small model, and today we might be loading a different adapter. I need a table using the same audio files and output constraints, with separate measurements for cold startup and warm inference. Keep unsuccessful cases in the report as well."
+    },
+    {
+      "id": "en-technical-negation",
+      "language": "en",
+      "mode": "faithful",
+      "transcript": "Do not run npm publish open /src/auth.ts and run npm test with --no-cache the request timeout must remain 2500 milliseconds and the amount should stay 4500 euros not 5400 euros",
+      "expected": "Do not run npm publish. Open /src/auth.ts and run npm test with --no-cache. The request timeout must remain 2500 milliseconds, and the amount should stay 4500 euros, not 5400 euros."
+    },
+    {
+      "id": "fr-code-switch-preserve",
+      "language": "fr",
+      "mode": "faithful",
+      "transcript": "Dans la pull request garde le retry budget à 3 tentatives ne change pas le feature flag et vérifie que le cache de Qwen ne conserve pas les données de la session précédente ensuite lance npm test mais surtout pas npm publish",
+      "expected": "Dans la pull request, garde le retry budget à 3 tentatives, ne change pas le feature flag et vérifie que le cache de Qwen ne conserve pas les données de la session précédente. Ensuite, lance npm test, mais surtout pas npm publish."
+    },
+    {
+      "id": "fr-context-ambiguity",
+      "language": "fr",
+      "mode": "faithful",
+      "transcript": "Le client a dit que le serveur était indisponible mais il parlait peut être du service de sauvegarde je préfère conserver cette incertitude plutôt que d'affirmer une panne qui n'a pas été confirmée",
+      "expected": "Le client a dit que le serveur était indisponible, mais il parlait peut-être du service de sauvegarde. Je préfère conserver cette incertitude plutôt que d'affirmer une panne qui n'a pas été confirmée."
+    },
+    {
+      "id": "en-timeout",
+      "language": "en",
+      "mode": "faithful",
+      "timeoutMilliseconds": 1,
+      "transcript": "Please review the deployment plan and the test results before publishing the next release because the application must preserve names numbers negations and technical commands exactly as they were dictated",
+      "expected": "Please review the deployment plan and the test results before publishing the next release because the application must preserve names, numbers, negations and technical commands exactly as they were dictated."
+    },
+    {
+      "id": "en-after-timeout",
+      "language": "en",
+      "mode": "faithful",
+      "transcript": "The calendar is ready",
+      "expected": "The calendar is ready."
+    },
+    {
+      "id": "fr-timeout",
+      "language": "fr",
+      "mode": "rewrite",
+      "timeoutMilliseconds": 1,
+      "transcript": "Je voudrais que tu vérifies les résultats avant de changer les paramètres du modèle parce que le but est de gagner du temps sans perdre les informations importantes notamment les noms les chiffres et les négations",
+      "expected": "Vérifie les résultats avant de changer les paramètres du modèle. Le but est de gagner du temps sans perdre les informations importantes, notamment les noms, les chiffres et les négations."
+    },
+    {
+      "id": "fr-after-timeout",
+      "language": "fr",
+      "mode": "faithful",
+      "transcript": "Envoie le rapport mercredi matin",
+      "expected": "Envoie le rapport mercredi matin."
+    }
+  ]
+}

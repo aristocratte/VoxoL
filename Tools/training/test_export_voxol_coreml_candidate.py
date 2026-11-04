@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -118,6 +119,25 @@ class ExportVoxoLCoreMLCandidateTests(unittest.TestCase):
                 "self_encoder_subsampling_linear_weight_to_fp16"
             )
         )
+
+    def test_copy_runtime_support_preserves_language_penalty_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "template"
+            destination = root / "candidate"
+            for component in ("decoder.mlpackage", "joint.mlpackage"):
+                (template / component).mkdir(parents=True)
+                (template / component / "model.bin").write_bytes(component.encode())
+            (template / "tokenizer.json").write_text("{}\n")
+            penalty = b'{"french_suppressed_token_ids":[1,2,3]}\n'
+            (template / "language-penalty.json").write_bytes(penalty)
+            destination.mkdir()
+
+            MODULE.copy_runtime_support(template, destination)
+
+            self.assertEqual(
+                (destination / "language-penalty.json").read_bytes(), penalty
+            )
 
 
 if __name__ == "__main__":

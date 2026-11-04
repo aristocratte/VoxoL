@@ -7,12 +7,14 @@ public enum FidelityRejectionReason: String, Equatable, Sendable {
     case missingProtectedToken
     case duplicatedProtectedToken
     case reorderedProtectedToken
+    case numberAttachmentChanged
     case unknownPlaceholder
     case outputTooLong
     case modelPreamble
     case thinkingLeak
     case unexpectedMarkdown
     case languageChanged
+    case questionIntentChanged
     case unexpectedContent
     case missingContent
     case editScopeTooLarge
@@ -77,7 +79,11 @@ public enum FidelityValidator {
         if placeholders.contains(where: { !known.contains($0) }) {
             return reject(.unknownPlaceholder, preparation)
         }
-        if placeholders != preparation.protectedTokens.map(\.placeholder) {
+        // Order is judged against where the placeholders sit in the prompt, not against their
+        // numbering: the numbers follow the order the protections were found in, which is not
+        // always the order of the words, and a candidate that kept the sentence intact was
+        // being thrown away as "reordered" — one rejection in thirteen on the human corpus.
+        if placeholders != matches(#"\bVOXOLP\d+\b"#, in: preparation.promptText) {
             return reject(.reorderedProtectedToken, preparation)
         }
 
@@ -89,15 +95,20 @@ public enum FidelityValidator {
         }
 
         let lower = candidate.lowercased()
+        // Only phrasings a dictation itself would not open with. "Ok," "d'accord" or "voilà"
+        // are how people start sentences, and rejecting them threw away good text.
         let preambles = [
-            "sure,", "certainly,", "here is", "here's", "final text:",
-            "bien sûr", "voici", "texte final :", "résultat :",
+            "sure,", "certainly,", "here is", "here's", "here you go", "final text:",
+            "corrected text:", "cleaned text:", "output:",
+            "bien sûr", "voici", "texte final :", "texte final:", "texte corrigé :",
+            "texte corrigé:", "résultat :", "résultat:", "réponse :", "réponse:",
         ]
         if preambles.contains(where: lower.hasPrefix) {
             return reject(.modelPreamble, preparation)
         }
         if lower.contains("<think>") || lower.contains("</think>")
-            || lower.contains("<|assistant|")
+            || lower.contains("<|assistant|") || lower.contains("<|im_start|>")
+            || lower.contains("<|im_end|>")
         {
             return reject(.thinkingLeak, preparation)
         }
@@ -109,18 +120,41 @@ public enum FidelityValidator {
 
         let sourceWordCount = preparation.normalizedText.split(whereSeparator: { !$0.isLetter })
             .count
-        if sourceWordCount >= 8,
-            let candidateLanguage = LanguageDetector.dominantLanguage(
+        if sourceWordCount >= 8 {
+            let sourceIsCodeSwitched = LanguageDetector.containsCodeSwitching(
+                in: preparation.normalizedText
+            )
+            if sourceIsCodeSwitched {
+                guard LanguageDetector.containsCodeSwitching(in: restored) else {
+                    return reject(.languageChanged, preparation)
+                }
+            } else if let candidateLanguage = LanguageDetector.dominantLanguage(
                 in: restored,
                 minimumEvidence: 2
-            ),
-            candidateLanguage != preparation.language
-        {
-            return reject(.languageChanged, preparation)
+            ), candidateLanguage != preparation.language {
+                return reject(.languageChanged, preparation)
+            }
+        }
+        guard
+            questionMarkCount(in: candidate)
+                >= questionMarkCount(in: preparation.promptText)
+        else {
+            return reject(.questionIntentChanged, preparation)
         }
 
-        let sourceWords = words(in: preparation.promptText)
+        let originalSourceWords = words(in: preparation.promptText)
         let candidateWords = words(in: candidate)
+        if numberAttachmentChanged(
+            sourceWords: originalSourceWords,
+            candidateWords: candidateWords,
+            tokens: preparation.protectedTokens,
+            language: preparation.language
+        ) {
+            return reject(.numberAttachmentChanged, preparation)
+        }
+        let sourceWords = acceptingContextualAgreement(
+            source: originalSourceWords, candidate: candidateWords, language: preparation.language
+        )
         if containsUnsupportedContent(
             candidateWords,
             sourceWords: sourceWords,
@@ -204,7 +238,7 @@ private extension FidelityValidator {
         switch reason {
         case .missingContent, .unexpectedContent, .editScopeTooLarge,
             .missingProtectedToken, .duplicatedProtectedToken,
-            .reorderedProtectedToken:
+            .reorderedProtectedToken, .numberAttachmentChanged, .questionIntentChanged:
             true
         case .emptyOutput, .outputTooLong, .modelPreamble, .thinkingLeak,
             .unexpectedMarkdown, .languageChanged, .unknownPlaceholder:
@@ -218,7 +252,7 @@ private extension FidelityValidator {
     ) -> (text: String, revertedCount: Int)? {
         let sourceSentences = SpanRepair.sentences(in: preparation.promptText)
         let candidateSentences = SpanRepair.sentences(in: candidate)
-        guard sourceSentences.count > 1 || candidateSentences.count > 1,
+        guard
             let pairs = SpanRepair.align(
                 source: sourceSentences,
                 candidate: candidateSentences
@@ -232,17 +266,51 @@ private extension FidelityValidator {
             if pairIsAcceptable(pair, preparation: preparation) {
                 pieces.append(pair.candidate)
             } else {
-                pieces.append(pair.source)
+                pieces.append(repairOrthography(in: pair, preparation: preparation))
                 revertedCount += 1
             }
         }
-        guard revertedCount > 0, revertedCount < pairs.count else {
-            // Nothing reverted means the whole-text failure was cross-sentence
-            // and splicing cannot help; everything reverted is the fallback by
-            // another name.
+        guard revertedCount > 0,
+            pieces.joined(separator: " ") != sourceSentences.joined(separator: " ")
+        else {
             return nil
         }
         return (pieces.joined(separator: " "), revertedCount)
+    }
+
+    /// Keep individually valid spelling/agreement replacements even when the same
+    /// sentence loses a negation or hallucinates content. Structural edits are not
+    /// transplanted: every trial still passes the original per-sentence rules,
+    /// and the assembled result must pass the whole validator afterwards.
+    static func repairOrthography(
+        in pair: SpanRepair.AlignedPair,
+        preparation: DeterministicPreparation
+    ) -> String {
+        guard words(in: pair.source).count <= 256, words(in: pair.candidate).count <= 256 else {
+            return pair.source
+        }
+        let edits = EditScript.build(source: pair.source, candidate: pair.candidate).edits
+        var result = pair.source
+        for edit in edits.sorted(by: { $0.sourceRange.lowerBound > $1.sourceRange.lowerBound }) {
+            switch edit.kind {
+            case .accent, .agreement, .substitution:
+                break
+            default:
+                continue
+            }
+            guard !edit.sourceText.isEmpty, !edit.replacementText.isEmpty,
+                let range = Range(NSRange(edit.sourceRange), in: result)
+            else { continue }
+            var trial = result
+            trial.replaceSubrange(range, with: edit.replacementText)
+            if pairIsAcceptable(
+                SpanRepair.AlignedPair(source: pair.source, candidate: trial),
+                preparation: preparation
+            ) {
+                result = trial
+            }
+        }
+        return result
     }
 
     /// The whole-text rules, applied to one aligned sentence pair.
@@ -258,8 +326,24 @@ private extension FidelityValidator {
             return false
         }
 
-        let sourceWords = words(in: pair.source)
+        let originalSourceWords = words(in: pair.source)
         let candidateWords = words(in: pair.candidate)
+        guard
+            !numberAttachmentChanged(
+                sourceWords: originalSourceWords,
+                candidateWords: candidateWords,
+                tokens: preparation.protectedTokens,
+                language: preparation.language
+            )
+        else {
+            return false
+        }
+        let sourceWords = acceptingContextualAgreement(
+            source: originalSourceWords, candidate: candidateWords, language: preparation.language
+        )
+        guard questionMarkCount(in: pair.source) == questionMarkCount(in: pair.candidate) else {
+            return false
+        }
         if containsUnsupportedContent(
             candidateWords,
             sourceWords: sourceWords,
@@ -299,6 +383,28 @@ private extension FidelityValidator {
         in candidate: String,
         against preparation: DeterministicPreparation
     ) -> String {
+        var fragment = candidate
+        if preparation.context.startsMidSentence,
+            let sourceFirst = preparation.promptText.first, sourceFirst.isLowercase,
+            let candidateFirst = fragment.first,
+            String(candidateFirst).lowercased() == String(sourceFirst)
+        {
+            fragment.replaceSubrange(
+                fragment.startIndex...fragment.startIndex, with: String(sourceFirst))
+        }
+        if preparation.context.endsMidSentence {
+            while fragment.last.map({ ".?!…".contains($0) }) == true {
+                fragment.removeLast()
+            }
+            fragment = fragment.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let last = preparation.promptText.last, ",;:".contains(last),
+                fragment.last != last
+            {
+                fragment += String(last)
+            }
+            return fragment
+        }
+        let candidate = fragment
         let terminalPunctuation = ".?!…:;"
         guard candidate.last.map({ !terminalPunctuation.contains($0) }) == true,
             !containsStructuredList(candidate)
@@ -314,6 +420,12 @@ private extension FidelityValidator {
             return candidate + "."
         }
         return candidate
+    }
+
+    static func questionMarkCount(in text: String) -> Int {
+        text.reduce(0) { count, character in
+            count + (character == "?" || character == "？" ? 1 : 0)
+        }
     }
 
     static func matches(_ pattern: String, in input: String) -> [String] {
@@ -333,6 +445,71 @@ private extension FidelityValidator {
             .replacingOccurrences(of: "‑", with: " ")
         return matches(#"[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*"#, in: comparisonText)
             .map(normalizeWord)
+    }
+
+    /// A model may fix a present-tense agreement without changing the modal verb.
+    /// Only the same subject at the same position licenses the specific correction;
+    /// critical words still cannot pass by fuzzy spelling similarity elsewhere.
+    static func acceptingContextualAgreement(
+        source: [String], candidate: [String], language: TextLanguage
+    ) -> [String] {
+        guard language == .french, source.count == candidate.count, source.count > 1 else {
+            return source
+        }
+        let corrections: [String: [String: String]] = [
+            "je": ["peut": "peux", "doit": "dois"],
+            "tu": ["peut": "peux", "doit": "dois"],
+            "il": ["peux": "peut", "dois": "doit"],
+            "elle": ["peux": "peut", "dois": "doit"],
+            "on": ["peux": "peut", "dois": "doit"],
+        ]
+        var result = source
+        for index in 1..<source.count {
+            let subject = source[index - 1]
+            guard subject == candidate[index - 1],
+                corrections[subject]?[source[index]] == candidate[index]
+            else { continue }
+            result[index] = candidate[index]
+        }
+        return result
+    }
+
+    /// Keeping the number itself is insufficient: "3 commits" must not become
+    /// "commit 3". Detect a neighboring content word crossing a numeric placeholder
+    /// in either direction, while permitting its ordinary spelling/plural correction.
+    /// This is a local attachment check, not a complete semantic equivalence test.
+    static func numberAttachmentChanged(
+        sourceWords: [String], candidateWords: [String], tokens: [ProtectedToken],
+        language: TextLanguage
+    ) -> Bool {
+        let functionWords = grammarInsertionWords(for: language)
+        func equivalent(_ lhs: String, _ rhs: String) -> Bool {
+            lhs == rhs || minorCorrectionDistance(from: lhs, to: rhs, language: language) != nil
+        }
+        for token in tokens where token.kind == .number {
+            let placeholder = normalizeWord(token.placeholder)
+            guard let sourceIndex = sourceWords.firstIndex(of: placeholder),
+                let candidateIndex = candidateWords.firstIndex(of: placeholder)
+            else { continue }
+            for direction in [-1, 1] {
+                let sourceNeighbor = sourceIndex + direction
+                let crossedNeighbor = candidateIndex - direction
+                let sameNeighbor = candidateIndex + direction
+                guard sourceWords.indices.contains(sourceNeighbor),
+                    candidateWords.indices.contains(crossedNeighbor)
+                else { continue }
+                let word = sourceWords[sourceNeighbor]
+                guard !functionWords.contains(word), !word.hasPrefix("voxolp"),
+                    equivalent(word, candidateWords[crossedNeighbor])
+                else { continue }
+                if !candidateWords.indices.contains(sameNeighbor)
+                    || !equivalent(word, candidateWords[sameNeighbor])
+                {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     static func containsUnsupportedContent(
@@ -378,9 +555,10 @@ private extension FidelityValidator {
         var remainingCandidate = candidateWords
         let removableWords = grammarInsertionWords(for: language)
             .union(removableDiscourseWords(for: language, mode: mode))
+            .subtracting(subjectPronouns(for: language))
         let removableListWords = allowListFraming ? listFramingWords(for: language) : []
 
-        for source in sourceWords {
+        for (sourceIndex, source) in sourceWords.enumerated() {
             if let exactIndex = remainingCandidate.firstIndex(of: source) {
                 remainingCandidate.remove(at: exactIndex)
                 continue
@@ -394,6 +572,13 @@ private extension FidelityValidator {
                 continue
             }
             if removableWords.contains(source) || removableListWords.contains(source) {
+                continue
+            }
+            if subjectPronouns(for: language).contains(source),
+                redundantSubject(
+                    at: sourceIndex, source: sourceWords, candidate: candidateWords,
+                    language: language, mode: mode)
+            {
                 continue
             }
             return true
@@ -437,13 +622,20 @@ private extension FidelityValidator {
             // word: "peut" mapped to "peu" is one letter and a different
             // sentence. Criticals survive exactly or the edit is refused.
             !SpanRepair.criticalWords(for: language).contains(source),
-            !SpanRepair.criticalWords(for: language).contains(candidate)
+            !SpanRepair.criticalWords(for: language).contains(candidate),
+            !subjectPronouns(for: language).contains(source),
+            !subjectPronouns(for: language).contains(candidate)
         else {
             return nil
         }
         if knownGrammarAlternatives(for: language).contains(where: {
             $0.contains(source) && $0.contains(candidate)
         }) {
+            return 1
+        }
+        if isDuplicatedFragment(source, of: candidate)
+            || isDuplicatedFragment(candidate, of: source)
+        {
             return 1
         }
 
@@ -462,6 +654,72 @@ private extension FidelityValidator {
         let prefixCount = zip(source, candidate).prefix { $0 == $1 }.count
         let suffixCount = zip(source.reversed(), candidate.reversed()).prefix { $0 == $1 }.count
         return max(prefixCount, suffixCount) >= 2 ? distance : nil
+    }
+
+    /// Recognizes one exact duplicated syllable sequence rather than increasing
+    /// the edit-distance allowance for arbitrary names or content words.
+    /// Entire repeated words ("bonbon", names) and short fragments are excluded.
+    static func isDuplicatedFragment(_ longer: String, of shorter: String) -> Bool {
+        guard shorter.count >= 7, longer.count <= 64,
+            longer.allSatisfy(\.isLetter), shorter.allSatisfy(\.isLetter)
+        else { return false }
+        let source = Array(longer)
+        let target = Array(shorter)
+        let repeatedCount = source.count - target.count
+        guard repeatedCount >= 3, source.count - 2 * repeatedCount >= 2 else { return false }
+        for start in 0...(source.count - 2 * repeatedCount) {
+            let middle = start + repeatedCount
+            let end = middle + repeatedCount
+            if source[start..<middle].elementsEqual(source[middle..<end]),
+                (Array(source[..<middle]) + Array(source[end...])) == target
+            {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// An actor is not a disposable function word. In particular, dropping "il"
+    /// from "il ne faut pas" or changing "nous" to "vous" is not spelling cleanup.
+    static func subjectPronouns(for language: TextLanguage) -> Set<String> {
+        switch language {
+        case .french: ["je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles"]
+        case .english: ["i", "you", "he", "she", "it", "we", "they"]
+        }
+    }
+
+    /// A trailing "you know" or an explicit repeated nominal subject is spoken
+    /// scaffolding. These local patterns do not allow the only subject to vanish.
+    static func redundantSubject(
+        at index: Int, source: [String], candidate: [String],
+        language: TextLanguage, mode: CleanupMode
+    ) -> Bool {
+        func occurrences(of pattern: [String], in words: [String]) -> Int {
+            guard words.count >= pattern.count else { return 0 }
+            return (0...(words.count - pattern.count)).filter { start in
+                words[start..<(start + pattern.count)].elementsEqual(pattern)
+            }.count
+        }
+        if language == .english {
+            return mode == .rewrite && index + 2 == source.count
+                && source[index] == "you" && source[index + 1] == "know"
+        }
+        guard language == .french,
+            source[index] == "il" || source[index] == "elle"
+                || source[index] == "ils" || source[index] == "elles"
+        else { return false }
+        if source[index] == "il", index + 2 < source.count,
+            source[index + 1] == "y", source[index + 2] == "a",
+            occurrences(of: ["il", "y", "a"], in: source) > 1,
+            occurrences(of: ["il", "y", "a"], in: candidate) > 0
+        {
+            return true
+        }
+        guard mode == .rewrite, index >= 2, index + 1 < source.count,
+            ["le", "la", "les", "un", "une", "ce", "cette", "ces"].contains(source[index - 2])
+        else { return false }
+        let retainedSubject = [source[index - 2], source[index - 1], source[index + 1]]
+        return occurrences(of: retainedSubject, in: candidate) > 0
     }
 
     static func normalizeWord(_ word: String) -> String {

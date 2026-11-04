@@ -12,7 +12,7 @@
     "configSHA256": "bfa7f8778fb85017298b71b7d2be9dbbfcd77912cc2fac8a5088d4c4a06ffc1c",
     "provenance": "campagne v8 (teacher Wispr) — remplacement planifié par corpus humain, décision utilisateur en cours"
   },
-  "promptVersion": "voxol-cleanup-v5 (fidèle) + instruction Réécriture distincte",
+  "promptVersion": "voxol-cleanup-v7 (fidèle/réécriture, garde fr/en ciblée)",
   "validator": "v2 — réparation par spans + lexique critique (commit 4e5be50)",
   "baselineSuite": {
     "cases": 101,

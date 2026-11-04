@@ -4,6 +4,93 @@ import XCTest
 @testable import TextProcessingKit
 
 final class TextProcessingTests: XCTestCase {
+    func testFrenchElisionKeepsOuiAndConsonantalYNames() {
+        let text = "Je confirme que oui et que Yann arrive."
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(rawTranscript: text, preferredLanguage: .french))
+        XCTAssertEqual(preparation.normalizedText, text)
+    }
+
+    func testFrenchElisionRepairsASRSpacingWithoutChangingLiterals() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript:
+                    "Les besoins que avait l'association. Il précise que à Paris cela fonctionne.",
+                preferredLanguage: .french
+            )
+        )
+        XCTAssertEqual(
+            preparation.normalizedText,
+            "Les besoins qu'avait l'association. Il précise qu'à Paris cela fonctionne.")
+        let literal = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Garde `que avait` et « que avait » tels quels.",
+                preferredLanguage: .french
+            )
+        )
+        XCTAssertTrue(literal.normalizedText.contains("`que avait`"))
+        XCTAssertTrue(literal.normalizedText.contains("« que avait »"))
+    }
+
+    func testLanguageWithoutEvidenceFallsBackToTheRequestedLanguage() {
+        // "corrige ça" has no function word from either list: the old default
+        // called it English and the validator then rejected the French answer.
+        XCTAssertEqual(LanguageDetector.detect("corrige ça"), .english)
+        XCTAssertEqual(LanguageDetector.detect("corrige ça", fallback: .french), .french)
+        XCTAssertEqual(LanguageDetector.detect("je pense que oui", fallback: .english), .french)
+
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "corrige ça",
+                fallbackLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+        XCTAssertEqual(preparation.language, .french)
+    }
+
+    func testCodeSwitchSignalRequiresEvidenceFromBothLanguages() {
+        XCTAssertTrue(
+            LanguageDetector.containsCodeSwitching(
+                in: "Je pense que this should work maintenant"
+            )
+        )
+        XCTAssertTrue(
+            LanguageDetector.containsCodeSwitching(
+                in: "Je viens de rebooter mon laptop après un update"
+            )
+        )
+        XCTAssertFalse(
+            LanguageDetector.containsCodeSwitching(
+                in: "Je veux mettre à jour mon ordinateur maintenant"
+            )
+        )
+        XCTAssertFalse(
+            LanguageDetector.containsCodeSwitching(
+                in: "I need to update my laptop now"
+            )
+        )
+        XCTAssertFalse(
+            LanguageDetector.containsCodeSwitching(
+                in: "Tu peux corriger la slide maintenant"
+            )
+        )
+    }
+
+    func testCodeSwitchPromptForbidsTranslation() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Je pense que this should work maintenant",
+                fallbackLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+        let prompt = PolishingPromptBuilder.build(from: preparation)
+
+        XCTAssertTrue(prompt.user.contains("FRANÇAIS + ANGLAIS"))
+        XCTAssertTrue(prompt.user.contains("ne traduis rien"))
+    }
+
     func testAlreadyCorrectFrenchChatPreservesSurfaceTypography() {
         let transcripts = [
             "Alors j'aimerais bien que tu réduises l'ensemble des",
@@ -396,7 +483,7 @@ final class TextProcessingTests: XCTestCase {
         XCTAssertTrue(prompt.user.contains("DICTATION TO CLEAN:\n"))
         XCTAssertFalse(prompt.user.contains("{"))
         XCTAssertFalse(prompt.user.contains("CONTEXT BEFORE:"))
-        XCTAssertEqual(PolishingPrompt.version, "voxol-cleanup-v5")
+        XCTAssertEqual(PolishingPrompt.version, "voxol-cleanup-v8")
         XCTAssertLessThanOrEqual(prompt.maximumOutputTokens, 384)
     }
 

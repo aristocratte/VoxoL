@@ -101,6 +101,27 @@ def main() -> int:
         for value, ids in sorted(groups.items()):
             summarize(ids, f"  {dimension}={value}")
 
+    # Où le polisher n'a pas servi, et pourquoi. Chaque route est un choix du
+    # pipeline ; un repli avec sa raison dit s'il faut toucher un seuil, le
+    # validateur ou le modèle — le taux seul ne le dit pas.
+    routes: dict[str, int] = defaultdict(int)
+    reasons: dict[str, int] = defaultdict(int)
+    polish_times: list[float] = []
+    for dictation in window.values():
+        routes[str(dictation.get("route", "?"))] += 1
+        reason = dictation.get("fallback") or dictation.get("rejection")
+        if dictation.get("route") == "deterministicFallback":
+            reasons[str(reason or "non enregistré")] += 1
+        if isinstance(dictation.get("polishMs"), (int, float)):
+            polish_times.append(float(dictation["polishMs"]))
+    print("\nRoutes : " + ", ".join(f"{k} {v}" for k, v in sorted(routes.items())))
+    if reasons:
+        print("Replis : " + ", ".join(f"{k} {v}" for k, v in sorted(reasons.items())))
+    if polish_times:
+        p50 = percentile(polish_times, 0.5)
+        p95 = percentile(polish_times, 0.95)
+        print(f"Polisher : p50 {p50:.0f} ms, p95 {p95:.0f} ms sur {len(polish_times)} dictées")
+
     # Rétention D7 : parmi les personnes actives il y a 8-14 jours (ici, la
     # machine), y a-t-il encore de l'activité cette semaine ?
     previous = [

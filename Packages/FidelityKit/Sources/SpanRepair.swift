@@ -35,7 +35,7 @@ public enum SpanRepair {
                 "tous", "toutes", "tout", "toute", "chaque", "seulement",
                 "uniquement", "moins", "plus",
                 // Modalité et obligation.
-                "doit", "doivent", "peut", "peuvent", "devrait", "devraient",
+                "dois", "doit", "doivent", "peux", "peut", "peuvent", "devrait", "devraient",
                 "faut", "faudrait", "obligatoire", "interdit",
                 // Conditions et exceptions.
                 "si", "sinon", "sauf",

@@ -237,6 +237,18 @@ public enum DatasetBuilder {
 
     /// Builds stable splits without allowing a protected value to disappear.
     public static func build(_ examples: [CleanupDatasetExample]) -> DatasetBuildResult {
+        build(examples, aiExperiment: false)
+    }
+
+    /// Explicit experimental lane. AI curation never sets the human approval flag.
+    /// Its outputs are development data, not human-reviewed promotion evidence.
+    public static func buildAIExperiment(_ examples: [CleanupDatasetExample]) -> DatasetBuildResult {
+        build(examples, aiExperiment: true)
+    }
+
+    private static func build(
+        _ examples: [CleanupDatasetExample], aiExperiment: Bool
+    ) -> DatasetBuildResult {
         var train: [TrainingRecord] = []
         var validation: [TrainingRecord] = []
         var test: [TrainingRecord] = []
@@ -244,7 +256,11 @@ public enum DatasetBuilder {
         var contentKeys = Set<String>()
         var splitsByGroup: [String: Set<String>] = [:]
         for example in examples {
-            guard let group = example.splitGroup, let split = example.split else {
+            guard
+                let group = example.splitGroup,
+                let split = example.split,
+                ["train", "validation", "test"].contains(split)
+            else {
                 continue
             }
             splitsByGroup[group, default: []].insert(split)
@@ -254,9 +270,12 @@ public enum DatasetBuilder {
                 splits.count > 1 ? group : nil
             }
         )
+        let explicitSplitByGroup = splitsByGroup.compactMapValues { splits in
+            splits.count == 1 ? splits.first : nil
+        }
 
         for example in examples.sorted(by: { $0.id < $1.id }) {
-            guard isValid(example),
+            guard isValid(example, aiExperiment: aiExperiment),
                 example.splitGroup.map({ !conflictingGroups.contains($0) }) ?? true
             else {
                 rejected.append(example.id)
@@ -270,7 +289,7 @@ public enum DatasetBuilder {
                 continue
             }
             let record = trainingRecord(for: example)
-            switch assignedSplit(for: example) {
+            switch assignedSplit(for: example, explicitSplitByGroup: explicitSplitByGroup) {
             case "train":
                 train.append(record)
             case "validation":
@@ -291,8 +310,11 @@ public enum DatasetBuilder {
 }
 
 private extension DatasetBuilder {
-    static func isValid(_ example: CleanupDatasetExample) -> Bool {
-        guard example.approved, !example.id.isEmpty, !example.rawTranscript.isEmpty,
+    static func isValid(_ example: CleanupDatasetExample, aiExperiment: Bool) -> Bool {
+        let reviewEligible = aiExperiment
+            ? (!example.approved && example.source == "ai-curated-experimental")
+            : example.approved
+        guard reviewEligible, !example.id.isEmpty, !example.rawTranscript.isEmpty,
             !example.targetText.isEmpty,
             ["fr", "en"].contains(example.language),
             WritingProfile(rawValue: example.profile) != nil,
@@ -411,11 +433,24 @@ private extension DatasetBuilder {
         return String(result)
     }
 
-    static func assignedSplit(for example: CleanupDatasetExample) -> String {
+    static func assignedSplit(
+        for example: CleanupDatasetExample,
+        explicitSplitByGroup: [String: String]
+    ) -> String {
+        if let group = example.splitGroup {
+            if let split = explicitSplitByGroup[group] {
+                return split
+            }
+            return split(for: group)
+        }
         if let split = example.split {
             return split
         }
-        switch bucket(for: example.id) {
+        return split(for: example.id)
+    }
+
+    static func split(for identifier: String) -> String {
+        switch bucket(for: identifier) {
         case 0..<80:
             return "train"
         case 80..<90:

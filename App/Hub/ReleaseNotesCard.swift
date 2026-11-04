@@ -30,15 +30,18 @@ enum ReleaseNotes {
                 items: [
                     Item(
                         title: "Sentence-level repair",
-                        detail: "When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded."
+                        detail:
+                            "When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded."
                     ),
                     Item(
                         title: "Meaning is guarded harder",
-                        detail: "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases."
+                        detail:
+                            "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases."
                     ),
                     Item(
                         title: "Learning that can back down",
-                        detail: "A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself."
+                        detail:
+                            "A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself."
                     ),
                 ]
             ),
@@ -48,19 +51,23 @@ enum ReleaseNotes {
                 items: [
                     Item(
                         title: "Rewrite mode",
-                        detail: "Settings → Preparation → Rewrite: crutches like “du coup”, “en fait” and false starts are dropped, and the sentence is punctuated like written text. Faithful stays the default."
+                        detail:
+                            "Settings → Preparation → Rewrite: crutches like “du coup”, “en fait” and false starts are dropped, and the sentence is punctuated like written text. Faithful stays the default."
                     ),
                     Item(
                         title: "Updates install themselves",
-                        detail: "One click downloads the new version, verifies its signature, installs it and relaunches — no more browser and Finder round-trip."
+                        detail:
+                            "One click downloads the new version, verifies its signature, installs it and relaunches — no more browser and Finder round-trip."
                     ),
                     Item(
                         title: "The dictionary shows what it learns",
-                        detail: "A toast names each learned word, one correction is enough to get a suggestion, and a learned word is recognized immediately — not at the next launch."
+                        detail:
+                            "A toast names each learned word, one correction is enough to get a suggestion, and a learned word is recognized immediately — not at the next launch."
                     ),
                     Item(
                         title: "Words on screen are heard better",
-                        detail: "Names and terms visible in the target app guide the recognizer for that dictation."
+                        detail:
+                            "Names and terms visible in the target app guide the recognizer for that dictation."
                     ),
                 ]
             ),
@@ -70,22 +77,26 @@ enum ReleaseNotes {
                 items: [
                     Item(
                         title: "Cleanup runs on long dictations",
-                        detail: "It was skipped past twenty-four words — exactly the dictations that needed it most, which is why they read like a raw transcript."
+                        detail:
+                            "It was skipped past twenty-four words — exactly the dictations that needed it most, which is why they read like a raw transcript."
                     ),
                     Item(
                         title: "History and statistics are on by default",
-                        detail: "They stayed off until you found the switch, so a fresh install showed zeroes forever. Private mode still turns everything off in one click."
+                        detail:
+                            "They stayed off until you found the switch, so a fresh install showed zeroes forever. Private mode still turns everything off in one click."
                     ),
                     Item(
                         title: "Undo now has a redo",
-                        detail: "Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them."
+                        detail:
+                            "Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them."
                     ),
                     Item(
                         title: "Updates find you",
-                        detail: "VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings."
+                        detail:
+                            "VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings."
                     ),
                 ]
-            )
+            ),
         ]
     }
 

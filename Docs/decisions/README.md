@@ -13,4 +13,5 @@ celle qu'elle supersède.
 - ADR-0008 — modèles externes avec manifeste épinglé et vérifié (partiellement remplacée par ADR-0010)
 - ADR-0009 — ASR système à langue verrouillée
 - ADR-0010 — Qwen3.5-0.8B comme polisher expérimental
+- ADR-0011 — transcriptions avec locuteurs en Swift et Core ML (exception facultative à ADR-0002)
 - Threat model — limites de confiance, défenses et gates de release

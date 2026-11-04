@@ -25,6 +25,15 @@ enum DefaultSettings {
             // particular speaker gets wrong. Discarding them by default threw
             // away the app's ability to improve on the person using it.
             "voxol.learningEnabled": true,
+            // Session-only, byte-exact cleanup reuse while recording. This
+            // does not change the model prompt, weights or fidelity validation.
+            "voxol.prefetchEnabled": true,
+            // Text-quality v3 is observational until its separate promotion gates pass.
+            "voxol.textQualityV3Shadow": false,
+            "voxol.editGateV3": false,
+            "voxol.codeDictationV1": false,
+            "voxol.qwenPatchMode": false,
+            "voxol.selectiveASRRescue": false,
         ])
     }
 }

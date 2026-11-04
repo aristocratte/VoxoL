@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 
 from export_voxol_coreml_candidate import (
     COREMLTOOLS_VERSION,
@@ -24,6 +25,22 @@ SUPPORTED_RUNTIME_CONTRACTS = frozenset(
         "waveform-480000-to-376x640-v2",
     }
 )
+SHORT_WAVEFORM_RUNTIME_CONTRACT = re.compile(
+    r"^waveform-(?P<samples>\d+)-to-(?P<frames>\d+)x640-v3$"
+)
+
+
+def is_supported_runtime_contract(value: str | None) -> bool:
+    if value in SUPPORTED_RUNTIME_CONTRACTS:
+        return True
+    if value is None:
+        return False
+    match = SHORT_WAVEFORM_RUNTIME_CONTRACT.fullmatch(value)
+    if match is None:
+        return False
+    sample_count = int(match.group("samples"))
+    frame_count = int(match.group("frames"))
+    return 16_000 <= sample_count <= 480_000 and 0 < frame_count <= 376
 
 
 def validate_source_metadata(
@@ -37,7 +54,7 @@ def validate_source_metadata(
             f"expected {expected_delta_sha256}, got {actual}."
         )
     runtime_contract = metadata.get("voxol.runtime_contract")
-    if runtime_contract not in SUPPORTED_RUNTIME_CONTRACTS:
+    if not is_supported_runtime_contract(runtime_contract):
         raise ValueError("FP16 source has an incompatible VoxoL runtime contract.")
 
 

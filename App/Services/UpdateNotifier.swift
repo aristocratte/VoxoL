@@ -21,10 +21,11 @@ final class UpdateNotifier {
     static let shared = UpdateNotifier()
 
     /// The newer release, once one is found. Drives the sidebar badge.
-    private(set) var available: UpdateCheck.Release?
+    var available: UpdateCheck.Release? { state.available }
 
     /// Set while a check is in flight, so a manual retry can show progress.
-    private(set) var isChecking = false
+    var isChecking: Bool { state.phase == .checking }
+    private(set) var state = UpdateCheck.State()
 
     @ObservationIgnored private var pollingTask: Task<Void, Never>?
     @ObservationIgnored private let lastNotifiedKey = "voxol.lastNotifiedUpdateVersion"
@@ -51,16 +52,22 @@ final class UpdateNotifier {
     /// follows the feed, so a manual check from Settings cannot leave the
     /// sidebar showing something stale.
     func check(announce: Bool) async {
-        guard let feed = URL(string: UpdateFeed.releasesURL) else { return }
-        isChecking = true
-        defer { isChecking = false }
+        guard state.begin() else { return }
+        guard let feed = URL(string: UpdateFeed.releasesURL) else {
+            state.fail()
+            return
+        }
         do {
-            let (data, _) = try await URLSession.shared.data(from: feed)
-            let releases = try UpdateCheck.releases(fromGitHubJSON: data)
+            let request = URLRequest(url: feed, timeoutInterval: 15)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let response = response as? HTTPURLResponse else {
+                throw UpdateCheck.FeedError.invalidResponse
+            }
+            let releases = try UpdateCheck.releases(
+                fromGitHubJSON: data, statusCode: response.statusCode)
             let current = BugReportComposer.Environment.current().applicationVersion
-            let update = UpdateCheck.availableUpdate(current: current, releases: releases)
-            available = update
-            guard announce, let update else { return }
+            state.finish(current: current, releases: releases)
+            guard announce, let update = available else { return }
             // One alert per version: the same prompt on every launch teaches
             // the user to dismiss it without reading, and the badge is already
             // carrying the message from then on.
@@ -71,6 +78,7 @@ final class UpdateNotifier {
             // A failed check — offline, rate limited — must never interrupt the
             // app, and must not clear a badge that was legitimately raised by
             // an earlier successful check.
+            state.fail()
         }
     }
 

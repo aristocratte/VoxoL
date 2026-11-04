@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoxoL · YouTube vers MP3</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #192c40; background: #f4f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 880px; margin: 0 auto; padding: 38px 24px 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+    .brand { font-weight: 750; font-size: 19px; letter-spacing: -.5px; }
+    .brand span { color: #758395; font-weight: 450; font-size: 13px; margin-left: 10px; letter-spacing: 0; }
+    .badge { background: #e4eee8; color: #365c44; padding: 6px 11px; border-radius: 20px; font-size: 12px; }
+    h1 { font-size: clamp(30px, 5vw, 44px); letter-spacing: -1.6px; margin: 0 0 12px; }
+    .intro { color: #617184; line-height: 1.6; margin: 0 0 28px; max-width: 540px; }
+    .card { background: white; border: 1px solid #dce4ec; border-radius: 18px; padding: 26px; box-shadow: 0 6px 24px #192c4004; }
+    label { display: block; font-size: 14px; font-weight: 650; margin-bottom: 10px; }
+    textarea { width: 100%; min-height: 126px; resize: vertical; border: 1px solid #ccd7e2; border-radius: 10px; padding: 13px 14px; font: inherit; font-size: 14px; line-height: 1.6; background: #fafcfe; }
+    textarea:focus { outline: 3px solid #d8e8fb; border-color: #3279c0; }
+    .form-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; }
+    button, .button { border: 0; border-radius: 10px; padding: 13px 17px; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px; }
+    .primary { color: white; background: #2465a6; }
+    .primary:hover { background: #1a5189; }
+    .secondary { color: #244564; background: #eaf0f6; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint { font-size: 12px; color: #778596; margin: 12px 0 0; }
+    .status { margin: 22px 0 0; padding: 14px 16px; border-radius: 10px; background: #eef4fa; font-size: 14px; line-height: 1.5; }
+    .status.error { background: #fff0ec; color: #974b33; }
+    .result { margin-top: 14px; animation: arrive .3s ease-out both; }
+    .result-head { display: flex; gap: 14px; align-items: center; }
+    .file-icon { width: 44px; height: 48px; border-radius: 10px; background: #e8f0f8; display: grid; place-items: center; color: #2465a6; font-size: 12px; font-weight: 750; }
+    h2 { font-size: 17px; margin: 0 0 5px; }
+    .filename { color: #64768a; font-size: 13px; overflow-wrap: anywhere; }
+    .details { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+    .details span { font-size: 12px; border: 1px solid #e2e8ee; border-radius: 7px; padding: 5px 9px; color: #53677b; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .storage { display: flex; gap: 12px; align-items: center; margin: 20px 0; padding: 15px 17px; border: 1px solid #d8e7dd; background: #edf5ef; border-radius: 12px; }
+    .storage-icon { font-size: 22px; color: #386849; }
+    .storage strong { font-size: 13px; display: block; }
+    .storage code { font-size: 11px; color: #567761; display: block; margin-top: 4px; overflow-wrap: anywhere; }
+    .storage.error { background: #fff0ec; border-color: #efd4cb; color: #974b33; }
+    .queue-head { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 12px; gap: 16px; }
+    .queue-head h2 { margin: 0; }
+    .queue-summary { color: #617184; font-size: 12px; text-align: right; }
+    .job-main { min-width: 0; flex: 1; }
+    .job-title { font-size: 15px; margin: 0 0 5px; }
+    .job-percent { font-size: 23px; letter-spacing: -1px; font-variant-numeric: tabular-nums; font-weight: 700; color: #2465a6; }
+    .phase-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 16px 0 9px; }
+    .phase { font-size: 13px; color: #53677b; }
+    .metrics { color: #778596; font-size: 12px; font-variant-numeric: tabular-nums; min-height: 18px; margin-top: 9px; }
+    .track { height: 7px; background: #e9eff5; overflow: hidden; border-radius: 10px; }
+    .fill { height: 100%; width: 0; border-radius: inherit; background: #3279c0; transition: width .5s ease; position: relative; }
+    .active .fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #ffffff75, transparent); animation: shimmer 1.5s linear infinite; }
+    .indeterminate .fill { width: 30% !important; animation: glide 1.4s ease-in-out infinite; }
+    .ready .fill { background: #448c62; }
+    .ready .file-icon { color: #386849; background: #e7f2e9; }
+    .ready .phase, .ready .job-percent { color: #386849; }
+    .error .phase, .error .job-percent { color: #974b33; }
+    .error .fill { background: #c67d64; }
+    .spinner { width: 16px; height: 16px; border: 2px solid #cfdeec; border-top-color: #3279c0; border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; }
+    .empty { text-align: center; color: #778596; font-size: 13px; padding: 28px; border: 1px dashed #d5dfe8; border-radius: 14px; }
+    .handoff-note { font-size: 12px; color: #6b7a8b; line-height: 1.6; margin-top: 20px; }
+    .path { margin-top: 18px; font-size: 12px; color: #778596; overflow-wrap: anywhere; }
+    .path code { display: block; margin-top: 5px; font-size: 11px; }
+    .steps { display: flex; gap: 22px; margin-top: 26px; color: #6b7a8b; font-size: 12px; flex-wrap: wrap; }
+    .steps b { margin-right: 6px; color: #2465a6; }
+    [hidden] { display: none !important; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+    @keyframes glide { 0%, 100% { transform: translateX(-15%); } 50% { transform: translateX(250%); } }
+    @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { *, *::after { animation: none !important; transition: none !important; } .indeterminate .fill { width: 100% !important; opacity: .45; } }
+    @media (max-width: 560px) { main { padding: 26px 16px; } header { margin-bottom: 28px; } .form-bottom { align-items: stretch; flex-direction: column; gap: 12px; } .card { padding: 20px; } .brand span { display: none; } .actions > * { flex: 1; } .queue-head { align-items: flex-start; } .result-head { gap: 10px; } .job-percent { font-size: 20px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div class="brand">VoxoL<span>Outils de données</span></div><span class="badge">Sur ton SSD</span></header>
+    <h1>YouTube → MP3</h1>
+    <p class="intro">Colle tes liens. Les pistes audio se téléchargent en parallèle, directement sur ton SSD externe.</p>
+    <div id="storage" class="storage"><span class="storage-icon" aria-hidden="true">▣</span><div><strong id="storage-title">Vérification du SSD…</strong><code id="storage-path"></code></div></div>
+    <section class="card">
+      <form id="download-form">
+        <label for="youtube-urls">Liens YouTube · un par ligne</label>
+        <textarea id="youtube-urls" placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…&#10;https://www.youtube.com/shorts/…" required autocomplete="off" spellcheck="false"></textarea>
+        <div class="form-bottom">
+          <span id="parallel-hint" class="hint">3 téléchargements simultanés · doublons ignorés</span>
+          <button id="start" class="primary" type="submit" disabled>Lancer les téléchargements</button>
+        </div>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+    </section>
+    <section aria-label="Téléchargements">
+      <div class="queue-head"><h2>Téléchargements</h2><span id="queue-summary" class="queue-summary">Aucune vidéo pour le moment</span></div>
+      <div id="jobs"></div>
+      <p id="empty" class="empty">Tes téléchargements et leur progression apparaîtront ici.</p>
+    </section>
+    <p class="handoff-note">Dans ChatGPT, clique sur <strong>+ → Ajouter des fichiers</strong>, choisis le MP3 sur le SSD et colle la consigne de la vidéo. Elle demande un <strong>fichier JSON téléchargeable</strong>, avec contrôle du début, de la fin et du contenu. Enregistre le JSON sur le SSD à côté de l’audio.</p>
+    <div class="steps"><span><b>1</b>Colle les liens</span><span><b>2</b>Suis la progression</span><span><b>3</b>Joins les MP3 à ChatGPT</span></div>
+  </main>
+  <script>
+    const session = __SESSION_TOKEN__;
+    const form = document.querySelector('#download-form');
+    const start = document.querySelector('#start');
+    const status = document.querySelector('#status');
+    const list = document.querySelector('#jobs');
+    const cards = new Map();
+    let jobs = new Map();
+    let pollTimer = null;
+    let submitting = false;
+    let storageAvailable = false;
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, { ...options, headers: { 'X-Downloader-Session': session, 'Content-Type': 'application/json' } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'La requête a échoué.');
+      return data;
+    }
+    function message(text, error = false) {
+      status.hidden = false;
+      status.classList.toggle('error', error);
+      status.textContent = text;
+    }
+    function size(bytes) { return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} Mo` : `${Math.ceil(bytes / 1024)} Ko`; }
+    function duration(value) { const seconds = Math.round(value); return `${Math.floor(seconds / 60)} min ${String(seconds % 60).padStart(2, '0')} s`; }
+    function cardFor(job) {
+      if (cards.has(job.id)) return cards.get(job.id);
+      const card = document.createElement('article');
+      card.className = 'card result';
+      card.dataset.jobId = job.id;
+      card.innerHTML = `<div class="result-head"><div class="file-icon" aria-hidden="true">MP3</div><div class="job-main"><h3 class="job-title"></h3><div class="filename"></div></div><span class="job-percent"></span></div>
+        <div class="phase-row"><span class="phase"></span><span class="spinner" aria-hidden="true" hidden></span></div>
+        <div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div><div class="metrics"></div>
+        <div class="details" hidden><span class="duration"></span><span class="size"></span><span>Audio uniquement</span></div>
+        <div class="actions" hidden><a class="button secondary" href="https://chatgpt.com/" target="_blank" rel="noopener">Ouvrir ChatGPT ↗</a><button class="secondary" type="button" data-action="prompt">Copier la consigne</button><button class="secondary" type="button" data-action="path">Copier le chemin</button></div>
+        <div class="path" hidden>Fichier enregistré<code></code></div><button class="secondary retry" type="button" data-action="retry" hidden>Réessayer</button>`;
+      cards.set(job.id, card);
+      list.append(card);
+      return card;
+    }
+    function render(data) {
+      storageAvailable = data.storage.available;
+      start.disabled = submitting || !storageAvailable;
+      document.querySelector('#storage').classList.toggle('error', !storageAvailable);
+      document.querySelector('#storage-title').textContent = storageAvailable ? `${data.storage.external ? 'SSD connecté' : 'Dossier de sortie'} · ${data.storage.name}` : data.storage.error;
+      document.querySelector('#storage-path').textContent = data.storage.path;
+      document.querySelector('#parallel-hint').textContent = `${data.workers} téléchargements simultanés · doublons ignorés`;
+      jobs = new Map(data.jobs.map(job => [job.id, job]));
+      const ready = data.jobs.filter(job => job.status === 'ready').length;
+      const active = data.jobs.filter(job => ['downloading', 'converting', 'verifying'].includes(job.status)).length;
+      const queued = data.jobs.filter(job => job.status === 'queued').length;
+      const errors = data.jobs.filter(job => job.status === 'error').length;
+      document.querySelector('#queue-summary').textContent = data.jobs.length ? `${ready}/${data.jobs.length} prêts${active ? ` · ${active} en cours` : ''}${queued ? ` · ${queued} en attente` : ''}${errors ? ` · ${errors} en erreur` : ''}` : 'Aucune vidéo pour le moment';
+      document.querySelector('#empty').hidden = !!data.jobs.length;
+      for (const job of data.jobs) {
+        const card = cardFor(job);
+        const complete = job.status === 'ready';
+        const failed = job.status === 'error';
+        const running = ['downloading', 'converting', 'verifying'].includes(job.status);
+        const indeterminate = running && (job.progress == null || job.status !== 'downloading');
+        card.className = `card result ${complete ? 'ready' : failed ? 'error' : running ? 'active' : ''}${indeterminate ? ' indeterminate' : ''}`;
+        card.querySelector('.job-title').textContent = complete ? job.filename : `youtube-${job.video_id}`;
+        card.querySelector('.filename').textContent = job.url;
+        card.querySelector('.job-percent').textContent = complete ? '✓' : failed ? '!' : job.status === 'downloading' && job.progress != null ? `${Math.floor(job.progress)} %` : '—';
+        card.querySelector('.phase').textContent = failed ? job.error : job.phase;
+        card.querySelector('.spinner').hidden = !running;
+        const track = card.querySelector('.track');
+        track.setAttribute('aria-label', `Progression de youtube-${job.video_id}`);
+        track.setAttribute('aria-valuetext', failed ? job.error : job.phase);
+        if (job.progress != null && !indeterminate) track.setAttribute('aria-valuenow', String(Math.round(job.progress)));
+        else track.removeAttribute('aria-valuenow');
+        card.querySelector('.fill').style.width = `${complete ? 100 : job.progress ?? 0}%`;
+        const metrics = [];
+        if (running && job.status === 'downloading') {
+          if (job.downloaded_bytes != null) metrics.push(`${size(job.downloaded_bytes)}${job.total_bytes ? ` / ${job.estimated_total ? '≈ ' : ''}${size(job.total_bytes)}` : ''}`);
+          if (job.speed_bytes) metrics.push(`${size(job.speed_bytes)}/s`);
+          if (job.eta_seconds != null) metrics.push(`≈ ${duration(job.eta_seconds)} restantes`);
+        }
+        card.querySelector('.metrics').textContent = metrics.join(' · ');
+        card.querySelector('.details').hidden = !complete;
+        card.querySelector('.actions').hidden = !complete;
+        card.querySelector('.path').hidden = !complete;
+        card.querySelector('.retry').hidden = !failed;
+        card.querySelector('.retry').disabled = !storageAvailable;
+        if (complete) {
+          card.querySelector('.duration').textContent = duration(job.duration_seconds);
+          card.querySelector('.size').textContent = size(job.bytes);
+          card.querySelector('.path code').textContent = job.path;
+        }
+      }
+    }
+    async function refresh() {
+      try {
+        render(await request('/api/status'));
+      } catch (error) {
+        start.disabled = true;
+        message('Connexion interrompue. Garde le lanceur ouvert, puis recharge cette page.', true);
+      }
+      pollTimer = setTimeout(refresh, 650);
+    }
+    async function submit(links) {
+      clearTimeout(pollTimer);
+      submitting = true;
+      start.disabled = true;
+      try {
+        const data = await request('/api/download', { method: 'POST', body: JSON.stringify({ urls: links }) });
+        render(data);
+        message(data.added ? `${data.added} vidéo${data.added > 1 ? 's' : ''} ajoutée${data.added > 1 ? 's' : ''} à la file.${data.duplicates ? ` ${data.duplicates} doublon(s) ignoré(s).` : ''}` : 'Ces vidéos sont déjà dans la file ou enregistrées sur le SSD.');
+        if (data.added) document.querySelector('#youtube-urls').value = '';
+      } catch (error) {
+        message(error.message, true);
+      } finally {
+        submitting = false;
+        start.disabled = !storageAvailable;
+        pollTimer = setTimeout(refresh, 650);
+      }
+    }
+    form.addEventListener('submit', event => { event.preventDefault(); submit(document.querySelector('#youtube-urls').value.trim()); });
+    list.addEventListener('click', async event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const job = jobs.get(button.closest('article').dataset.jobId);
+      if (!job) return;
+      if (button.dataset.action === 'retry') { await submit([job.url]); return; }
+      try {
+        await navigator.clipboard.writeText(button.dataset.action === 'prompt' ? job.prompt : job.path);
+        button.textContent = button.dataset.action === 'prompt' ? 'Consigne copiée' : 'Chemin copié';
+      } catch (error) {
+        message('La copie n’a pas fonctionné. Le chemin est affiché ci-dessous et la consigne est dans le fichier .prompt.txt à côté du MP3.', true);
+      }
+    });
+    refresh();
+  </script>
+</body>
+</html>

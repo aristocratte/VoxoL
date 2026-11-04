@@ -165,6 +165,28 @@ def quality_reasons(
     return reasons
 
 
+def read_quarantine(path: Path, source_rows: list[dict[str, object]]) -> dict[str, list[str]]:
+    source = {str(row["id"]): row for row in source_rows}
+    quarantine: dict[str, list[str]] = {}
+    for item in read_jsonl(path):
+        identifier = str(item.get("id", ""))
+        reasons = item.get("reasons")
+        if identifier not in source or identifier in quarantine:
+            raise SystemExit(f"Unknown or duplicate quarantine ID: {identifier}")
+        if not isinstance(reasons, list) or not reasons or not all(
+            isinstance(reason, str) and reason.replace("_", "").isalnum()
+            for reason in reasons
+        ):
+            raise SystemExit(f"Invalid quarantine reasons: {identifier}")
+        row = source[identifier]
+        if item.get("audio_sha256") != row.get("audio_sha256") or item.get("raw_sha256") != hashlib.sha256(
+            str(row.get("raw", "")).encode("utf-8")
+        ).hexdigest():
+            raise SystemExit(f"Stale quarantine source identity: {identifier}")
+        quarantine[identifier] = [f"quarantine_{reason}" for reason in reasons]
+    return quarantine
+
+
 @dataclass(frozen=True)
 class SourceGroup:
     identifier: str
@@ -569,6 +591,7 @@ def prepare(
     freeze_timestamp: str,
     base_split_report: Path | None = None,
     additional_corpora: list[tuple[Path, Path]] | None = None,
+    quarantine_path: Path | None = None,
 ) -> dict[str, object]:
     corpora = [(input_manifest, dataset_root), *(additional_corpora or [])]
     source_rows = [
@@ -576,6 +599,7 @@ def prepare(
         for manifest, root in corpora
         for row in read_corpus_rows(manifest, root)
     ]
+    quarantine = read_quarantine(quarantine_path, source_rows) if quarantine_path else {}
     seen_ids: set[str] = set()
     seen_audio_hashes: set[str] = set()
     included = []
@@ -586,6 +610,7 @@ def prepare(
             raise SystemExit(f"Missing or duplicate item id: {identifier!r}")
         seen_ids.add(identifier)
         reasons = quality_reasons(dataset_root, row, seen_audio_hashes)
+        reasons.extend(quarantine.get(identifier, []))
         if reasons:
             excluded.append(
                 {
@@ -667,6 +692,9 @@ def prepare(
             "maximumWordsPerSecond": MAXIMUM_WORDS_PER_SECOND,
             "minimumDurationSeconds": MINIMUM_DURATION_SECONDS,
             "minimumWordsPerSecond": MINIMUM_WORDS_PER_SECOND,
+            "quarantineManifest": str(quarantine_path.resolve()) if quarantine_path else None,
+            "quarantineManifestSHA256": sha256(quarantine_path) if quarantine_path else None,
+            "quarantinedItemCount": len(quarantine),
         },
         "groups": [
             {
@@ -752,6 +780,7 @@ def main() -> None:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--base-split-report", type=Path)
+    parser.add_argument("--quarantine-jsonl", type=Path)
     parser.add_argument(
         "--additional-corpus",
         action="append",
@@ -773,6 +802,7 @@ def main() -> None:
             (Path(manifest).resolve(), Path(root).resolve())
             for manifest, root in arguments.additional_corpus
         ],
+        arguments.quarantine_jsonl.resolve() if arguments.quarantine_jsonl else None,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
 

@@ -1,6 +1,19 @@
 {
+ "corpora": {
+  "human-v1.jsonl": {
+   "role": "diagnostic-ai-labeled-v1",
+   "legacyRowSourceLabel": "human-authored",
+   "targetProvenance": "ai-labeled-and-human-reviewed",
+   "promotionEligible": false,
+   "independentSourceCount": 92,
+   "frEnGateIncludedRows": 182,
+   "frEnGateExcludedRows": 2,
+   "audit": "diagnostic-ai-labeled-v1-audit.json"
+  }
+ },
  "generatedAt": "2026-08-21",
- "note": "Réconciliation demandée par l'audit : 504 paires sources -> 411 retenues par le validateur (train 326 / valid 32 / test 53) + 93 rejetées. Les 184 'humaines' = 92 sources x 2 contrats ; s'y ajoutent 20 corrections personnelles (10 sources x 2) et 300 synthétiques (75 phrases originales x 4 variantes). Zéro paire d'origine inconnue ; zéro sortie Wispr.",
+ "auditedAt": "2026-08-29",
+ "note": "Historique : 504 paires sources -> 411 retenues et 93 rejetées. Le split initial par ID (train 326 / valid 32 / test 53) faisait traverser train/validation/test à 52 split_group, soit 183 lignes. Le builder corrigé assigne le groupe entier (train 344 / valid 26 / test 41), mais le JSONL exact ayant entraîné les candidats R1/R3 n'est pas persisté : ces adapters restent non reproductibles et non promotables. Les 184 paires dites humaines viennent de 92 sources x 2 contrats, avec cibles rédigées par un labeler IA ; s'y ajoutaient 20 corrections personnelles et 300 synthétiques. Zéro sortie Wispr dans cette lignée.",
  "pairs": [
   {
    "id": "human-perso-20260810-155017-faithful",

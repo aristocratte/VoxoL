@@ -58,6 +58,8 @@ public struct CapturedAudio: Sendable {
     public let maximumRootMeanSquare: Float
     /// Samples that arrived at or above the converter's ceiling.
     public let clippedSampleCount: Int
+    /// Exact input-format samples retained only when native retention was requested.
+    public let nativeAudio: NativeCapturedAudio?
 
     /// Creates a completed capture result.
     public init(
@@ -66,7 +68,8 @@ public struct CapturedAudio: Sendable {
         speechDetected: Bool,
         droppedSampleCount: Int,
         maximumRootMeanSquare: Float = 0,
-        clippedSampleCount: Int = 0
+        clippedSampleCount: Int = 0,
+        nativeAudio: NativeCapturedAudio? = nil
     ) {
         self.samples = samples
         self.sampleRate = sampleRate
@@ -74,11 +77,69 @@ public struct CapturedAudio: Sendable {
         self.droppedSampleCount = droppedSampleCount
         self.maximumRootMeanSquare = maximumRootMeanSquare
         self.clippedSampleCount = clippedSampleCount
+        self.nativeAudio = nativeAudio
     }
 
     /// Duration represented by the returned samples.
     public var durationSeconds: TimeInterval {
         Double(samples.count) / sampleRate
+    }
+}
+
+/// Unconverted microphone samples for opt-in listening and capture diagnostics.
+public struct NativeCapturedAudio: Sendable {
+    /// One array per original input channel, in capture order.
+    public let channels: [[Float]]
+    /// Hardware stream sample rate, before resampling.
+    public let sampleRate: Double
+    /// Frames omitted because the bounded native buffer filled.
+    public let droppedFrameCount: Int
+
+    /// A complete original can be used for listening; truncated captures cannot.
+    public var isComplete: Bool {
+        droppedFrameCount == 0 && sampleRate.isFinite && sampleRate > 0
+            && !(channels.first?.isEmpty ?? true)
+            && channels.allSatisfy { $0.count == channels[0].count }
+    }
+
+    /// Encodes the original samples exactly, without conversion, gain or lossy compression.
+    public func wavData() throws -> Data {
+        guard isComplete, channels.count <= 8, sampleRate <= 384_000 else {
+            throw CocoaError(.fileWriteInvalidFileName)
+        }
+        let count = channels[0].count
+        let byteCount = count * channels.count * MemoryLayout<Float>.size
+        guard byteCount < Int(UInt32.max) - 48 else { throw CocoaError(.fileWriteUnknown) }
+        var data = Data(capacity: 56 + byteCount)
+        func append16(_ value: UInt16) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
+        }
+        func append32(_ value: UInt32) {
+            var little = value.littleEndian
+            withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
+        }
+        data.append(contentsOf: "RIFF".utf8)
+        append32(UInt32(48 + byteCount))
+        data.append(contentsOf: "WAVEfmt ".utf8)
+        append32(16)
+        append16(3)  // IEEE Float32
+        append16(UInt16(channels.count))
+        append32(UInt32(sampleRate))
+        append32(UInt32(sampleRate) * UInt32(channels.count) * 4)
+        append16(UInt16(channels.count) * 4)
+        append16(32)
+        data.append(contentsOf: "fact".utf8)
+        append32(4)
+        append32(UInt32(count))
+        data.append(contentsOf: "data".utf8)
+        append32(UInt32(byteCount))
+        for frame in 0..<count {
+            for channel in channels {
+                append32(channel[frame].bitPattern)
+            }
+        }
+        return data
     }
 }
 
@@ -106,10 +167,19 @@ public enum AudioCaptureError: Error, Equatable, LocalizedError, Sendable {
 public final class AudioCaptureSession {
     /// Sample rate produced by every successful capture.
     public nonisolated static let sampleRate: Double = 16_000
+    /// Quality used consistently for capture and file-based recognition.
+    public nonisolated static let sampleRateConverterQuality = Int(AVAudioQuality.high.rawValue)
 
+    // Emergency capacity between background drains, not a recording limit.
     private let maximumDurationSeconds: Int
+    /// Applies at the next start. Callers must honor collection and private-mode settings.
+    public var retainsNativeAudio: Bool
+    /// Native callback buffer capacity between drains, subject to a 64 MiB limit.
+    public var maximumNativeDurationSeconds: Int = 15
     private var engine: AVAudioEngine?
     private var processor: AudioTapProcessor?
+    private let sampleDrainQueue = DispatchQueue(label: "voxol.audio-capture-drain", qos: .userInitiated)
+    private var sampleDrainTimer: DispatchSourceTimer?
     /// Feeds the render side of the voice-processing unit without ever
     /// playing a sample.
     private let silenceSource = AVAudioPlayerNode()
@@ -124,6 +194,10 @@ public final class AudioCaptureSession {
     /// The device the last successful `start()` actually recorded from, so the interface can say
     /// so instead of guessing.
     public private(set) var activeInputUID: String?
+    /// Negotiated input sample rate from the last successful start.
+    public private(set) var inputSampleRate: Double = 0
+    /// Negotiated input channel count from the last successful start.
+    public private(set) var inputChannelCount: UInt32 = 0
 
     /// How Apple's voice processing should be applied to the next capture.
     public var voiceProcessingMode: VoiceProcessingMode = .automatic
@@ -142,9 +216,10 @@ public final class AudioCaptureSession {
     /// diagnostics can tell a processed take from a raw one.
     public private(set) var voiceProcessingActive = false
 
-    /// Creates a capture session with bounded in-memory retention.
-    public init(maximumDurationSeconds: Int = 180) {
+    /// Creates a capture session with a bounded real-time callback buffer.
+    public init(maximumDurationSeconds: Int = 180, retainsNativeAudio: Bool = false) {
         self.maximumDurationSeconds = maximumDurationSeconds
+        self.retainsNativeAudio = retainsNativeAudio
     }
 
     /// Whether the underlying audio engine is currently running.
@@ -230,12 +305,16 @@ public final class AudioCaptureSession {
         guard inputFormat.channelCount > 0, inputFormat.sampleRate > 0 else {
             throw AudioCaptureError.inputUnavailable
         }
+        activeInputUID =
+            AudioInputDevices.uid(for: inputNode.auAudioUnit.deviceID) ?? activeInputUID
 
         let ringCapacity = maximumDurationSeconds * Int(Self.sampleRate)
         guard
             let processor = AudioTapProcessor(
                 inputFormat: inputFormat,
-                ringCapacity: ringCapacity
+                ringCapacity: ringCapacity,
+                retainsNativeAudio: retainsNativeAudio,
+                maximumNativeDurationSeconds: maximumNativeDurationSeconds
             )
         else {
             throw AudioCaptureError.converterUnavailable
@@ -254,6 +333,13 @@ public final class AudioCaptureSession {
             try engine.start()
             self.engine = engine
             self.processor = processor
+            inputSampleRate = inputFormat.sampleRate
+            inputChannelCount = inputFormat.channelCount
+            let timer = DispatchSource.makeTimerSource(queue: sampleDrainQueue)
+            timer.schedule(deadline: .now() + .milliseconds(250), repeating: .milliseconds(250))
+            timer.setEventHandler(handler: Self.makeDrainHandler(processor: processor))
+            sampleDrainTimer = timer
+            timer.resume()
         } catch {
             inputNode.removeTap(onBus: 0)
             throw error
@@ -268,6 +354,9 @@ public final class AudioCaptureSession {
 
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
+        sampleDrainTimer?.cancel()
+        sampleDrainTimer = nil
+        sampleDrainQueue.sync {}
         self.engine = nil
         self.processor = nil
 
@@ -277,7 +366,8 @@ public final class AudioCaptureSession {
             speechDetected: status.speechDetected,
             droppedSampleCount: status.droppedSampleCount,
             maximumRootMeanSquare: status.maximumRootMeanSquare,
-            clippedSampleCount: status.clippedSampleCount
+            clippedSampleCount: status.clippedSampleCount,
+            nativeAudio: processor.drainNativeAudio()
         )
     }
 
@@ -293,14 +383,29 @@ public final class AudioCaptureSession {
             processor.consume(buffer)
         }
     }
+
+    // Dispatch runs this off the main actor. Constructing the closure in
+    // start() would inherit actor isolation and trap on its first firing.
+    nonisolated static func makeDrainHandler(
+        processor: AudioTapProcessor
+    ) -> @Sendable () -> Void {
+        { [processor] in processor.collectSamples() }
+    }
 }
 
-private final class AudioTapProcessor: @unchecked Sendable {
+// Internal so the real conversion path can be checked offline with known signals.
+final class AudioTapProcessor: @unchecked Sendable {
     private static let frameSampleCount = 320
 
     private let converter: AVAudioConverter
     private let conversionBuffer: AVAudioPCMBuffer
     private let ringBuffer: AudioRingBuffer
+    private let retainedSamplesLock = NSLock()
+    private var retainedSamples: [Float] = []
+    private var retainedNativeChannels: [[Float]] = []
+    private let nativeRingBuffers: [AudioRingBuffer]
+    private let nativeSampleRate: Double
+    private var droppedNativeFrameCount = 0
     private let retainedSampleCount = Atomic<Int>(0)
     private let droppedSampleCount = Atomic<Int>(0)
     private let detectedSpeech = Atomic<Bool>(false)
@@ -315,7 +420,10 @@ private final class AudioTapProcessor: @unchecked Sendable {
     private var converterInputBuffer: AVAudioPCMBuffer?
     private var providedConverterInput = false
 
-    init?(inputFormat: AVAudioFormat, ringCapacity: Int) {
+    init?(
+        inputFormat: AVAudioFormat, ringCapacity: Int, retainsNativeAudio: Bool = false,
+        maximumNativeDurationSeconds: Int = 15
+    ) {
         guard
             let targetFormat = AVAudioFormat(
                 commonFormat: .pcmFormatFloat32,
@@ -332,9 +440,31 @@ private final class AudioTapProcessor: @unchecked Sendable {
             return nil
         }
 
+        // Match the file loader's high-quality conversion. Signal checks at
+        // 48 kHz found upper-band attenuation and high-frequency fold-back
+        // into the 16 kHz speech band with the default setting.
+        converter.sampleRateConverterQuality = AudioCaptureSession.sampleRateConverterQuality
         self.converter = converter
         self.conversionBuffer = conversionBuffer
         ringBuffer = AudioRingBuffer(capacity: ringCapacity)
+        nativeSampleRate = inputFormat.sampleRate
+        // A native copy must never prevent ASR on an unsupported input format.
+        // Bound total native sample memory even with high-rate multichannel devices.
+        let canRetainNative =
+            retainsNativeAudio && inputFormat.commonFormat == .pcmFormatFloat32
+            && !inputFormat.isInterleaved && inputFormat.channelCount <= 8
+        let nativeCapacity = Int(
+            min(
+                Double(max(0, maximumNativeDurationSeconds)),
+                Double(ringCapacity) / AudioCaptureSession.sampleRate
+            ) * inputFormat.sampleRate)
+        let boundedCapacity = min(
+            nativeCapacity, 64 * 1_024 * 1_024 / (Int(inputFormat.channelCount) * 4))
+        nativeRingBuffers =
+            canRetainNative && boundedCapacity > 0
+            ? (0..<inputFormat.channelCount).map { _ in AudioRingBuffer(capacity: boundedCapacity) }
+            : []
+        retainedNativeChannels = nativeRingBuffers.map { _ in [] }
     }
 
     var status: AudioCaptureStatus {
@@ -353,6 +483,13 @@ private final class AudioTapProcessor: @unchecked Sendable {
     }
 
     func consume(_ inputBuffer: AVAudioPCMBuffer) {
+        if !nativeRingBuffers.isEmpty, let channels = inputBuffer.floatChannelData {
+            for (index, ring) in nativeRingBuffers.enumerated() {
+                let count = Int(inputBuffer.frameLength)
+                let written = ring.write(UnsafeBufferPointer(start: channels[index], count: count))
+                if index == 0 { droppedNativeFrameCount += count - written }
+            }
+        }
         conversionBuffer.frameLength = 0
         converterInputBuffer = inputBuffer
         providedConverterInput = false
@@ -433,12 +570,47 @@ private final class AudioTapProcessor: @unchecked Sendable {
         }
     }
 
+    /// The audio callback only writes to the fixed ring; this consumer keeps
+    /// earlier samples before the ring fills, including on recordings over 180 s.
+    func collectSamples() {
+        retainedSamplesLock.lock()
+        retainedSamples.append(contentsOf: ringBuffer.readAll())
+        for (index, ring) in nativeRingBuffers.enumerated() {
+            retainedNativeChannels[index].append(contentsOf: ring.readAll())
+        }
+        retainedSamplesLock.unlock()
+    }
+
     func drainSamples() -> [Float] {
-        ringBuffer.readAll()
+        retainedSamplesLock.lock()
+        retainedSamples.append(contentsOf: ringBuffer.readAll())
+        let result = retainedSamples
+        retainedSamples = []
+        retainedSamplesLock.unlock()
+        return result
+    }
+
+    func drainNativeAudio() -> NativeCapturedAudio? {
+        guard !nativeRingBuffers.isEmpty else { return nil }
+        retainedSamplesLock.lock()
+        for (index, ring) in nativeRingBuffers.enumerated() {
+            retainedNativeChannels[index].append(contentsOf: ring.readAll())
+        }
+        let channels = retainedNativeChannels
+        retainedNativeChannels = nativeRingBuffers.map { _ in [] }
+        retainedSamplesLock.unlock()
+        return NativeCapturedAudio(
+            channels: channels, sampleRate: nativeSampleRate,
+            droppedFrameCount: droppedNativeFrameCount)
     }
 
     func snapshotSamples(maximumCount: Int) -> [Float] {
-        ringBuffer.snapshotLatest(maximumCount: maximumCount)
+        guard maximumCount > 0 else { return [] }
+        retainedSamplesLock.lock()
+        retainedSamples.append(contentsOf: ringBuffer.readAll())
+        let result = Array(retainedSamples.suffix(maximumCount))
+        retainedSamplesLock.unlock()
+        return result
     }
 }
 
@@ -604,7 +776,7 @@ public enum AudioInputDevices {
         return list.reduce(0) { $0 + Int($1.mNumberChannels) }
     }
 
-    private static func uid(for deviceID: AudioDeviceID) -> String? {
+    fileprivate static func uid(for deviceID: AudioDeviceID) -> String? {
         string(from: deviceID, selector: kAudioDevicePropertyDeviceUID)
     }
 

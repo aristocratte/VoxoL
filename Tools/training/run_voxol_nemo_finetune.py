@@ -49,6 +49,8 @@ class TrainingConfiguration:
     seed: int
     deterministic: bool
     resume_checkpoint: str | None
+    initial_delta: str | None = None
+    initial_delta_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -80,7 +82,13 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--num-workers", type=int, default=2)
     result.add_argument("--seed", type=int, default=42)
     result.add_argument("--deterministic", action="store_true")
-    result.add_argument("--resume-checkpoint", type=Path)
+    initialization = result.add_mutually_exclusive_group()
+    initialization.add_argument("--resume-checkpoint", type=Path)
+    initialization.add_argument(
+        "--initial-delta", type=Path,
+        help="Start a fresh optimizer from a pinned VoxoL encoder delta.",
+    )
+    result.add_argument("--initial-delta-sha256")
     result.add_argument("--dry-run", action="store_true")
     return result
 
@@ -112,6 +120,19 @@ def validated_configuration(arguments: argparse.Namespace) -> TrainingConfigurat
         raise SystemExit(
             f"Values must be nonnegative: {', '.join(invalid_nonnegative)}"
         )
+    if (arguments.initial_delta is None) != (arguments.initial_delta_sha256 is None):
+        raise SystemExit("--initial-delta and --initial-delta-sha256 are required together.")
+    if arguments.initial_delta is not None:
+        if re.fullmatch(r"[0-9a-fA-F]{64}", arguments.initial_delta_sha256) is None:
+            raise SystemExit("The initial delta SHA-256 must contain 64 hexadecimal digits.")
+        if not arguments.initial_delta.is_file() or arguments.initial_delta.stat().st_size == 0:
+            raise SystemExit(f"Missing initial delta: {arguments.initial_delta}")
+        if sha256(arguments.initial_delta) != arguments.initial_delta_sha256.lower():
+            raise SystemExit("The initial delta SHA-256 does not match.")
+        if not (arguments.freeze_decoder and arguments.freeze_joint and arguments.freeze_batchnorm):
+            raise SystemExit("Starting from an encoder delta requires frozen decoder, joint and BatchNorm.")
+        if arguments.experiment_root.exists() and any(arguments.experiment_root.iterdir()):
+            raise SystemExit("Starting from an initial delta requires a new, empty experiment directory.")
     for manifest in (arguments.train_manifest, arguments.validation_manifest):
         if not arguments.dry_run and (not manifest.is_file() or manifest.stat().st_size == 0):
             raise SystemExit(f"Missing training manifest: {manifest}")
@@ -152,6 +173,14 @@ def validated_configuration(arguments: argparse.Namespace) -> TrainingConfigurat
             str(arguments.resume_checkpoint.resolve())
             if arguments.resume_checkpoint is not None
             else None
+        ),
+        initial_delta=(
+            str(arguments.initial_delta.resolve())
+            if arguments.initial_delta is not None else None
+        ),
+        initial_delta_sha256=(
+            arguments.initial_delta_sha256.lower()
+            if arguments.initial_delta_sha256 is not None else None
         ),
     )
 
@@ -287,6 +316,69 @@ def capture_trainable_base_state(
     if not selected:
         raise RuntimeError("The selective fine-tuning recipe selected no parameters.")
     return selected
+
+
+def initialize_trainable_state(
+    model: object,
+    configuration: TrainingConfiguration,
+    base_artifact_sha256: str,
+    torch: object,
+) -> tuple[dict[str, object], dict[str, object] | None]:
+    # Save NVIDIA's original weights before applying the parent. Exporters add
+    # the resulting cumulative delta to NVIDIA, so a parent-relative delta
+    # would silently discard the previous fine-tuning at conversion time.
+    base_state = capture_trainable_base_state(model, torch)
+    if configuration.initial_delta is None:
+        return base_state, None
+    path = Path(configuration.initial_delta)
+    if sha256(path) != configuration.initial_delta_sha256:
+        raise ValueError("The initial delta SHA-256 changed.")
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    if not isinstance(payload, dict):
+        raise ValueError("The initial delta must be a VoxoL parameter-delta payload.")
+    expected = {
+        "schemaVersion": 2,
+        "artifactType": "voxol-parameter-delta",
+        "baseModel": MODEL_ID,
+        "baseRevision": MODEL_REVISION,
+        "baseArtifactSHA256": base_artifact_sha256,
+        "trainedTopEncoderLayers": configuration.train_top_encoder_layers,
+        "trainDecoder": configuration.train_decoder,
+        "trainJoint": configuration.train_joint,
+        "batchNormFrozen": configuration.freeze_batchnorm,
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value or type(payload.get(key)) is not type(value):
+            raise ValueError(f"Initial delta metadata mismatch for {key}.")
+    state_delta = payload.get("stateDelta")
+    if not isinstance(state_delta, dict) or set(state_delta) != set(base_state):
+        raise ValueError("The initial delta must contain exactly the selected trainable tensors.")
+    parameters = dict(model.named_parameters())
+    maximum_update = 0.0
+    parameter_count = 0
+    # Check every tensor before changing any parameter.
+    for name, source in state_delta.items():
+        if not isinstance(source, torch.Tensor) or source.dtype != torch.float32:
+            raise ValueError(f"Initial delta tensor must be FP32: {name}")
+        if source.shape != parameters[name].shape:
+            raise ValueError(f"Initial delta tensor shape mismatch: {name}")
+        if not torch.isfinite(source).all().item():
+            raise ValueError(f"Initial delta tensor is nonfinite: {name}")
+        maximum_update = max(maximum_update, float(source.abs().max()))
+        parameter_count += source.numel()
+    with torch.no_grad():
+        for name, source in state_delta.items():
+            destination = parameters[name]
+            destination.add_(source.to(device=destination.device, dtype=destination.dtype))
+    return base_state, {
+        "path": str(path.resolve()),
+        "sha256": configuration.initial_delta_sha256,
+        "tensorCount": len(state_delta),
+        "parameterCount": parameter_count,
+        "maximumAbsoluteUpdate": maximum_update,
+        "optimizerResumed": False,
+        "outputDeltaReference": "pinned-nvidia-base",
+    }
 
 
 def true_parameter_delta(
@@ -493,7 +585,9 @@ def main() -> None:
         freeze_batchnorm=configuration.freeze_batchnorm,
         torch=torch,
     )
-    trainable_base_state = capture_trainable_base_state(model, torch)
+    trainable_base_state, initialization_report = initialize_trainable_state(
+        model, configuration, base_artifact_sha256, torch,
+    )
     validation_items = load_validation_items(
         Path(configuration.validation_manifest)
     )
@@ -546,6 +640,7 @@ def main() -> None:
                 "trainDecoder": configuration.train_decoder,
                 "trainJoint": configuration.train_joint,
                 "batchNormFrozen": configuration.freeze_batchnorm,
+                "initialDeltaSHA256": configuration.initial_delta_sha256,
                 "stateDelta": true_parameter_delta(
                     pl_module,
                     trainable_base_state,
@@ -666,6 +761,8 @@ def main() -> None:
         "totalParameters": total,
         "trainableFraction": trainable / total,
         "fullCheckpointRoot": str(full_checkpoint_root),
+        "initialization": initialization_report,
+        "outputDeltaReference": "pinned-nvidia-base",
     }
     (experiment_root / "training-configuration.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wispr · Collecte YouTube</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #10141c; color: #eef2f8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 85% 0%, #263657 0, transparent 42%), #10141c; }
+    main { max-width: 920px; margin: 0 auto; padding: 48px 24px 80px; }
+    .eyebrow { color: #9abaff; font-size: 13px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -.04em; margin: 12px 0 10px; }
+    .intro { color: #aeb9ca; max-width: 670px; line-height: 1.55; margin-bottom: 28px; }
+    section { background: #1a2230; border: 1px solid #344056; border-radius: 18px; padding: 24px; margin-top: 18px; box-shadow: 0 16px 48px #0002; }
+    h2 { font-size: 18px; margin: 0 0 16px; }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+    textarea { display: block; width: 100%; min-height: 220px; resize: vertical; padding: 16px; border-radius: 12px; background: #101722; border: 1px solid #485874; color: #eef2f8; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    textarea:focus { outline: 2px solid #7da7ff; outline-offset: 2px; }
+    .hint { color: #aeb9ca; font-size: 13px; line-height: 1.5; margin: 10px 0 0; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+    button { border: 1px solid #53627a; border-radius: 10px; padding: 11px 17px; color: #eef2f8; background: #2a3649; font: inherit; font-weight: 600; cursor: pointer; }
+    button.primary { background: #83aaff; color: #101722; border-color: #83aaff; }
+    button.danger { background: #3e2c38; border-color: #7a4355; }
+    button:hover:not(:disabled) { filter: brightness(1.15); }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    .status-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .indicator { width: 10px; height: 10px; border-radius: 50%; background: #8393ac; }
+    .indicator.running { background: #83aaff; box-shadow: 0 0 0 5px #83aaff22; }
+    .indicator.done { background: #77d5a0; }
+    .indicator.error { background: #f4a087; }
+    #status-text { font-weight: 600; }
+    #counts { color: #aeb9ca; font-size: 14px; margin: 10px 0 0; }
+    #eta { color: #a9c3ff; font-size: 14px; line-height: 1.5; margin: 12px 0 0; }
+    #message { min-height: 20px; margin-top: 14px; color: #f4a087; font-size: 14px; }
+    #message.ok { color: #77d5a0; }
+    #log { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #0c1119; border: 1px solid #354155; border-radius: 10px; padding: 15px; color: #c5d0e0; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 100px; }
+    .output { color: #aeb9ca; font-size: 13px; overflow-wrap: anywhere; }
+    .output strong { color: #e5eaf4; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Wispr Flow · collecteur local</div>
+    <h1>Transcrire des vidéos YouTube</h1>
+    <p class="intro">Colle autant de liens que nécessaire. Jusqu’à trois vidéos sont traitées en parallèle ; les téléchargements et segments déjà terminés sont conservés pour une reprise après coupure.</p>
+
+    <section aria-labelledby="input-heading">
+      <h2 id="input-heading">Vidéos à traiter</h2>
+      <label for="links">Liens YouTube ou playlists</label>
+      <textarea id="links" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…&#10;https://youtu.be/…&#10;https://www.youtube.com/playlist?list=…"></textarea>
+      <p class="hint">Un lien par ligne, ou colle directement une liste avec du texte et des puces. Les doublons sont ignorés.</p>
+      <div class="controls">
+        <button id="start" class="primary" type="button">Démarrer la collecte</button>
+        <button id="resume" type="button">Reprendre la dernière collecte</button>
+        <button id="stop" class="danger" type="button">Arrêter</button>
+      </div>
+      <div id="message" role="alert" aria-live="polite"></div>
+    </section>
+
+    <section aria-labelledby="progress-heading">
+      <h2 id="progress-heading">Progression</h2>
+      <div class="status-line"><span id="indicator" class="indicator"></span><span id="status-text">Chargement…</span></div>
+      <p id="counts"></p>
+      <p id="eta" aria-live="polite">Heure de fin : en attente de progression.</p>
+      <p class="output">Résultats : <strong id="output-dir">—</strong></p>
+      <pre id="log" aria-label="Journal de la collecte">Aucune collecte en cours.</pre>
+    </section>
+  </main>
+  <script>
+    const token = __SESSION_TOKEN__;
+    const el = id => document.getElementById(id);
+    let busy = false;
+
+    async function request(path, data) {
+      const response = await fetch(path, {
+        method: data === undefined ? 'GET' : 'POST',
+        headers: {'X-Wispr-Session': token, 'Content-Type': 'application/json'},
+        body: data === undefined ? undefined : JSON.stringify(data),
+        cache: 'no-store'
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Erreur HTTP ${response.status}`);
+      return result;
+    }
+
+    function render(state) {
+      const counts = state.counts || {};
+      const done = counts.done || 0;
+      const failures = (counts.download_failed || 0) + (counts.transcription_failed || 0);
+      const indicator = el('indicator');
+      indicator.className = 'indicator ' + (state.running ? 'running' : state.complete ? 'done' : failures || state.sourceErrors?.length ? 'error' : '');
+      el('status-text').textContent = state.running ? 'Collecte en cours' : state.complete ? 'Collecte terminée' : state.hasJob ? 'Collecte interrompue ou incomplète' : 'Prêt à démarrer';
+      el('counts').textContent = state.hasJob ? `${done} / ${state.total} vidéo(s) terminée(s) · ${counts.running || 0} en cours · ${failures} échec(s) · ${(state.sourceErrors || []).length} erreur(s) de source` : 'Aucune collecte enregistrée';
+      const eta = state.eta || {};
+      if (state.complete) {
+        el('eta').textContent = 'Collecte terminée.';
+      } else if (!state.running) {
+        el('eta').textContent = 'Heure de fin : collecte en pause ou incomplète.';
+      } else if (eta.at) {
+        const when = new Intl.DateTimeFormat('fr-FR', {dateStyle: 'short', timeStyle: 'short'}).format(new Date(eta.at));
+        const hours = Math.floor(eta.minutesRemaining / 60);
+        const minutes = eta.minutesRemaining % 60;
+        const remaining = hours ? `${hours} h ${String(minutes).padStart(2, '0')}` : `${minutes} min`;
+        const caveat = eta.provisional ? ` · provisoire (${eta.knownVideos}/${eta.totalVideos} durées connues${eta.failedChunks ? `, ${eta.failedChunks} segment(s) à relancer` : ''})` : '';
+        el('eta').textContent = `Fin estimée du passage : ${when} (dans ~${remaining})${caveat}`;
+      } else {
+        const progress = eta.estimatedTotalChunks ? `${eta.completedChunks} / ~${eta.estimatedTotalChunks} segments validés` : 'préparation des vidéos';
+        el('eta').textContent = `Heure de fin : calcul en cours · ${progress}`;
+      }
+      el('output-dir').textContent = state.outputDir || '—';
+      el('log').textContent = state.log || 'Aucun journal pour le moment.';
+      el('start').disabled = busy || state.running;
+      el('resume').disabled = busy || state.running || !state.hasJob;
+      el('stop').disabled = busy || !state.canStop;
+    }
+
+    async function refresh() {
+      try { render(await request('/api/status')); }
+      catch (error) { el('message').className = ''; el('message').textContent = error.message; }
+    }
+
+    async function act(path, data, success) {
+      busy = true;
+      el('message').className = '';
+      el('message').textContent = '';
+      try {
+        render(await request(path, data));
+        el('message').className = 'ok';
+        el('message').textContent = success;
+      } catch (error) {
+        el('message').textContent = error.message;
+      } finally {
+        busy = false;
+        await refresh();
+      }
+    }
+
+    el('start').addEventListener('click', () => act('/api/start', {links: el('links').value}, 'Collecte démarrée.'));
+    el('resume').addEventListener('click', () => act('/api/resume', {}, 'Reprise démarrée.'));
+    el('stop').addEventListener('click', () => act('/api/stop', {}, 'Arrêt demandé. La reprise restera possible.'));
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

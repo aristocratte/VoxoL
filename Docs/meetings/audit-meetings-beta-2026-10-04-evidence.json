@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-10-04",
+  "user_timezone": "America/Mexico_City",
+  "plugin": {
+    "slug": "chatgpt-meetings",
+    "version": "0.8.77",
+    "license": "Proprietary",
+    "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77"
+  },
+  "git_head": "b27f0c97edf9e6c47be9790158692710f4f7f79d",
+  "git_status_at_evidence_sha256": "3aa9bfed565832b69947088f07f03e432332abca389980c54e5f7b12d132e377",
+  "evidence_levels": [
+    "public_documentation",
+    "static_source_inspection",
+    "read_only_connector_response"
+  ],
+  "connector_observations": {
+    "get_profile": {
+      "isError": false,
+      "identity_fields_omitted": true
+    },
+    "find_all": {
+      "arguments": {
+        "limit": 5
+      },
+      "isError": false,
+      "results_count": 0,
+      "has_more": false,
+      "cursor": null
+    },
+    "fetch": {
+      "called": false,
+      "reason": "No available private notes"
+    }
+  },
+  "public_sources": [
+    {
+      "url": "https://help.openai.com/en/articles/20001546-the-meetings-plugin-in-chatgpt",
+      "accessed_on": "2026-10-04",
+      "type": "vendor_documentation"
+    },
+    {
+      "url": "https://help.openai.com/en/articles/11487532-chatgpt-record",
+      "accessed_on": "2026-10-04",
+      "type": "legacy_product_reference_only",
+      "note": "Record capabilities are not attributed to Meetings Beta"
+    }
+  ],
+  "limitations": [
+    "Native Codex UI access refused by computer-use tool; no bypass",
+    "No available meeting note to fetch",
+    "No recording, permissions, real generation, sharing or recovery test",
+    "No performance or quality qualification",
+    "Recommendations not user-approved implementation scope"
+  ],
+  "static_checks": {
+    "plugin_version": true,
+    "capture_limit_3598_seconds": true,
+    "capture_ui_announces_one_hour": true,
+    "import_limit_two_hours": true,
+    "diarization_limit_two_hours": true,
+    "personal_notes_present": true,
+    "actions_as_document_blocks": true,
+    "plugin_live_notes_conditional": true,
+    "plugin_live_transcript_conditional": true,
+    "no_personal_notes_input_in_document_generation": true,
+    "current_screen_routed": true
+  },
+  "document_checks": {
+    "existing_local_links_checked": 30,
+    "markdown_fences_balanced": true,
+    "credential_pattern_scan": true
+  },
+  "artifact": {
+    "path": "/Users/aris/Documents/Zphyr/Docs/meetings/audit-meetings-beta-2026-10-04.md",
+    "sha256": "9346ceeca58638e1c8e4e2f03d0e5229ce7ecf8e760595a3a8c949afed3673b8",
+    "previous_functional_audit_sha256": "4f596bb24f96883b52517fd6a837b0732c2e813ff4fbaf5938bc57f4086a1a17"
+  },
+  "files": [
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/README.md",
+      "bytes": 24643,
+      "sha256": "1ffaf188de7770a88fccf21c5be7fea363f4b80d3db0e5eb8c067e901b7b8e36",
+      "lines": 219
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/.codex-plugin/plugin.json",
+      "bytes": 2060,
+      "sha256": "a394891866df6ec8344011bebbb173e7364fd7d4a05a76007865e71b9aae794e",
+      "lines": 70
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/.app.json",
+      "bytes": 160,
+      "sha256": "4dfd766038c06fab2c02d72c30af41f11c2425ef18502bb41c37992ade9094b6",
+      "lines": 9
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/skills/search-meetings/SKILL.md",
+      "bytes": 2393,
+      "sha256": "16a328fd9e7c1aa5147f075fb05ca3006494191747ed60a5da161f26d5f3fc75",
+      "lines": 27
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/skills/one-on-one-prep/SKILL.md",
+      "bytes": 3367,
+      "sha256": "161b6055696841b64df0f211a7812c4ef53949d5744f1edc9ff166a518e5c967",
+      "lines": 36
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/skills/review-meeting-follow-ups/SKILL.md",
+      "bytes": 4874,
+      "sha256": "9580fae3730102662cc3b89356f48490069f4a2e19fb0c4e097318e52e193d14",
+      "lines": 80
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scheduled/weekday-one-on-one-prep.json",
+      "bytes": 278,
+      "sha256": "167d3c2274e221e3d4e5b21d128a031bcc306d4fa87010aca24a2693a15d205a",
+      "lines": 8
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scheduled/end-of-day-meeting-follow-ups.json",
+      "bytes": 350,
+      "sha256": "bd996bccf47264705977f9d387f4bea9d6d2f17f9d43c0caf21bacc323266d4c",
+      "lines": 8
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scripts/meetings_mcp.py",
+      "bytes": 149782,
+      "sha256": "fbb72323a77272af456ee21f225fb36ddc379e277e5c884d58c17d780e872af7",
+      "lines": 3760
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scripts/meetings_settings.py",
+      "bytes": 9378,
+      "sha256": "26d0b4be8cd86050da66d5ab2f3c718ffd37ff4a6b68bc7d95fde252f079c79f",
+      "lines": 284
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scripts/meetings_calendar_types.py",
+      "bytes": 3474,
+      "sha256": "564d55bafb46194f02ff91c5a2c6d1420fd99eed518a6b00e4d3631b3eac9def",
+      "lines": 113
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/scripts/meetings_note_status.py",
+      "bytes": 8261,
+      "sha256": "7155bd15d300d915fc04ffa0528a65c05d808a65e7adc5e4322458e90ead9ff5",
+      "lines": 277
+    },
+    {
+      "kind": "plugin",
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/assets/meetings-app.html",
+      "bytes": 1742306,
+      "sha256": "ad6c67c6dda8f5f628e31b4f2b42c65d3df0234a94f8517fbb05a4d4a553b282",
+      "lines": 281
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Services/MeetingCalendarStore.swift",
+      "bytes": 4698,
+      "sha256": "b40791ca5d6bc0f8552b86cb5ed91acb4e92d90c2240ddfd34ec37b68f2315f8",
+      "lines": 119
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Services/MeetingRecorder.swift",
+      "bytes": 15656,
+      "sha256": "eacbfb7d3cf1bbab2d85b2bb64b4187c372dcfc6082b157711360905ce7ce436",
+      "lines": 386
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Services/MeetingsStore.swift",
+      "bytes": 62420,
+      "sha256": "fbf5885a2a8fb7cf992a4581ca75aab263574cad0e294f079c6098dbd2a72f8a",
+      "lines": 1359
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Services/MeetingDocumentExport.swift",
+      "bytes": 2123,
+      "sha256": "c83c615f221b8bcad37680aa758fdbef22f0bab256e5d9ad5e0496556a74603e",
+      "lines": 42
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/NativeMeetingsView.swift",
+      "bytes": 39537,
+      "sha256": "2330e5a7a4f4e7e959223b7ccb39f73d585e5216db6ac9e3508a2a5dd7d698a5",
+      "lines": 836
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingAgendaView.swift",
+      "bytes": 8411,
+      "sha256": "d364422fc37f2aba5b4c5245771faa78fad6ffe6c830108b4c264d256c4d1d43",
+      "lines": 178
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingSessionViews.swift",
+      "bytes": 18787,
+      "sha256": "9fdd6333c51c0358a7c13676cb0ef2ac74d54224b165562bd209c236c10ae01f",
+      "lines": 386
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingDocumentWorkspace.swift",
+      "bytes": 27414,
+      "sha256": "6a564d89f6ef3d10a7ce4482dc94ced3c10590d0fa692e757fe42047292159fe",
+      "lines": 585
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingRichEditor.swift",
+      "bytes": 20413,
+      "sha256": "e8e9aeb4b5ad14c87c58ca152f2049aa3f4b3d3038355809cd2b32dfa706c163",
+      "lines": 452
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingSourcePanel.swift",
+      "bytes": 13162,
+      "sha256": "831e74d4af052e5532b689e12bb1f9304c69b1b3b55ccf54a36a4458bda9c7ef",
+      "lines": 290
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/AppDelegate.swift",
+      "bytes": 14363,
+      "sha256": "dbcbf6789df3688d17824645244f724318f4464319d841d0839582c4f26ad03e",
+      "lines": 302
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/HubView.swift",
+      "bytes": 23422,
+      "sha256": "ae8aa50cdb4cb68f286a084530923a887cb3b3e6c84c7b9efe39009191de5d9d",
+      "lines": 605
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/SpeakerTranscript.swift",
+      "bytes": 13783,
+      "sha256": "7d459d6abdc0a880f444397968c6a179fff05d1c16969a2c082a5972febb3159",
+      "lines": 299
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/MeetingDocument.swift",
+      "bytes": 13700,
+      "sha256": "d2154930121c9d4b0c28c349e57948d4524b16112f6d5e2ab8ffae83ef1f3277",
+      "lines": 304
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/MeetingDocumentGeneration.swift",
+      "bytes": 14553,
+      "sha256": "c3ff693f7495abece417e2ed3524e6fced55ad4d4c75934c96e38ad90d6816b8",
+      "lines": 272
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/MeetingReport.swift",
+      "bytes": 43523,
+      "sha256": "5f1580bb3368c4a434c09a2dff6940dc4362ef5fa0e4381aef23f8783fc4fa7e",
+      "lines": 1002
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/MeetingMedia.swift",
+      "bytes": 4564,
+      "sha256": "aa618059467b6628a0979790805c73268a99267e2dfd904bb668bed5b6caf1f2",
+      "lines": 109
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Packages/SpeakerKit/Sources/NativeSpeakerDiarizer.swift",
+      "bytes": 10798,
+      "sha256": "fa5686b66219f67086bf0ee4a8356cd8b98e2d8437050c6e79a1bcdf12ef2776",
+      "lines": 230
+    },
+    {
+      "kind": "voxol",
+      "path": "/Users/aris/Documents/Zphyr/Docs/meetings/implementation-document-2026-09-27.md",
+      "bytes": 5614,
+      "sha256": "d226bc78a327b83a6eced34fa884e5c851fa5993c957cf890723b615b92393eb",
+      "lines": 45
+    }
+  ],
+  "privacy": {
+    "raw_identity_auth_meeting_content_saved": false,
+    "remote_writes_for_plugin": false
+  },
+  "changes_for_this_audit": [
+    "Audit Markdown report",
+    "Sanitized JSON source inventory"
+  ],
+  "scope_clarification": {
+    "date": "2026-10-04",
+    "origin": "explicit_user_statement",
+    "primary_focus": "Interface, document formatting and contextual interactions",
+    "functional_audit": "Retained as supporting material",
+    "actual_ui_runtime_test": false,
+    "application_code_changes": false
+  },
+  "ux_source_anchors": [
+    {
+      "path": "/Users/aris/.codex/plugins/cache/openai-curated-remote/chatgpt-meetings/0.8.77/assets/meetings-app.html",
+      "sha256": "ad6c67c6dda8f5f628e31b4f2b42c65d3df0234a94f8517fbb05a4d4a553b282"
+    },
+    {
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/NativeMeetingsView.swift",
+      "sha256": "2330e5a7a4f4e7e959223b7ccb39f73d585e5216db6ac9e3508a2a5dd7d698a5"
+    },
+    {
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingDocumentWorkspace.swift",
+      "sha256": "6a564d89f6ef3d10a7ce4482dc94ced3c10590d0fa692e757fe42047292159fe"
+    },
+    {
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingRichEditor.swift",
+      "sha256": "e8e9aeb4b5ad14c87c58ca152f2049aa3f4b3d3038355809cd2b32dfa706c163"
+    },
+    {
+      "path": "/Users/aris/Documents/Zphyr/App/Hub/MeetingSourcePanel.swift",
+      "sha256": "831e74d4af052e5532b689e12bb1f9304c69b1b3b55ccf54a36a4458bda9c7ef"
+    }
+  ]
+}

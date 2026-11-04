@@ -3,8 +3,16 @@ import ParakeetCore
 
 @main
 struct ASRSmokeCLI {
-    static func main() throws {
+    static func main() async throws {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments.first == "--cache-benchmark" {
+            try await CacheBenchmark.run(Array(arguments.dropFirst()))
+            return
+        }
+        if arguments.first == "--rolling-preview-benchmark" {
+            try await RollingPreviewBenchmark.run(Array(arguments.dropFirst()))
+            return
+        }
         guard arguments.count == 3 || arguments.count == 5 else {
             throw CLIError.invalidArguments
         }
@@ -66,7 +74,8 @@ struct ASRSmokeCLI {
                 overlapDurationSeconds: overlapSeconds,
                 segmentationThresholdDurationSeconds: segmentationThresholdSeconds
             ),
-            retryConfiguration: retryConfiguration
+            retryConfiguration: retryConfiguration,
+            warmUpEncoder: environment["VOXOL_ASR_ENCODER_WARMUP"] == "1"
         )
         let loadDuration = loadStart.duration(to: .now)
         let iterations = max(
@@ -108,7 +117,8 @@ private enum CLIError: LocalizedError {
         [--compute-units ane|gpu|cpu|all] <audio-file>
 
         Optional environment: VOXOL_ASR_SEGMENT_SECONDS, VOXOL_ASR_OVERLAP_SECONDS,
-        VOXOL_ASR_SEGMENTATION_THRESHOLD_SECONDS, VOXOL_ASR_CONFIDENCE_RETRY=0
+        VOXOL_ASR_SEGMENTATION_THRESHOLD_SECONDS, VOXOL_ASR_CONFIDENCE_RETRY=0,
+        VOXOL_ASR_CACHE_BENCHMARK_COMPUTE_UNITS=ane|gpu|cpu|all
         """
     }
 }

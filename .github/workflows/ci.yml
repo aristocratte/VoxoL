@@ -1,11 +1,12 @@
 name: CI
 
-# Every push runs the pure-logic test targets and the SwiftPM build. The
-# Parakeet and polisher test targets need multi-gigabyte model files installed
-# under Application Support, which a runner does not have — those suites run
-# locally, and the benchmark consistency assertions run wherever the external
-# SSD is mounted. Keeping the filter explicit beats a green checkmark that
-# quietly skipped compilation.
+# Every push runs the same fast gate a contributor runs locally: repository
+# policy, formatting, every Swift unit test and the Python suites. The few
+# tests that need multi-gigabyte model files under Application Support skip
+# themselves (XCTSkipUnless) when the files are absent, so the whole suite can
+# run here; the benchmark consistency assertions still run wherever the
+# external SSD is mounted. A filtered run used to hide half the tests and a
+# lint step that had been red for weeks.
 on:
   push:
     branches: [main]
@@ -25,10 +26,21 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
+      - name: Check repository policy
+        run: ./Scripts/check-repository-policy.sh
+
+      - name: Lint formatting
+        run: >
+          xcrun swift-format lint --strict --parallel --recursive
+          Package.swift App Packages Tools Tests
+
       - name: Build packages
         run: swift build
 
-      - name: Run model-free test suites
-        run: >
-          swift test --filter
-          "TextProcessingKitTests|AppCoreKitTests|ASRBenchmarkKitTests|FidelityKitTests"
+      - name: Run Swift test suites
+        run: swift test
+
+      - name: Run Python test suites
+        run: |
+          python3 -m unittest discover -s Scripts -p 'test_*.py'
+          python3 -m unittest discover -s Tools/benchmarks -p 'test_*.py'

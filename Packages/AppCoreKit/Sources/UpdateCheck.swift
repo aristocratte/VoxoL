@@ -10,6 +10,49 @@ import Foundation
 ///
 /// Deliberately inert by default: it reports, it does not fetch or install.
 public enum UpdateCheck {
+    /// Failures that must not be presented as a successful check with no update.
+    public enum FeedError: Error, Equatable, Sendable {
+        case invalidResponse
+        case httpStatus(Int)
+        case unexpectedPayload
+    }
+
+    /// Both settings and the sidebar present the result of the same check.
+    public struct State: Equatable, Sendable {
+        /// User-visible progress and outcome of the most recent check.
+        public enum Phase: Equatable, Sendable {
+            case idle, checking, current, available, failed
+        }
+
+        /// The current operation or the outcome of the most recent one.
+        public private(set) var phase: Phase = .idle
+        /// The last verified update, retained if a subsequent check fails.
+        public private(set) var available: Release?
+
+        /// Starts without claiming the installed version has been checked.
+        public init() {}
+
+        /// Coalesces a manual check with one already running at launch.
+        @discardableResult
+        public mutating func begin() -> Bool {
+            guard phase != .checking else { return false }
+            phase = .checking
+            return true
+        }
+
+        /// Records a successfully retrieved and parsed release feed.
+        public mutating func finish(current: String, releases: [Release]) {
+            available = UpdateCheck.availableUpdate(current: current, releases: releases)
+            phase = available == nil ? .current : .available
+        }
+
+        /// Records an unsuccessful check while preserving a previously discovered update.
+        public mutating func fail() {
+            // A connection failure cannot revoke a previously discovered update.
+            phase = .failed
+        }
+    }
+
     /// A release as published by the update feed.
     public struct Release: Sendable, Equatable {
         /// Version string such as `0.2.0`, with any leading `v` removed.
@@ -78,11 +121,16 @@ public enum UpdateCheck {
     ///
     /// Drafts and pre-releases are skipped: someone running the shipped build
     /// should not be pushed onto an unfinished one.
-    public static func releases(fromGitHubJSON data: Data) throws -> [Release] {
+    public static func releases(fromGitHubJSON data: Data, statusCode: Int = 200) throws
+        -> [Release]
+    {
+        guard (200..<300).contains(statusCode) else {
+            throw FeedError.httpStatus(statusCode)
+        }
         guard
             let payload = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else {
-            return []
+            throw FeedError.unexpectedPayload
         }
         return payload.compactMap { entry in
             guard

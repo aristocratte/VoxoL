@@ -90,24 +90,109 @@ public final class ParakeetTranscriber: @unchecked Sendable {
     public func wordConfidences(
         for transcription: Transcription
     ) -> [(word: String, margin: Float)] {
-        var result = [(word: String, margin: Float)]()
-        var current = ""
-        var margin = Float.greatestFiniteMagnitude
+        wordEvidence(for: transcription).map { ($0.surface, $0.minimumLogitMargin) }
+    }
+
+    /// Full decoder proof for each lexical word in the detokenized transcript.
+    public func wordEvidence(for transcription: Transcription) -> [ParakeetWordEvidence] {
+        struct TokenGroup {
+            var text: String
+            var indices: [Int]
+        }
+
+        var groups = [TokenGroup]()
+        var current = TokenGroup(text: "", indices: [])
+        func flush() {
+            if !current.text.isEmpty, !current.indices.isEmpty {
+                groups.append(current)
+            }
+            current = TokenGroup(text: "", indices: [])
+        }
         for (index, tokenID) in transcription.tokenIds.enumerated() {
-            guard let piece = tokenizer.piece(for: tokenID) else { continue }
-            let value =
-                index < transcription.tokenLogitMargins.count
-                ? transcription.tokenLogitMargins[index] : 0
+            guard let piece = tokenizer.piece(for: tokenID), !piece.isEmpty else { continue }
             if piece.first == Tokenizer.metaSpace {
-                if !current.isEmpty { result.append((current, margin)) }
-                current = String(piece.dropFirst())
-                margin = value
+                flush()
+                current.text = String(piece.dropFirst())
+                current.indices = [index]
             } else {
-                current += piece
-                margin = min(margin, value)
+                current.text += piece
+                current.indices.append(index)
             }
         }
-        if !current.isEmpty { result.append((current, margin)) }
+        flush()
+
+        guard
+            let lexical = try? NSRegularExpression(
+                pattern: #"[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*"#
+            )
+        else { return [] }
+        let source = transcription.text as NSString
+        var searchLocation = 0
+        var result = [ParakeetWordEvidence]()
+        for group in groups {
+            let remaining = NSRange(
+                location: min(searchLocation, source.length),
+                length: max(0, source.length - min(searchLocation, source.length))
+            )
+            let groupRange = source.range(of: group.text, options: [], range: remaining)
+            guard groupRange.location != NSNotFound else { continue }
+            searchLocation = groupRange.location + groupRange.length
+            let localRange = NSRange(location: 0, length: (group.text as NSString).length)
+            let tokenIDs = group.indices.compactMap { index in
+                transcription.tokenIds.indices.contains(index)
+                    ? transcription.tokenIds[index] : nil
+            }
+            let frames = group.indices.compactMap { index in
+                transcription.frameIndices.indices.contains(index)
+                    ? transcription.frameIndices[index] : nil
+            }
+            let durations = group.indices.compactMap { index in
+                transcription.durations.indices.contains(index)
+                    ? transcription.durations[index] : nil
+            }
+            let margins = group.indices.compactMap { index in
+                transcription.tokenLogitMargins.indices.contains(index)
+                    ? transcription.tokenLogitMargins[index] : nil
+            }
+            let minimumMargin = margins.min() ?? 0
+            let meanMargin =
+                margins.isEmpty
+                ? 0 : margins.reduce(0, +) / Float(margins.count)
+            let frameStart = frames.min()
+            let frameEnd = zip(frames, durations).map { frame, duration in
+                frame + max(1, duration)
+            }.max()
+            let frameRange = frameStart.flatMap { start in
+                frameEnd.map { start..<max(start + 1, $0) }
+            }
+            let nearBoundary = frames.contains { frame in
+                transcription.chunkBoundaryFrames.contains { boundary in
+                    abs(frame - boundary) <= 5
+                }
+            }
+
+            for match in lexical.matches(in: group.text, range: localRange) {
+                let absolute = NSRange(
+                    location: groupRange.location + match.range.location,
+                    length: match.range.length
+                )
+                result.append(
+                    ParakeetWordEvidence(
+                        surface: source.substring(with: absolute),
+                        sourceRange: absolute.location..<(absolute.location + absolute.length),
+                        tokenIDs: tokenIDs,
+                        tokenIndices: group.indices,
+                        frameIndices: frames,
+                        durations: durations,
+                        logitMargins: margins,
+                        minimumLogitMargin: minimumMargin,
+                        meanLogitMargin: meanMargin,
+                        frameRange: frameRange,
+                        nearChunkBoundary: nearBoundary
+                    )
+                )
+            }
+        }
         return result
     }
 
@@ -170,7 +255,8 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         decoderWorkers: Int? = nil,
         segmentation: ParakeetSegmentationConfiguration = .production,
         retryConfiguration: ParakeetRetryConfiguration? = nil,
-        sourceCompatibleFeatures: Bool = false
+        sourceCompatibleFeatures: Bool = false,
+        warmUpEncoder: Bool = false
     ) throws {
         self.computeUnits = computeUnits
         self.chunkMelFrames = chunkMelFrames
@@ -201,17 +287,76 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         let decCompiled = try cache.compiledURL(for: decoderURL)
         let joiCompiled = try cache.compiledURL(for: jointURL)
 
-        let encoderConfiguration = MLModelConfiguration()
-        encoderConfiguration.computeUnits = computeUnits.mlComputeUnits
-        let cpuConfiguration = MLModelConfiguration()
-        cpuConfiguration.computeUnits = .cpuOnly
+        func makeEncoderConfiguration() -> MLModelConfiguration {
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = computeUnits.mlComputeUnits
+            if computeUnits == .all {
+                // Amortize additional Core ML specialization during model preparation
+                // to reduce warm encoder latency on the validated all-devices path.
+                var hints = configuration.optimizationHints
+                hints.specializationStrategy = .fastPrediction
+                configuration.optimizationHints = hints
+            }
+            return configuration
+        }
+        let decoderConfiguration = MLModelConfiguration()
+        let decoderComputeUnits = ProcessInfo.processInfo.environment[
+            "VOXOL_ASR_DECODER_COMPUTE_UNITS"
+        ].flatMap(ParakeetComputeUnits.init(rawValue:))?.mlComputeUnits ?? .cpuOnly
+        decoderConfiguration.computeUnits = decoderComputeUnits
+        if ProcessInfo.processInfo.environment["VOXOL_ASR_DECODER_FAST_PREDICTION"] == "1" {
+            var hints = decoderConfiguration.optimizationHints
+            hints.specializationStrategy = .fastPrediction
+            decoderConfiguration.optimizationHints = hints
+        }
 
         let encoder = try MLModel(
             contentsOf: encCompiled,
-            configuration: encoderConfiguration
+            configuration: makeEncoderConfiguration()
         )
-        let decoder = try MLModel(contentsOf: decCompiled, configuration: cpuConfiguration)
-        let joint = try MLModel(contentsOf: joiCompiled, configuration: cpuConfiguration)
+        let useStaticEncoderVariants =
+            ProcessInfo.processInfo.environment["VOXOL_ASR_ENCODER_STATIC_VARIANTS"] == "1"
+        let additionalWaveformEncoders: [MLModel]
+        if useStaticEncoderVariants {
+            let variantSources = ["encoder-20s", "encoder-25s"].compactMap { name in
+                try? ParakeetTranscriber.resolveModel(under: modelsRoot, named: name)
+            }
+            guard !variantSources.isEmpty else {
+                throw ParakeetError.runtimeUnavailable
+            }
+            additionalWaveformEncoders = try variantSources.map { source in
+                let compiled = try cache.compiledURL(for: source)
+                return try MLModel(
+                    contentsOf: compiled,
+                    configuration: makeEncoderConfiguration()
+                )
+            }
+        } else {
+            additionalWaveformEncoders = []
+        }
+        let decoder = try MLModel(contentsOf: decCompiled, configuration: decoderConfiguration)
+        let joint = try MLModel(contentsOf: joiCompiled, configuration: decoderConfiguration)
+        let fusedDecoderJoint: MLModel? = try {
+            guard
+                let rawPath = ProcessInfo.processInfo.environment[
+                    "VOXOL_ASR_DECODER_JOINT_FUSED_MODEL"
+                ],
+                !rawPath.isEmpty
+            else { return nil }
+
+            let expandedPath = NSString(string: rawPath).expandingTildeInPath
+            let sourceURL = URL(fileURLWithPath: expandedPath)
+            let fusedCache = ModelCache(
+                cacheDirectory: sourceURL.deletingLastPathComponent()
+                    .appendingPathComponent(".compiled", isDirectory: true),
+                deleteSourceAfterCompile: false
+            )
+            let compiledURL = try fusedCache.compiledURL(for: sourceURL)
+            return try MLModel(
+                contentsOf: compiledURL,
+                configuration: decoderConfiguration
+            )
+        }()
 
         // Decoder stateful sizes are encoded in the spec's hidden / cell
         // input shapes: [num_layers, 1, hidden].
@@ -238,6 +383,8 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             encoder: encoder,
             decoder: decoder,
             joint: joint,
+            fusedDecoderJoint: fusedDecoderJoint,
+            additionalWaveformEncoders: additionalWaveformEncoders,
             encoderShapes: ModelRunner.EncoderShapes(
                 batch: 1, maxTime: chunkMelFrames, numMelBins: 128
             ),
@@ -258,6 +405,9 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             numMelFilters: 128,
             preemphasis: 0.97
         )
+        if warmUpEncoder {
+            try runner.warmUpEncoder()
+        }
     }
 
     // MARK: - High-level transcription
@@ -266,9 +416,22 @@ public final class ParakeetTranscriber: @unchecked Sendable {
     /// split into overlapping segments so each continuation retains enough
     /// acoustic context to keep the language stable. Repeated-prefix tokens
     /// are discarded before the streams are concatenated and detokenized.
-    public func transcribe(audioURL: URL) throws -> Transcription {
-        let audio = try AudioLoader.loadMono16k(at: audioURL)
-        return try transcribe(samples: audio)
+    public func transcribe(
+        audioURL: URL,
+        cancellationCheck: @escaping @Sendable () throws -> Void = {}
+    ) throws -> Transcription {
+        try cancellationCheck()
+        let audio = try AudioLoader.mapMono16k(
+            at: audioURL,
+            cancellationCheck: cancellationCheck
+        )
+        return try transcribe(
+            storage: .mappedPCM(audio.data, sampleCount: audio.sampleCount),
+            sampleCount: audio.sampleCount,
+            cancellationCheck: cancellationCheck,
+            encoderCache: nil,
+            sessionID: nil
+        )
     }
 
     /// Transcribe an already-loaded mono `Float` buffer at ``sampleRate``.
@@ -282,12 +445,57 @@ public final class ParakeetTranscriber: @unchecked Sendable {
     ///
     /// Call sites don't have to care: it's still a plain synchronous
     /// throwing method.
-    public func transcribe(samples: [Float]) throws -> Transcription {
-        let primary = try transcribeSinglePass(
-            samples: samples,
-            segmentation: segmentation
+    /// The optional cancellation check must be thread-safe: all pipeline stages call it.
+    public func transcribe(
+        samples: [Float],
+        cancellationCheck: @escaping @Sendable () throws -> Void = {}
+    ) throws -> Transcription {
+        try transcribe(
+            samples: samples, cancellationCheck: cancellationCheck,
+            encoderCache: nil, sessionID: nil)
+    }
+
+    func transcribe(
+        samples: [Float],
+        cancellationCheck: @escaping @Sendable () throws -> Void,
+        encoderCache: EncoderResultCache?,
+        sessionID: UUID?,
+        collectLogitMargins: Bool = true,
+        retryLongForm: Bool = true
+    ) throws -> Transcription {
+        try transcribe(
+            storage: .memory(samples),
+            sampleCount: samples.count,
+            cancellationCheck: cancellationCheck,
+            encoderCache: encoderCache,
+            sessionID: sessionID,
+            collectLogitMargins: collectLogitMargins,
+            retryLongForm: retryLongForm
         )
+    }
+
+    private func transcribe(
+        storage: AudioSampleStorage,
+        sampleCount: Int,
+        cancellationCheck: @escaping @Sendable () throws -> Void,
+        encoderCache: EncoderResultCache?,
+        sessionID: UUID?,
+        collectLogitMargins: Bool = true,
+        retryLongForm: Bool = true
+    ) throws -> Transcription {
+        try cancellationCheck()
+        let primary = try transcribeSinglePass(
+            storage: storage,
+            sampleCount: sampleCount,
+            segmentation: segmentation,
+            cancellationCheck: cancellationCheck,
+            encoderCache: encoderCache,
+            sessionID: sessionID,
+            collectLogitMargins: collectLogitMargins
+        )
+        try cancellationCheck()
         guard
+            retryLongForm,
             let retryConfiguration,
             LongFormRetryPolicy.shouldRetry(
                 audioDurationSeconds: primary.audioDurationSeconds,
@@ -299,8 +507,13 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         }
 
         let fallback = try transcribeSinglePass(
-            samples: samples,
-            segmentation: retryConfiguration.fallbackSegmentation
+            storage: storage,
+            sampleCount: sampleCount,
+            segmentation: retryConfiguration.fallbackSegmentation,
+            cancellationCheck: cancellationCheck,
+            encoderCache: encoderCache,
+            sessionID: sessionID,
+            collectLogitMargins: collectLogitMargins
         )
         let useFallback = LongFormRetryPolicy.shouldPreferFallback(
             audioDurationSeconds: primary.audioDurationSeconds,
@@ -317,10 +530,15 @@ public final class ParakeetTranscriber: @unchecked Sendable {
     }
 
     private func transcribeSinglePass(
-        samples: [Float],
-        segmentation: ParakeetSegmentationConfiguration
+        storage: AudioSampleStorage,
+        sampleCount: Int,
+        segmentation: ParakeetSegmentationConfiguration,
+        cancellationCheck: @escaping @Sendable () throws -> Void,
+        encoderCache: EncoderResultCache?,
+        sessionID: UUID?,
+        collectLogitMargins: Bool
     ) throws -> Transcription {
-        let audioDuration = Double(samples.count) / Double(sampleRate)
+        let audioDuration = Double(sampleCount) / Double(sampleRate)
         // The direct-waveform runtime declares its exact sample capacity.
         // Feature-input runtimes retain the centered-STFT frame calculation.
         let modelWindowSamples = AudioSegmenter.modelWindowSampleCount(
@@ -332,15 +550,12 @@ public final class ParakeetTranscriber: @unchecked Sendable {
         // exactly one 10 ms hop. Trimming only that final hop avoids a costly
         // two-window decode and its overlap ambiguity.
         let singlePassSampleCount = AudioSegmenter.singlePassSampleCount(
-            inputSampleCount: samples.count,
+            inputSampleCount: sampleCount,
             maximumSampleCount: modelWindowSamples,
             overflowToleranceSampleCount:
                 runner.maximumWaveformSampleCount == nil
                 ? 0 : featureExtractor.hopLength
         )
-        let inferenceSamples =
-            singlePassSampleCount == samples.count
-            ? samples : Array(samples.prefix(singlePassSampleCount))
         let configuredMaximumSamples = Int(
             segmentation.maximumSegmentDurationSeconds * Double(sampleRate)
         )
@@ -362,8 +577,9 @@ public final class ParakeetTranscriber: @unchecked Sendable {
                 )
             )
         )
-        let chunks = AudioSegmenter.makeSegments(
-            samples: inferenceSamples,
+        let chunks = AudioSegmenter.makeSegmentPlan(
+            storage: storage,
+            sampleCount: singlePassSampleCount,
             maximumSamples: maximumSegmentSamples,
             overlapSamples: overlapSamples,
             segmentationThresholdSamples: segmentationThresholdSamples
@@ -376,7 +592,11 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             runner: runner,
             sourceCompatibleFeatures: sourceCompatibleFeatures,
             logitBias: logitBias,
-            contextualBias: contextualBias
+            contextualBias: contextualBias,
+            collectLogitMargins: collectLogitMargins,
+            cancellationCheck: cancellationCheck,
+            encoderCache: encoderCache,
+            sessionID: sessionID
         )
         let elapsed = Date().timeIntervalSince(start)
 
@@ -390,13 +610,15 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             frameIndices: result.frames,
             durations: result.durations,
             tokenLogitMargins: result.tokenLogitMargins,
+            chunkBoundaryFrames: result.chunkBoundaryFrames,
             audioDurationSeconds: audioDuration,
             inferenceDurationSeconds: elapsed,
             timing: TranscriptionTiming(
                 melExtract: result.melElapsed,
                 encoder: result.encoderElapsed,
                 decoderLoop: result.decodeElapsed,
-                detokenize: detokElapsed
+                detokenize: detokElapsed,
+                reusedEncoderChunks: result.reusedEncoderChunks
             ),
             confidence: TranscriptionConfidence(
                 emittedTokenCount: result.tokens.count,
@@ -429,6 +651,7 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             frameIndices: selected.frameIndices,
             durations: selected.durations,
             tokenLogitMargins: selected.tokenLogitMargins,
+            chunkBoundaryFrames: selected.chunkBoundaryFrames,
             audioDurationSeconds: selected.audioDurationSeconds,
             inferenceDurationSeconds:
                 primary.inferenceDurationSeconds
@@ -440,7 +663,9 @@ public final class ParakeetTranscriber: @unchecked Sendable {
                 decoderLoop:
                     primary.timing.decoderLoop + fallback.timing.decoderLoop,
                 detokenize:
-                    primary.timing.detokenize + fallback.timing.detokenize
+                    primary.timing.detokenize + fallback.timing.detokenize,
+                reusedEncoderChunks:
+                    primary.timing.reusedEncoderChunks + fallback.timing.reusedEncoderChunks
             ),
             confidence: selected.confidence,
             inferenceAttemptCount: 2,

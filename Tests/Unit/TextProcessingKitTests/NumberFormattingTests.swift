@@ -144,6 +144,35 @@ final class NumberFormattingTests: XCTestCase {
         XCTAssertTrue(preparation.normalizedText.contains("B450"))
         XCTAssertFalse(preparation.normalizedText.contains("quatre cent"))
     }
+
+    func testMoreThanTenProtectedTokensDoNotCorruptFreshNumbers() {
+        // A real personal dictation contained enough negations for a spoken
+        // number to become VOXOLP10+. Restoring VOXOLP1 first changed VOXOLP10
+        // into the visible garbage `pas0` and also damaged an English negation.
+        let raw = """
+            pas ici pas là pas maintenant pas demain sans erreur jamais traduire non merci \
+            aucun ajout aucune omission ne change rien, garde les quatre dernières images \
+            without complexity
+            """
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: raw,
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(fastPathEnabled: false)
+            )
+        )
+
+        XCTAssertGreaterThan(preparation.protectedTokens.count, 10)
+        XCTAssertTrue(preparation.normalizedText.contains("4 dernières images"))
+        XCTAssertTrue(preparation.normalizedText.contains("without complexity"))
+        XCTAssertFalse(
+            preparation.normalizedText.range(of: #"pas\d"#, options: .regularExpression) != nil
+        )
+        XCTAssertFalse(preparation.normalizedText.contains("VOXOLP"))
+
+        let restoredPrompt = preparation.restorePlaceholders(in: preparation.promptText)
+        XCTAssertEqual(restoredPrompt, preparation.normalizedText)
+    }
 }
 
 /// The gating that decides whether Qwen cleanup runs at all.

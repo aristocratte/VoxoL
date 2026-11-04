@@ -1,1 +1,3 @@
-"NSMicrophoneUsageDescription" = "VoxoL utilise le microphone uniquement lorsque vous choisissez de dicter.";
+"NSMicrophoneUsageDescription" = "VoxoL utilise le microphone lorsque vous dictez ou enregistrez une réunion.";
+"NSCalendarsFullAccessUsageDescription" = "VoxoL affiche les prochaines réunions de vos calendriers lorsque vous choisissez de les connecter.";
+"NSAudioCaptureUsageDescription" = "VoxoL capture le son des appels uniquement lorsque vous démarrez un enregistrement de réunion.";

@@ -14,6 +14,110 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DefaultSettings.register()
 
         let arguments = ProcessInfo.processInfo.arguments
+        #if DEBUG
+            if arguments.contains("--product-audit-preview") {
+                NSApplication.shared.setActivationPolicy(.regular)
+                let requestedWidth = UserDefaults.standard.double(forKey: "voxol.auditWidth")
+                let requestedHeight = UserDefaults.standard.double(forKey: "voxol.auditHeight")
+                let previewSize = NSSize(
+                    width: requestedWidth > 0 ? max(1100, requestedWidth) : 1320,
+                    height: requestedHeight > 0 ? max(720, requestedHeight) : 800)
+                let window = NSWindow(
+                    contentRect: NSRect(origin: .zero, size: previewSize),
+                    styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                    backing: .buffered, defer: false)
+                window.title = "VoxoL — Product audit preview"
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.contentViewController = NSHostingController(
+                    rootView: ProductAuditPreviewRoot())
+                window.setContentSize(previewSize)
+                mainWindowController = NSWindowController(window: window)
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                if let index = arguments.firstIndex(of: "--product-audit-screenshot"),
+                    arguments.indices.contains(index + 1)
+                {
+                    let output = URL(fileURLWithPath: arguments[index + 1])
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(2))
+                        if let search = UserDefaults.standard.string(forKey: "voxol.auditSearch") {
+                            window.makeFirstResponder(nil)
+                            let event = NSEvent.keyEvent(
+                                with: .keyDown, location: .zero, modifierFlags: .command,
+                                timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                characters: "f", charactersIgnoringModifiers: "f",
+                                isARepeat: false, keyCode: 3)
+                            let handled =
+                                event.map { window.performKeyEquivalent(with: $0) } ?? false
+                            try? await Task.sleep(for: .milliseconds(150))
+                            let editor = window.firstResponder as? NSTextView
+                            print(
+                                "AUDIT_SEARCH_FOCUS: shortcut=\(handled) fieldEditor=\(editor?.isFieldEditor == true)"
+                            )
+                            if editor?.isFieldEditor == true {
+                                editor?.insertText(
+                                    search, replacementRange: editor?.selectedRange() ?? NSRange())
+                            }
+                            try? await Task.sleep(for: .milliseconds(300))
+                            if UserDefaults.standard.bool(forKey: "voxol.auditEscape"),
+                                let escape = NSEvent.keyEvent(
+                                    with: .keyDown, location: .zero, modifierFlags: [],
+                                    timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                                    characters: "\u{1B}", charactersIgnoringModifiers: "\u{1B}",
+                                    isARepeat: false, keyCode: 53)
+                            {
+                                window.sendEvent(escape)
+                                try? await Task.sleep(for: .milliseconds(300))
+                                print(
+                                    "AUDIT_SEARCH_ESCAPE: empty=\(editor?.string.isEmpty == true)")
+                            }
+                        }
+                        guard let view = window.contentView,
+                            let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                        else {
+                            print("AUDIT_CAPTURE_FAILED: no native backing view")
+                            NSApplication.shared.terminate(nil)
+                            return
+                        }
+                        view.cacheDisplay(in: view.bounds, to: bitmap)
+                        do {
+                            guard let png = bitmap.representation(using: .png, properties: [:])
+                            else {
+                                throw CocoaError(.fileWriteUnknown)
+                            }
+                            try FileManager.default.createDirectory(
+                                at: output.deletingLastPathComponent(),
+                                withIntermediateDirectories: true)
+                            try png.write(to: output, options: .atomic)
+                            print(
+                                "AUDIT_CAPTURE: \(output.path) \(bitmap.pixelsWide)x\(bitmap.pixelsHigh)"
+                            )
+                        } catch {
+                            print("AUDIT_CAPTURE_FAILED: \(error)")
+                        }
+                        NSApplication.shared.terminate(nil)
+                    }
+                }
+                return
+            }
+            if arguments.contains("--speaker-preview") {
+                NSApplication.shared.setActivationPolicy(.regular)
+                let window = NSWindow(
+                    contentRect: NSRect(x: 0, y: 0, width: 1100, height: 740),
+                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                    backing: .buffered, defer: false)
+                window.title = "VoxoL — Speakers Preview"
+                window.minSize = NSSize(width: 900, height: 620)
+                window.contentViewController = NSHostingController(rootView: SpeakerPreviewRoot())
+                mainWindowController = NSWindowController(window: window)
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                return
+            }
+        #endif
         if arguments.contains(CaptureProbeRunner.argument) {
             NSApplication.shared.setActivationPolicy(.prohibited)
             Task {
@@ -81,6 +185,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let recorder = MeetingRecorder.activeRecorder
+        let meetings = MeetingsStore.activeStore
+        let history = TranscriptStore.activeStore
+        if let recorder, recorder.state != .recording && recorder.state != .paused {
+            return .terminateCancel
+        }
+        guard
+            recorder != nil || history?.hasUnprotectedChanges == true
+                || meetings?.saveState == .saving || meetings?.saveState == .failed
+        else { return .terminateNow }
+
+        // Finish audio and both stores before allowing the process to exit.
+        Task {
+            await recorder?.stop()
+            await meetings?.flushPendingSaves()
+            await history?.flushPendingSaves()
+            let saved = meetings?.saveState != .failed && history?.hasUnprotectedChanges != true
+            sender.reply(toApplicationShouldTerminate: saved)
+            if !saved {
+                showMainWindow()
+                let alert = NSAlert()
+                alert.messageText = String(localized: "Some changes could not be saved")
+                alert.informativeText = String(
+                    localized:
+                        "VoxoL has stayed open to protect your recent changes. Retry saving from the affected page before quitting."
+                )
+                alert.addButton(withTitle: String(localized: "Keep VoxoL open"))
+                if let window = mainWindowController?.window {
+                    alert.beginSheetModal(for: window) { _ in }
+                }
+            }
+        }
+        return .terminateLater
     }
 
     func applicationShouldHandleReopen(

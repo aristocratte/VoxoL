@@ -1,4 +1,5 @@
 import Foundation
+import CoreML
 import XCTest
 
 @testable import ParakeetCore
@@ -14,6 +15,51 @@ final class ContextualBiasTests: XCTestCase {
             termPieces: [humpback],
             entryBoost: 1,
             continuationBoost: 6
+        )
+    }
+
+    private func logits(_ values: [Float]) throws -> MLMultiArray {
+        let array = try MLMultiArray(
+            shape: [NSNumber(value: values.count)],
+            dataType: .float32
+        )
+        let pointer = array.dataPointer.bindMemory(
+            to: Float32.self,
+            capacity: values.count
+        )
+        for (index, value) in values.enumerated() {
+            pointer[index] = value
+        }
+        return array
+    }
+
+    private func referenceArgmax(
+        _ row: MLMultiArray,
+        staticBias: ParakeetDecodingBias?,
+        contextualBias: ParakeetContextualBias,
+        state: ParakeetContextualBias.State
+    ) -> Int {
+        GreedyTDTDecoder.argmax(
+            row,
+            biasedBy: GreedyTDTDecoder.mergedBias(
+                staticBias,
+                contextualBias,
+                state
+            )
+        )
+    }
+
+    private func directArgmax(
+        _ row: MLMultiArray,
+        staticBias: ParakeetDecodingBias?,
+        contextualBias: ParakeetContextualBias,
+        state: ParakeetContextualBias.State
+    ) -> Int {
+        GreedyTDTDecoder.argmaxApplyingContextualBias(
+            row,
+            staticBias: staticBias,
+            contextualBias: contextualBias,
+            contextState: state
         )
     }
 
@@ -107,5 +153,90 @@ final class ContextualBiasTests: XCTestCase {
             GreedyTDTDecoder.mergedBias(penalty, nil, nil)?.offsets,
             penalty.offsets
         )
+    }
+
+    func testDirectContextualArgmaxMatchesMergedReference() throws {
+        let subject = ParakeetContextualBias(
+            termPieces: [[1, 2], [4, 5]],
+            entryBoost: 1,
+            continuationBoost: 6
+        )
+        let state = subject.initialState()
+        let row = try logits([0, 4.4, 0.5, 5, 4.2, 0])
+
+        XCTAssertEqual(
+            directArgmax(row, staticBias: nil, contextualBias: subject, state: state),
+            referenceArgmax(row, staticBias: nil, contextualBias: subject, state: state)
+        )
+    }
+
+    func testDirectContextualArgmaxMatchesStaticBiasCollision() throws {
+        let subject = ParakeetContextualBias(
+            termPieces: [[1, 2]],
+            entryBoost: 1,
+            continuationBoost: 6
+        )
+        let state = subject.advanced(subject.initialState(), emitting: 1)
+        let penalty = ParakeetDecodingBias(offsets: [2: -12, 3: -1])
+        let row = try logits([0, 0, 10, 4, 3])
+
+        XCTAssertEqual(
+            directArgmax(row, staticBias: penalty, contextualBias: subject, state: state),
+            referenceArgmax(row, staticBias: penalty, contextualBias: subject, state: state)
+        )
+    }
+
+    func testDirectContextualArgmaxKeepsStrongestSharedTokenBoost() throws {
+        let subject = ParakeetContextualBias(
+            termPieces: [[1], [1, 1], [1, 2]],
+            entryBoost: 1,
+            continuationBoost: 6
+        )
+        let state = subject.advanced(subject.initialState(), emitting: 1)
+        XCTAssertEqual(subject.offsets(for: state)?[1], 6)
+        let row = try logits([0, 1, 6.5, 0])
+
+        XCTAssertEqual(
+            directArgmax(row, staticBias: nil, contextualBias: subject, state: state),
+            referenceArgmax(row, staticBias: nil, contextualBias: subject, state: state)
+        )
+    }
+
+    func testDirectContextualArgmaxMatchesReferenceAcrossStatesAndCollisions() throws {
+        let subject = ParakeetContextualBias(
+            termPieces: [[1, 2, 3], [1, 2, 4], [2, 5], [5, 1]],
+            entryBoost: 1,
+            continuationBoost: 6
+        )
+        let staticBiases: [ParakeetDecodingBias?] = [
+            nil,
+            ParakeetDecodingBias(offsets: [1: -12, 2: -3, 5: 2]),
+            ParakeetDecodingBias(offsets: [2: 4, 3: -8, 4: 1, 5: -2]),
+        ]
+        var state = subject.initialState()
+        for step in 0..<12 {
+            let values = (0..<8).map { index in
+                Float(((index + 3) * (step + 5) * 17) % 113) / 11 - 4
+            }
+            let row = try logits(values)
+            for staticBias in staticBiases {
+                XCTAssertEqual(
+                    directArgmax(
+                        row,
+                        staticBias: staticBias,
+                        contextualBias: subject,
+                        state: state
+                    ),
+                    referenceArgmax(
+                        row,
+                        staticBias: staticBias,
+                        contextualBias: subject,
+                        state: state
+                    ),
+                    "step=\(step), staticBias=\(String(describing: staticBias?.offsets))"
+                )
+            }
+            state = subject.advanced(state, emitting: [1, 2, 7, 5][step % 4])
+        }
     }
 }

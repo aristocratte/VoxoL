@@ -14,6 +14,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--memory-gb", type=float, required=True)
     parser.add_argument("--cache-mb", type=float, default=512)
+    parser.add_argument(
+        "--disable-compile", action="store_true",
+        help="Run eagerly when tracing recurrent training graphs becomes impractical",
+    )
     arguments, remaining = parser.parse_known_args()
     if arguments.memory_gb <= 0 or arguments.cache_mb <= 0:
         raise SystemExit("Memory and cache limits must be positive")
@@ -22,6 +26,8 @@ def main() -> None:
     cache_bytes = int(arguments.cache_mb * 1024**2)
     mx.set_memory_limit(memory_bytes)
     mx.set_cache_limit(cache_bytes)
+    if arguments.disable_compile:
+        mx.disable_compile()
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     from mlx_lm import lora

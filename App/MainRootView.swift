@@ -6,7 +6,9 @@ struct MainRootView: View {
     @State private var dictationSession = DictationSessionCoordinator.shared
     @State private var modelInstallation = ModelInstallationStore()
     @State private var transcripts = TranscriptStore()
+    @State private var meetings = MeetingsStore()
     @State private var personalization = PersonalizationStore()
+    @State private var trainingReviews = TrainingReviewStore()
     @AppStorage("voxol.hasCompletedPreflight") private var hasCompletedPreflight = false
     @AppStorage("voxol.interfaceLanguage") private var languageCode = AppLanguage.preferred.rawValue
     @AppStorage("voxol.dictationLanguage") private var dictationLanguageCode =
@@ -61,14 +63,20 @@ struct MainRootView: View {
         .environment(dictationSession)
         .environment(modelInstallation)
         .environment(transcripts)
+        .environment(meetings)
         .environment(personalization)
+        .environment(trainingReviews)
         .environment(\.locale, selectedLanguage.locale)
         .tint(theme.ink)
+        .task {
+            await meetings.load()
+        }
         .task {
             async let modelLoad: Void = modelInstallation.load()
             async let transcriptLoad: Void = transcripts.load()
             async let personalizationLoad: Void = personalization.load()
-            _ = await (modelLoad, transcriptLoad, personalizationLoad)
+            async let trainingReviewLoad: Void = trainingReviews.load()
+            _ = await (modelLoad, transcriptLoad, personalizationLoad, trainingReviewLoad)
         }
         .task(id: modelInstallation.installedCount) {
             if let modelRoot = modelInstallation.installedDirectory(for: .asr) {
@@ -143,3 +151,39 @@ struct MainRootView: View {
     MainRootView()
         .frame(width: 1120, height: 760)
 }
+
+#if DEBUG
+    /// Renders the real Hub with empty, in-memory stores. It never activates capture,
+    /// downloads models, checks for updates, or loads personal archives.
+    struct ProductAuditPreviewRoot: View {
+        @State private var theme = VoxoLTheme()
+        @State private var permissions = PermissionCoordinator()
+        @State private var session = DictationSessionCoordinator()
+        @State private var models = ModelInstallationStore()
+        @State private var transcripts = TranscriptStore(
+            directoryURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("voxol-product-audit-\(UUID().uuidString)"))
+        @State private var meetings = MeetingsStore()
+        @State private var personalization = PersonalizationStore()
+        @State private var reviews = TrainingReviewStore()
+
+        var body: some View {
+            HubView(languageCode: .constant("fr"), replayPreflight: {})
+                .environment(theme)
+                .environment(permissions)
+                .environment(session)
+                .environment(models)
+                .environment(transcripts)
+                .environment(meetings)
+                .environment(personalization)
+                .environment(reviews)
+                .environment(\.locale, Locale(identifier: "fr"))
+                .task {
+                    let state =
+                        UserDefaults.standard.string(forKey: "voxol.auditPreviewState") ?? "empty"
+                    transcripts.configureAuditPreview(state)
+                    if state == "meeting" { meetings.configurePreview("prose") }
+                }
+        }
+    }
+#endif

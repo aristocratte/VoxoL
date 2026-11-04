@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "created": "2026-09-07",
+  "source": "synthetic",
+  "humanReviewed": false,
+  "count": 96,
+  "countsBySplit": {
+    "development": 48,
+    "holdout": 48
+  },
+  "countsByLanguage": {
+    "fr": 68,
+    "en": 28
+  },
+  "trainingEligible": false,
+  "holdoutPolicy": "Frozen before model or prompt changes in this task; no optimizing against holdout outputs. Development and holdout use distinct utterances but intentionally share grammar categories; this is a controlled generalization test, not source-independent natural speech.",
+  "limitations": [
+    "Written ASR-like errors, no audio",
+    "Same AI authored references and experimental changes; no independent human certification",
+    "No natural-dictation or competitor quality claim",
+    "Not a training dataset or a replacement for acoustic evaluation"
+  ],
+  "files": {
+    "cases.jsonl": "f91838b12be0426ec2b7479aa7f406428108adb35683803a8897b39631a0434d",
+    "development.json": "48715e975776accd76186be474c05750fcc1504d6cfd8417d9b8e63b3ba9867d",
+    "holdout.json": "386ec695bb255216a0dde98f22ef7052993de5710f5b3c5f280ea2dfbc4b8b40"
+  }
+}
