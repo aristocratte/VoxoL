@@ -109,24 +109,15 @@ actor DictationTextProcessor {
             await runtime.isDictationSessionActive(sessionID),
             wordCount(of: request.rawTranscript) > Self.runThresholdWords
         else { return metrics }
-        let runs = TranscriptChunker.split(
-            request.rawTranscript, evidence: request.transcriptEvidence,
-            maximumWords: Self.runWords
-        )
-        var pieces = [String]()
-        for run in runs.dropLast() {
+        let runs = TranscriptChunker.requests(for: request, maximumWords: Self.runWords)
+        // The final run may still grow. Its two predecessors need that same
+        // complete lookahead at finalization before their prompts are reusable.
+        for item in runs.dropLast(TranscriptChunker.contextLookaheadCount + 1) {
             guard !Task.isCancelled, start.duration(to: .now) < budget,
                 await runtime.isDictationSessionActive(sessionID)
             else { break }
-            var item = request
-            item.rawTranscript = run.text
-            item.transcriptEvidence = run.evidence
-            let written = (request.context.beforeCursor + " " + pieces.joined(separator: " "))
-                .trimmingCharacters(in: .whitespaces)
-            item.context.beforeCursor = String(written.suffix(500))
             let prepared = DeterministicTextProcessor.prepare(item)
             guard prepared.shouldUsePolisher else {
-                pieces.append(prepared.normalizedText)
                 continue
             }
             let result = await polish(
@@ -140,10 +131,9 @@ actor DictationTextProcessor {
             )
             guard !Task.isCancelled else { break }
             // A deterministic generation failure in an earlier run must not
-            // starve every later run on every preview. Match final processing:
-            // keep that run's safe fallback as context, then continue. A timeout
+            // starve every later run on every preview. Neighboring context is
+            // always the source, independent of a run's outcome. A timeout
             // still ends this preview because it has spent the available budget.
-            pieces.append(result.text)
             if result.failure != nil { metrics.failedCallCount += 1 }
             metrics.generatedCallCount += result.generatedCallCount
             metrics.reusedCallCount += result.reusedCallCount
@@ -207,19 +197,15 @@ private extension DictationTextProcessor {
     static let runsBudget: Duration = .seconds(14)
 
     /// Polishes a long transcript one run of whole sentences at a time. Each run is prepared
-    /// again on its own — its own placeholders, its own validation — with what has already been
-    /// written as its context, so a run that fails costs only its sentences.
+    /// again with its own placeholders, validation and source context on both sides,
+    /// so a run that fails costs only its sentences.
     func processInRuns(
         _ preparation: DeterministicPreparation,
         request: TextProcessingRequest,
         runtime: QwenPolisherRuntime,
         sessionID: UUID?
     ) async -> DictationTextProcessingResult {
-        let runs = TranscriptChunker.split(
-            preparation.rawTranscript,
-            evidence: preparation.transcriptEvidence,
-            maximumWords: Self.runWords
-        )
+        let runs = TranscriptChunker.requests(for: request, maximumWords: Self.runWords)
         guard runs.count > 1 else {
             return await polish(
                 preparation, runtime: runtime, timeout: generationTimeout(for: preparation),
@@ -239,13 +225,7 @@ private extension DictationTextProcessor {
         var reusedOutputTokenCount = 0
         var generatedCallCount = 0
         var reusedCallCount = 0
-        for run in runs {
-            var runRequest = request
-            runRequest.rawTranscript = run.text
-            runRequest.transcriptEvidence = run.evidence
-            let written = (request.context.beforeCursor + " " + pieces.joined(separator: " "))
-                .trimmingCharacters(in: .whitespaces)
-            runRequest.context.beforeCursor = String(written.suffix(500))
+        for runRequest in runs {
             let runPreparation = DeterministicTextProcessor.prepare(runRequest)
 
             guard runPreparation.shouldUsePolisher else {

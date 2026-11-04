@@ -86,6 +86,10 @@ public struct QwenPolisherResult: Equatable, Sendable {
 
 /// Low-level MLX generation knobs kept explicit for repeatable performance testing.
 public struct QwenPolisherGenerationConfiguration: Equatable, Sendable {
+    /// Meeting-report prefill trades a small throughput cost for lower transient MLX memory.
+    /// Retained after the September 25 report A/B/B/A; interactive dictation uses the initializer.
+    public static let meetingReport = Self(prefillStepSize: 128)
+
     /// Explicit text-quality experiment; production remains the default.
     public let promptStyle: PolishingPromptStyle
     /// Process-wide MLX reusable-buffer pool ceiling, not an active-model memory cap.

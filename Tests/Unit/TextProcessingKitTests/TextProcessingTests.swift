@@ -4,6 +4,34 @@ import XCTest
 @testable import TextProcessingKit
 
 final class TextProcessingTests: XCTestCase {
+    func testFrenchElisionKeepsOuiAndConsonantalYNames() {
+        let text = "Je confirme que oui et que Yann arrive."
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(rawTranscript: text, preferredLanguage: .french))
+        XCTAssertEqual(preparation.normalizedText, text)
+    }
+
+    func testFrenchElisionRepairsASRSpacingWithoutChangingLiterals() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript:
+                    "Les besoins que avait l'association. Il précise que à Paris cela fonctionne.",
+                preferredLanguage: .french
+            )
+        )
+        XCTAssertEqual(
+            preparation.normalizedText,
+            "Les besoins qu'avait l'association. Il précise qu'à Paris cela fonctionne.")
+        let literal = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Garde `que avait` et « que avait » tels quels.",
+                preferredLanguage: .french
+            )
+        )
+        XCTAssertTrue(literal.normalizedText.contains("`que avait`"))
+        XCTAssertTrue(literal.normalizedText.contains("« que avait »"))
+    }
+
     func testLanguageWithoutEvidenceFallsBackToTheRequestedLanguage() {
         // "corrige ça" has no function word from either list: the old default
         // called it English and the validator then rejected the French answer.
@@ -455,7 +483,7 @@ final class TextProcessingTests: XCTestCase {
         XCTAssertTrue(prompt.user.contains("DICTATION TO CLEAN:\n"))
         XCTAssertFalse(prompt.user.contains("{"))
         XCTAssertFalse(prompt.user.contains("CONTEXT BEFORE:"))
-        XCTAssertEqual(PolishingPrompt.version, "voxol-cleanup-v7")
+        XCTAssertEqual(PolishingPrompt.version, "voxol-cleanup-v8")
         XCTAssertLessThanOrEqual(prompt.maximumOutputTokens, 384)
     }
 

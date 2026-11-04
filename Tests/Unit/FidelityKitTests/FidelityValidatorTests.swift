@@ -4,6 +4,119 @@ import XCTest
 @testable import TextProcessingKit
 
 final class FidelityValidatorTests: XCTestCase {
+    func testLocalRepairRetainsSubjectWhileCorrectingSpelling() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Mais il ne faut pas oublier de développervelopper les outils.",
+                preferredLanguage: .french))
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: " il ", with: " ")
+            .replacingOccurrences(of: "développervelopper", with: "développer")
+        let result = FidelityValidator.validateWithRepair(
+            candidate: candidate, against: preparation)
+        XCTAssertEqual(result.text, "Mais il ne faut pas oublier de développer les outils.")
+        XCTAssertTrue(result.usedModelOutput)
+    }
+
+    func testSubjectChangesAreNotAcceptedAsMinorSpelling() {
+        for (source, candidate, language) in [
+            ("Nous préparons le rapport.", "Vous préparons le rapport.", TextLanguage.french),
+            ("Il prépare le rapport.", "Prépare le rapport.", .french),
+            ("We prepare the report.", "He prepare the report.", .english),
+            ("I prepare the report.", "Prepare the report.", .english),
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: source, preferredLanguage: language))
+            XCTAssertFalse(
+                FidelityValidator.validate(candidate: candidate, against: preparation)
+                    .usedModelOutput,
+                "\(source) -> \(candidate)")
+        }
+    }
+
+    func testEmbeddedASRRepetitionCanBeCorrected() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Nous allons développervelopper les nouveaux outils.",
+                preferredLanguage: .french
+            )
+        )
+        let decision = FidelityValidator.validate(
+            candidate: "Nous allons développer les nouveaux outils.", against: preparation)
+        XCTAssertTrue(decision.usedModelOutput, "\(String(describing: decision.rejectionReason))")
+        XCTAssertEqual(decision.text, "Nous allons développer les nouveaux outils.")
+    }
+
+    func testRepetitionExceptionDoesNotAllowTruncationOrInventedWords() {
+        for (source, candidate) in [
+            ("Il donne un bonbon.", "Il donne un bon."),
+            ("Nous visitons BadenBaden.", "Nous visitons Baden."),
+            ("Nous allons développer les outils.", "Nous allons supprimer les outils."),
+            ("Nous évoquons anticonstitutionnellement.", "Nous évoquons constitutionnellement."),
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: source, preferredLanguage: .french))
+            XCTAssertFalse(
+                FidelityValidator.validate(candidate: candidate, against: preparation)
+                    .usedModelOutput,
+                "\(source) -> \(candidate)")
+        }
+    }
+
+    func testModelCannotReintroduceArtificialChunkBoundaries() {
+        let text = "Nous allons développer des outils pour les Safe Campus et pour SAFE Global."
+        let request = TextProcessingRequest(rawTranscript: text, preferredLanguage: .french)
+        let output = TranscriptChunker.requests(for: request, maximumWords: 5).map { run in
+            let preparation = DeterministicTextProcessor.prepare(run)
+            var candidate = preparation.promptText
+            if let first = candidate.first {
+                candidate.replaceSubrange(
+                    candidate.startIndex...candidate.startIndex,
+                    with: String(first).uppercased())
+            }
+            if candidate.last != "." { candidate += "." }
+            return FidelityValidator.validate(candidate: candidate, against: preparation).text
+        }.joined(separator: " ")
+        XCTAssertEqual(output, text)
+    }
+
+    func testLocalRepairDoesNotCopyContextOrLoseNumbersAndCode() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Nous allons développervelopper 3 outils avec `run --safe`.",
+                preferredLanguage: .french,
+                context: TextProcessingContext(dictationAfter: "Budget confirmé pour demain.")
+            )
+        )
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: "développervelopper", with: "développer")
+            .replacingOccurrences(of: "outils", with: "outils financés")
+            .replacingOccurrences(of: preparation.protectedTokens[0].placeholder, with: "9")
+        let decision = FidelityValidator.validateWithRepair(
+            candidate: candidate, against: preparation)
+        XCTAssertEqual(decision.text, "Nous allons développer 3 outils avec `run --safe`.")
+        XCTAssertFalse(decision.text.contains("financés"))
+        XCTAssertFalse(decision.text.contains("Budget"))
+    }
+
+    func testSpellingRepairWithinOneSentencePreservesRejectedNegation() {
+        let preparation = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Il ne faut pas oublier de développervelopper les outils.",
+                preferredLanguage: .french
+            )
+        )
+        let missingNegation = preparation.protectedTokens.first { $0.value == "pas" }!
+        let candidate = preparation.promptText
+            .replacingOccurrences(of: missingNegation.placeholder + " ", with: "")
+            .replacingOccurrences(of: "développervelopper", with: "développer")
+        let decision = FidelityValidator.validateWithRepair(
+            candidate: candidate, against: preparation)
+        XCTAssertTrue(decision.usedModelOutput)
+        XCTAssertEqual(decision.repairedSentenceCount, 1)
+        XCTAssertEqual(decision.text, "Il ne faut pas oublier de développer les outils.")
+    }
+
     func testSubjectBoundModalAgreementIsAcceptedWithoutChangingModality() {
         for (source, corrected) in [
             ("Tu peut réserver la salle", "Tu peux réserver la salle."),

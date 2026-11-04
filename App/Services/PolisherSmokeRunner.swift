@@ -788,7 +788,8 @@ private extension PolisherSmokeRunner {
                     generatedCalls: processed.generatedCallCount,
                     reusedCalls: processed.reusedCallCount,
                     prefetchDurationMilliseconds: Int(prefetchSeconds * 1_000),
-                    prefetchGeneratedCalls: prefetchGeneratedCalls
+                    prefetchGeneratedCalls: prefetchGeneratedCalls,
+                    v3Text: processed.v3ShadowDecision?.text
                 )
             )
             let latest = results[results.count - 1]
@@ -1105,6 +1106,8 @@ private struct PolisherEvaluationResult: Encodable {
     var reusedCalls: Int? = nil
     var prefetchDurationMilliseconds: Int? = nil
     var prefetchGeneratedCalls: Int? = nil
+    /// Text the v3 edit gate would have inserted; scored separately from `finalText`.
+    var v3Text: String? = nil
 }
 
 private struct PolisherEvaluationOutput: Encodable {

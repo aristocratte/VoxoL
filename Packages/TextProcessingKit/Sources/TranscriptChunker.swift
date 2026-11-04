@@ -23,6 +23,50 @@ public struct TranscriptChunk: Equatable, Sendable {
 /// inside the budget an ordinary dictation already meets, and a run that fails costs only its
 /// own sentences.
 public enum TranscriptChunker {
+    /// Two complete following runs provide context while allowing exact prefetch reuse.
+    public static let contextLookaheadCount = 2
+
+    /// Builds the same bounded, source-grounded requests for prefetch and final processing.
+    /// Destination context is retained separately; generated text is never fed back as evidence.
+    public static func requests(
+        for request: TextProcessingRequest,
+        maximumWords: Int
+    ) -> [TextProcessingRequest] {
+        // Resolve deterministic corrections before splitting: an elision or a
+        // spoken correction may itself cross the word-budget boundary.
+        let preparation = DeterministicTextProcessor.prepare(request)
+        let runs = split(
+            preparation.normalizedText, evidence: request.transcriptEvidence,
+            maximumWords: maximumWords)
+        let source = runs.map(\.text).joined(separator: " ")
+        var cursor = source.startIndex
+        return runs.enumerated().map { index, run in
+            var item = request
+            item.rawTranscript = run.text
+            item.transcriptEvidence = run.evidence
+            // Short fragments inherit the full dictation's language. A clear
+            // English passage in an automatic French/English dictation still
+            // detects English rather than being forced into French.
+            item.fallbackLanguage = preparation.language
+            item.context.dictationBefore = String(source[..<cursor].suffix(1_200))
+                .trimmingCharacters(in: .whitespaces)
+            item.context.dictationAfter = String(
+                runs.dropFirst(index + 1).prefix(contextLookaheadCount)
+                    .map(\.text).joined(separator: " ").prefix(1_200))
+            item.context.startsMidSentence =
+                index == 0
+                ? request.context.startsMidSentence
+                : !(runs[index - 1].text.last.map(terminators.contains) ?? false)
+            item.context.endsMidSentence =
+                index == runs.count - 1
+                ? request.context.endsMidSentence
+                : !(run.text.last.map(terminators.contains) ?? false)
+            cursor = source.index(cursor, offsetBy: run.text.count)
+            if cursor < source.endIndex { cursor = source.index(after: cursor) }
+            return item
+        }
+    }
+
     /// Runs of consecutive sentences holding at most `maximumWords` words each, in order.
     /// Joined back with single spaces they reproduce the text up to whitespace.
     public static func split(_ text: String, maximumWords: Int) -> [String] {
@@ -39,7 +83,7 @@ public enum TranscriptChunker {
             }
         }
 
-        for sentence in sentences(in: text) {
+        for sentence in joiningDependentClauses(sentences(in: text)) {
             let words = wordCount(sentence)
             if words > limit {
                 flush()
@@ -54,6 +98,21 @@ public enum TranscriptChunker {
         }
         flush()
         return runs
+    }
+
+    /// Keep a lowercase relative clause beside its antecedent, even when ASR
+    /// inserted a stop. This only groups inference input; the text is unchanged.
+    static func joiningDependentClauses(_ sentences: [String]) -> [String] {
+        let continuations = ["que ", "qu'", "qu’", "qui ", "dont ", "which ", "whose "]
+        var units = [String]()
+        for sentence in sentences {
+            if !units.isEmpty, continuations.contains(where: sentence.hasPrefix) {
+                units[units.count - 1] += " " + sentence
+            } else {
+                units.append(sentence)
+            }
+        }
+        return units
     }
 
     /// Splits text and evidence together so a run can never inherit offsets from another run.
@@ -119,11 +178,19 @@ public enum TranscriptChunker {
                     current.removeAll()
                     currentWords = 0
                 }
-                let tokens = clause.split(whereSeparator: \.isWhitespace).map(String.init)
-                for start in stride(from: 0, to: tokens.count, by: maximumWords) {
-                    let end = min(tokens.count, start + maximumWords)
-                    result.append(tokens[start..<end].joined(separator: " "))
+                var wordsInPiece = 0
+                var tokens = [String]()
+                for token in clause.split(whereSeparator: \.isWhitespace) {
+                    let count = wordCount(String(token))
+                    if wordsInPiece + count > maximumWords, !tokens.isEmpty {
+                        result.append(tokens.joined(separator: " "))
+                        tokens.removeAll(keepingCapacity: true)
+                        wordsInPiece = 0
+                    }
+                    tokens.append(String(token))
+                    wordsInPiece += count
                 }
+                if !tokens.isEmpty { result.append(tokens.joined(separator: " ")) }
                 continue
             }
             if currentWords + words > maximumWords, !current.isEmpty {

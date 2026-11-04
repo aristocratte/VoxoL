@@ -85,7 +85,7 @@ public struct TextQualityFeatureFlags: Equatable, Sendable {
     public static let disabled = TextQualityFeatureFlags()
 }
 
-/// Minimal, bounded destination context passed to local cleanup.
+/// Bounded destination and neighboring dictation context passed to local cleanup.
 public struct TextProcessingContext: Equatable, Sendable {
     /// Destination application bundle identifier.
     public var bundleIdentifier: String?
@@ -99,6 +99,14 @@ public struct TextProcessingContext: Equatable, Sendable {
     public var beforeCursor: String
     /// Text after the cursor, capped at three hundred characters.
     public var afterCursor: String
+    /// Earlier dictated text, distinct from the destination field and never output itself.
+    public var dictationBefore: String
+    /// Following dictated text used only to disambiguate the current fragment.
+    public var dictationAfter: String
+    /// The current fragment starts inside a sentence cut for inference, not at a new sentence.
+    public var startsMidSentence: Bool
+    /// The current fragment ends inside a sentence that continues in the next inference run.
+    public var endsMidSentence: Bool
 
     /// Creates a bounded processing context.
     public init(
@@ -107,7 +115,11 @@ public struct TextProcessingContext: Equatable, Sendable {
         domain: String? = nil,
         selectedText: String = "",
         beforeCursor: String = "",
-        afterCursor: String = ""
+        afterCursor: String = "",
+        dictationBefore: String = "",
+        dictationAfter: String = "",
+        startsMidSentence: Bool = false,
+        endsMidSentence: Bool = false
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.applicationName = applicationName
@@ -115,6 +127,10 @@ public struct TextProcessingContext: Equatable, Sendable {
         self.selectedText = String(selectedText.prefix(1_000))
         self.beforeCursor = String(beforeCursor.suffix(500))
         self.afterCursor = String(afterCursor.prefix(300))
+        self.dictationBefore = String(dictationBefore.suffix(1_200))
+        self.dictationAfter = String(dictationAfter.prefix(1_200))
+        self.startsMidSentence = startsMidSentence
+        self.endsMidSentence = endsMidSentence
     }
 }
 
@@ -323,6 +339,9 @@ public enum DeterministicTextProcessor {
         text = formatting.text
         let protected = protect(text, dictionary: entries)
         var promptText = protected.text
+        if language == .french {
+            promptText = repairFrenchElisions(in: promptText)
+        }
         // After protection so a dictionary term that contains digits keeps the
         // spelling its owner chose, and before everything else so the rest of
         // the pipeline sees the same text the user will read. This runs on the
@@ -357,9 +376,13 @@ public enum DeterministicTextProcessor {
             didDeterministicRewrite = didDeterministicRewrite || promptText != previousText
         }
         promptText = normalizePunctuationSpacing(promptText, language: language)
-        promptText = capitalizeStart(promptText)
+        if !request.context.startsMidSentence {
+            promptText = capitalizeStart(promptText)
+        }
 
-        if !formatting.applied, shouldAddTerminalPunctuation(promptText, profile: profile) {
+        if !request.context.endsMidSentence, !formatting.applied,
+            shouldAddTerminalPunctuation(promptText, profile: profile)
+        {
             if promptText.last == "," {
                 promptText.removeLast()
             }
@@ -617,7 +640,7 @@ public enum SpeechContextVocabulary {
 /// Versioned, bounded prompt sent to the local Qwen runtime.
 public struct PolishingPrompt: Equatable, Sendable {
     /// Prompt contract version recorded in diagnostics and datasets.
-    public static let version = "voxol-cleanup-v7"
+    public static let version = "voxol-cleanup-v8"
 
     /// Immutable system instruction.
     public let system: String
@@ -740,6 +763,15 @@ public enum PolishingPromptBuilder {
                 "\(labels.keepExactly): "
                     + preparation.protectedTokens.map(\.placeholder).joined(separator: " | ")
             )
+            let negations = preparation.protectedTokens.filter { $0.kind == .negation }
+            if !negations.isEmpty {
+                fields.append(
+                    (preparation.language == .french
+                        ? "SENS DES JETONS (recopie le jeton, pas sa valeur) : "
+                        : "TOKEN MEANINGS (copy the token, not its value): ")
+                        + negations.map { "\($0.placeholder) = \($0.value)" }.joined(
+                            separator: " | "))
+            }
         }
         if !dictionary.isEmpty {
             fields.append("\(labels.dictionary): " + dictionary.joined(separator: " | "))
@@ -752,6 +784,33 @@ public enum PolishingPromptBuilder {
         }
         if !preparation.context.afterCursor.isEmpty {
             fields.append("\(labels.contextAfter): \(preparation.context.afterCursor)")
+        }
+        if !preparation.context.dictationBefore.isEmpty
+            || !preparation.context.dictationAfter.isEmpty
+        {
+            let french = preparation.language == .french
+            fields.append(
+                french
+                    ? "Les extraits voisins sont du contexte, pas du texte à recopier. Corrige seulement le dernier fragment."
+                    : "Neighboring excerpts are context, not text to copy. Correct only the final fragment."
+            )
+            if !preparation.context.dictationBefore.isEmpty {
+                fields.append(
+                    (french ? "DICTÉE PRÉCÉDENTE : " : "PRECEDING DICTATION: ")
+                        + String(preparation.context.dictationBefore.suffix(1_200)))
+            }
+            if !preparation.context.dictationAfter.isEmpty {
+                fields.append(
+                    (french ? "SUITE DE LA DICTÉE : " : "FOLLOWING DICTATION: ")
+                        + String(preparation.context.dictationAfter.prefix(1_200)))
+            }
+        }
+        if preparation.context.startsMidSentence || preparation.context.endsMidSentence {
+            fields.append(
+                preparation.language == .french
+                    ? "La coupure de ce fragment n'est pas une fin de phrase : n'ajoute ni point ni majuscule à cette coupure."
+                    : "This fragment's split is not a sentence boundary: do not add a period or a capital at the split."
+            )
         }
         fields.append("\(labels.transcript):\n\(preparation.promptText)")
         let user = fields.joined(separator: "\n")
@@ -844,6 +903,25 @@ private struct PromptLabels {
 }
 
 private extension DeterministicTextProcessor {
+    /// An ASR space in "que avait" or "que à" is orthographic, not a new fact.
+    /// Code has already been protected; quoted examples must remain literal too.
+    static func repairFrenchElisions(in input: String) -> String {
+        let pattern =
+            #"«[^»]*»|"[^"\n]*"|(?iu:\b(que)\s+(?!oui\b|onze\b|onzi[eè]me\b)(?=[aeiouàâäéèêëîïôöùûü]))"#
+        guard let regex = try? RegularExpressionCache.shared.expression(pattern: pattern) else {
+            return input
+        }
+        var result = input
+        for match in regex.matches(in: input, range: NSRange(input.startIndex..., in: input))
+            .reversed()
+        where match.range(at: 1).location != NSNotFound {
+            guard let range = Range(match.range, in: result) else { continue }
+            let replacement = result[range].first == "Q" ? "Qu'" : "qu'"
+            result.replaceSubrange(range, with: replacement)
+        }
+        return result
+    }
+
     struct ProtectionCandidate {
         let range: NSRange
         let kind: ProtectedTokenKind
