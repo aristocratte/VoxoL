@@ -484,11 +484,11 @@ private struct EditorialHistoryDay: Identifiable {
 /// last row of each day for every row. With a few hundred dictations that was the lag.
 private struct EditorialTodaySnapshot {
     var days: [EditorialHistoryDay] = []
-    var weekBars: [CGFloat] = EditorialActivitySeries.fixtureWeek
+    var weekBars: [CGFloat] = Array(repeating: 0, count: 7)
     var weekLabels: [String] = []
-    var totalWords = 20_837
-    var averageWordsPerMinute = 148
-    var todayRecoveredMinutes = 3
+    var totalWords = 0
+    var averageWordsPerMinute = 0
+    var todayRecoveredMinutes = 0
 
     init() {}
 
@@ -497,7 +497,13 @@ private struct EditorialTodaySnapshot {
         calendar.locale = locale
         days = Self.group(records, calendar: calendar, locale: locale)
         weekLabels = EditorialActivitySeries.weekdayInitials(days: 7, calendar: calendar)
-        guard !usesFixture else { return }
+        if usesFixture {
+            weekBars = EditorialActivitySeries.fixtureWeek
+            totalWords = 20_837
+            averageWordsPerMinute = 148
+            todayRecoveredMinutes = 3
+            return
+        }
 
         let entries = records.map(EditorialWordEntry.init)
         let words = entries.reduce(0) { $0 + $1.words }
@@ -629,11 +635,15 @@ struct EditorialTodayView: View {
     @AppStorage("voxol.activationMode") private var activationMode = ActivationMode.hold
     @AppStorage("voxol.dictationShortcut") private var shortcut = DictationShortcut.optionSpace
     @AppStorage("voxol.inputDeviceUID") private var inputDeviceUID = ""
+    @AppStorage("voxol.privateMode") private var privateMode = false
+    @AppStorage("voxol.historyEnabled") private var historyEnabled = true
     @State private var visible = false
     @State private var inspectedRecord: TranscriptRecord?
     @State private var recentCardIsHovered = false
     @State private var snapshot = EditorialTodaySnapshot()
     @State private var query = ""
+    @State private var displayedDays: [EditorialHistoryDay] = []
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -657,7 +667,7 @@ struct EditorialTodayView: View {
 
                     historyFeed(metrics: metrics)
                         .padding(.top, metrics.compact ? 22 : 30)
-                        .frame(maxHeight: .infinity)
+                        .frame(maxHeight: .infinity, alignment: .top)
                         .editorialStagger(2, visible: visible)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -678,6 +688,23 @@ struct EditorialTodayView: View {
         .onChange(of: transcripts.records, initial: true) { _, _ in rebuildSnapshot() }
         .onChange(of: transcripts.usesExampleData) { _, _ in rebuildSnapshot() }
         .onChange(of: locale) { _, _ in rebuildSnapshot() }
+        .task(id: query) {
+            if !query.isEmpty {
+                do {
+                    try await Task.sleep(for: .milliseconds(120))
+                } catch {
+                    return
+                }
+            }
+            guard !Task.isCancelled else { return }
+            rebuildSearchResults()
+        }
+        .background {
+            Button("Search dictations") { searchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .hidden()
+                .accessibilityHidden(true)
+        }
         .sheet(item: $inspectedRecord) { record in
             TranscriptDetailSheet(record: record, store: transcripts)
                 .environment(theme)
@@ -690,6 +717,7 @@ struct EditorialTodayView: View {
             usesFixture: usesPrototypeFixture,
             locale: locale
         )
+        rebuildSearchResults()
     }
 
     /// A home page should say hello and name the day, not open on a control panel.
@@ -847,7 +875,36 @@ struct EditorialTodayView: View {
         return VStack(alignment: .leading, spacing: 0) {
             historyHeader(metrics: metrics)
 
-            if transcripts.records.isEmpty {
+            if let issue = transcripts.historyIssue {
+                historyRecoveryNotice(issue)
+                    .padding(.top, 12)
+            }
+            if privateMode || !historyEnabled {
+                Label(
+                    privateMode
+                        ? LocalizedStringKey("Private mode is on · new dictations are not saved")
+                        : LocalizedStringKey("History is paused · new dictations are not saved"),
+                    systemImage: privateMode ? "lock" : "pause.circle"
+                )
+                .font(VoxoLTypography.font(size: 12, relativeTo: .body))
+                .foregroundStyle(theme.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .help("Existing history stays on this Mac. Change this in Settings → Privacy.")
+                .padding(.top, 12)
+            }
+
+            if transcripts.isLoading && transcripts.records.isEmpty {
+                ProgressView("Loading history…")
+                    .controlSize(.small)
+                    .padding(.top, 18)
+            } else if transcripts.records.isEmpty && transcripts.historyIssue != nil {
+                EmptyView()
+            } else if transcripts.records.isEmpty && (privateMode || !historyEnabled) {
+                Text("Existing history stays on this Mac. Change this in Settings → Privacy.")
+                    .font(VoxoLTypography.font(size: metrics.bodySize, relativeTo: .body))
+                    .foregroundStyle(theme.secondaryInk)
+                    .padding(.top, 12)
+            } else if transcripts.records.isEmpty {
                 Text("Your next local result will appear here.")
                     .font(VoxoLTypography.font(size: metrics.bodySize, relativeTo: .body))
                     .foregroundStyle(theme.secondaryInk)
@@ -864,7 +921,7 @@ struct EditorialTodayView: View {
                     LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                         ForEach(days) { group in
                             Section {
-                                VStack(spacing: 0) {
+                                LazyVStack(spacing: 0) {
                                     ForEach(group.records) { record in
                                         EditorialHistoryRow(
                                             record: record,
@@ -918,8 +975,14 @@ struct EditorialTodayView: View {
                     .foregroundStyle(theme.secondaryInk)
                 TextField("Search dictations", text: $query)
                     .textFieldStyle(.plain)
+                    .focusEffectDisabled()
                     .font(VoxoLTypography.font(size: 12, relativeTo: .body))
                     .foregroundStyle(theme.ink)
+                    .focused($searchFocused)
+                    .accessibilityIdentifier("voxol.history.search")
+                    .onExitCommand {
+                        if query.isEmpty { searchFocused = false } else { query = "" }
+                    }
                 if !query.isEmpty {
                     Button {
                         query = ""
@@ -936,21 +999,74 @@ struct EditorialTodayView: View {
             .frame(width: metrics.compact ? 180 : 220, height: 30)
             .background(theme.selection)
             .clipShape(Capsule())
+            .overlay {
+                Capsule().stroke(searchFocused ? theme.cobalt : .clear, lineWidth: 1.5)
+            }
+            .help("Search dictations · ⌘F")
         }
     }
 
-    /// The whole history, or the days that still contain something once a search is typed.
-    private var displayedDays: [EditorialHistoryDay] {
-        let needle = query.trimmingCharacters(in: .whitespaces)
-        guard !needle.isEmpty else { return snapshot.days }
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        let matches = transcripts.records.filter {
-            $0.text.range(of: needle, options: options) != nil
-                || $0.applicationName.range(of: needle, options: options) != nil
+    /// Reuse the grouped history; runtime and hover redraws never repeat a text search.
+    private func rebuildSearchResults() {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else {
+            displayedDays = snapshot.days
+            return
         }
-        var calendar = Calendar.current
-        calendar.locale = locale
-        return EditorialTodaySnapshot.group(matches, calendar: calendar, locale: locale)
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        displayedDays = snapshot.days.compactMap { group in
+            let matches = group.records.filter {
+                $0.text.range(of: needle, options: options) != nil
+                    || $0.applicationName.range(of: needle, options: options) != nil
+            }
+            return matches.isEmpty
+                ? nil : EditorialHistoryDay(day: group.day, title: group.title, records: matches)
+        }
+    }
+
+    private func historyRecoveryNotice(_ issue: TranscriptHistoryIssue) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(theme.warning)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(
+                    issue == .loadFailed
+                        ? "History could not be loaded" : "History could not be saved"
+                )
+                .font(VoxoLTypography.font(size: 13, weight: .semibold, relativeTo: .body))
+                .foregroundStyle(theme.ink)
+                Text(
+                    issue == .loadFailed
+                        ? "Your existing archive has not been replaced. Keep VoxoL open and retry to save any new results."
+                        : "Recent changes are not saved. Keep VoxoL open and retry."
+                )
+                .font(VoxoLTypography.font(size: 12, relativeTo: .body))
+                .foregroundStyle(theme.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 8) {
+                Button("Retry") { Task { await transcripts.retryHistory() } }
+                    .buttonStyle(EditorialSettingsButtonStyle())
+                    .disabled(transcripts.isLoading)
+                    .accessibilityIdentifier("voxol.history.retry")
+                if !transcripts.records.isEmpty {
+                    Button("Export recovery copy") {
+                        Task { await transcripts.chooseRecoveryDestination() }
+                    }
+                    .buttonStyle(EditorialSettingsButtonStyle())
+                    .help(
+                        "Saves a separate JSON copy so you can quit safely. Your existing archive is unchanged."
+                    )
+                }
+            }
+        }
+        .padding(14)
+        .background(theme.warning.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12).stroke(theme.warning.opacity(0.25), lineWidth: 1)
+        }
     }
 
     /// The same numbers as the column, on one line, for windows too narrow to carry a column.
@@ -959,6 +1075,7 @@ struct EditorialTodayView: View {
             statTile(value: snapshot.totalWords.formatted(), label: "total words")
             statTile(value: snapshot.averageWordsPerMinute.formatted(), label: "wpm")
             statTile(value: todayRecovered, label: "recovered")
+                .help("Estimate based on typing at 40 words per minute, before review time.")
             Spacer(minLength: 8)
             Button(action: openInsights) {
                 HStack(spacing: 5) {
@@ -990,6 +1107,12 @@ struct EditorialTodayView: View {
             statTile(value: snapshot.averageWordsPerMinute.formatted(), label: "wpm")
             EditorialRule().padding(.vertical, 14)
             statTile(value: todayRecovered, label: "recovered")
+            Text("Estimated at 40 typed words/min")
+                .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
+                .foregroundStyle(theme.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
+                .help("Estimate based on typing at 40 words per minute, before review time.")
 
             Button(action: openInsights) {
                 HStack(spacing: 5) {
@@ -1080,7 +1203,7 @@ struct EditorialTodayView: View {
     private var latestRecord: TranscriptRecord? { transcripts.records.first }
 
     private var usesPrototypeFixture: Bool {
-        transcripts.usesExampleData || transcripts.records.isEmpty
+        transcripts.usesExampleData
     }
 
     private var latestText: String {
@@ -1756,15 +1879,17 @@ private struct EditorialPaceGauge: View {
 
             // The fill traces the same path as the track — 180° to 360° — rather than sweeping
             // the other way round the circle, where it would be drawn below the centre and clipped.
-            let fraction = min(1, max(0.02, Double(value) / ceiling))
-            var filled = Path()
-            filled.addArc(
-                center: centre, radius: radius,
-                startAngle: .degrees(180), endAngle: .degrees(180 + 180 * fraction),
-                clockwise: false)
-            context.stroke(
-                filled, with: .color(theme.cobalt),
-                style: StrokeStyle(lineWidth: width, lineCap: .round))
+            if value > 0 {
+                let fraction = min(1, Double(value) / ceiling)
+                var filled = Path()
+                filled.addArc(
+                    center: centre, radius: radius,
+                    startAngle: .degrees(180), endAngle: .degrees(180 + 180 * fraction),
+                    clockwise: false)
+                context.stroke(
+                    filled, with: .color(theme.cobalt),
+                    style: StrokeStyle(lineWidth: width, lineCap: .round))
+            }
 
             // The typing baseline, so the number has a reference rather than a vibe.
             let typingAngle = Angle.degrees(180 + 180 * (40.0 / ceiling)).radians
@@ -1847,7 +1972,7 @@ private struct EditorialGrainBars: View {
                     let cell = max(3, min(5, columnWidth / 6))
                     let barWidth = min(columnWidth - cell * 1.6, cell * 5)
 
-                    for (index, value) in values.enumerated() {
+                    for (index, value) in values.enumerated() where value > 0 {
                         let centre = columnWidth * (CGFloat(index) + 0.5)
                         let height = max(cell, value * plotHeight)
                         let isLast = index == values.count - 1
@@ -2244,7 +2369,10 @@ private struct EditorialInsightsModel {
             // "Other" only earns a row when something is actually in it, and empty placeholder
             // rows are not padding worth showing: a short honest list beats a padded one.
             let topCount = top.reduce(0) { $0 + $1.value }
-            let otherShare = Int((Double(total - topCount) / Double(total) * 100).rounded())
+            // The denominator is clamped only to avoid division by zero. It must
+            // not count as a dictation in an otherwise empty history.
+            let otherShare = Int(
+                (Double(filtered.count - topCount) / Double(total) * 100).rounded())
             if otherShare > 0 {
                 result.append(
                     EditorialAppShare(
@@ -2338,7 +2466,7 @@ struct EditorialInsightsView: View {
             let model =
                 self.model
                 ?? EditorialInsightsModel(
-                    records: [], period: period, usesFixture: true, locale: locale, theme: theme)
+                    records: [], period: period, usesFixture: false, locale: locale, theme: theme)
             let gap: CGFloat = metrics.compact ? 12 : 16
 
             ScrollView {
@@ -2437,7 +2565,7 @@ struct EditorialInsightsView: View {
             layout {
                 VStack(alignment: .leading, spacing: 0) {
                     eyebrow(period.eyebrow)
-                    Text(LocalizedStringKey("\(model.recoveredMinutes) minutes recovered."))
+                    Text(LocalizedStringKey("\(model.recoveredMinutes) minutes saved, estimated."))
                         .font(
                             VoxoLTypography.font(
                                 size: metrics.compact ? 24 : 30, weight: .semibold,
@@ -2457,6 +2585,7 @@ struct EditorialInsightsView: View {
                     .foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
+                    .help("Estimate based on typing at 40 words per minute, before review time.")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -2675,7 +2804,7 @@ struct EditorialInsightsView: View {
         let cleanedShare =
             model.sessions > 0
             ? Int((Double(model.correctedResults) / Double(model.sessions) * 100).rounded()) : 0
-        return insightCard(metrics: metrics, title: "Fixes made by VoxoL") {
+        return insightCard(metrics: metrics, title: "Changes to transcripts") {
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: model.correctedWords.formatted())
                     .font(
@@ -2687,11 +2816,12 @@ struct EditorialInsightsView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
 
-                Text("words rewritten after the microphone")
+                Text("words added or removed from the original")
                     .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
                     .foregroundStyle(theme.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
+                    .help("Includes your edits. A change is not a validated correction.")
 
                 EditorialRule().padding(.vertical, 12)
 
@@ -2700,7 +2830,7 @@ struct EditorialInsightsView: View {
                         .font(VoxoLTypography.font(size: 16, weight: .semibold, relativeTo: .body))
                         .foregroundStyle(theme.ink)
                         .monospacedDigit()
-                    Text("results cleaned up")
+                    Text("results changed")
                         .font(VoxoLTypography.font(size: 11.5, relativeTo: .caption))
                         .foregroundStyle(theme.secondaryInk)
                 }
@@ -2859,7 +2989,7 @@ struct EditorialInsightsView: View {
 
     private func appHeadline(_ model: EditorialInsightsModel) -> LocalizedStringKey {
         if usesPrototypeFixture { return "Notes remains your first reflex." }
-        guard let first = model.apps.first else { return "Your apps will appear here." }
+        guard let first = model.apps.first else { return "Nothing dictated yet." }
         return LocalizedStringKey("\(first.name) is your first reflex.")
     }
 
@@ -2876,7 +3006,7 @@ struct EditorialInsightsView: View {
     }
 
     private var usesPrototypeFixture: Bool {
-        transcripts.usesExampleData || transcripts.records.isEmpty
+        transcripts.usesExampleData
     }
 }
 
@@ -3506,7 +3636,8 @@ struct EditorialLibraryView: View {
                     metrics: metrics,
                     eyebrow: "Library",
                     title: "Make dictation your own.",
-                    summary: "Set exact words, shortcuts and writing style, then review saved recordings."
+                    summary:
+                        "Set exact words, shortcuts and writing style, then review saved recordings."
                 )
                 .padding(.bottom, metrics.headingGap)
                 .editorialStagger(0, visible: visible)
@@ -3592,11 +3723,11 @@ struct EditorialLibraryView: View {
                             Text(
                                 "Suggested after one correction. Review each word before adding it."
                             )
-                                .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
-                                .foregroundStyle(theme.secondaryInk)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 10)
+                            .font(VoxoLTypography.font(size: 11, relativeTo: .caption))
+                            .foregroundStyle(theme.secondaryInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
                             ForEach(suggestions) { suggestion in
                                 HStack(spacing: 12) {
                                     Image(systemName: "sparkles")
@@ -4234,9 +4365,6 @@ struct EditorialSettingsView: View {
 
     @State private var visible = false
     @State private var showsAppearanceNote = false
-    @State private var updateCheckInFlight = false
-    @State private var updateCheckedOnce = false
-    @State private var availableUpdate: UpdateCheck.Release?
 
     var body: some View {
         GeometryReader { geometry in
@@ -4716,7 +4844,7 @@ struct EditorialSettingsView: View {
                     Task { await checkForUpdate() }
                 }
                 .buttonStyle(SignalPressButtonStyle())
-                .disabled(updateCheckInFlight)
+                .disabled(UpdateNotifier.shared.isChecking)
             }
             settingsDivider
             settingsRow(
@@ -4731,24 +4859,24 @@ struct EditorialSettingsView: View {
     }
 
     private var updateStatusTitle: LocalizedStringKey {
-        if updateCheckInFlight { return "Checking…" }
-        if let available = availableUpdate { return "Update to \(available.version)" }
-        return updateCheckedOnce ? "Up to date" : "Check for updates"
+        let notifier = UpdateNotifier.shared
+        if notifier.isChecking { return "Checking…" }
+        if let available = notifier.available { return "Update to \(available.version)" }
+        if notifier.state.phase == .failed { return "Check failed · Retry" }
+        return notifier.state.phase == .current ? "Up to date" : "Check for updates"
     }
 
     private func checkForUpdate() async {
-        updateCheckInFlight = true
-        defer { updateCheckInFlight = false; updateCheckedOnce = true }
+        if UpdateNotifier.shared.available != nil {
+            UpdateNotifier.shared.installAvailableUpdate()
+            return
+        }
         // Delegated rather than duplicated: this used to run its own copy of
         // the same fetch and comparison, so the row here and the sidebar badge
         // could disagree about whether an update existed. One reader, one
         // answer. `announce: false` keeps the alert out of the way of someone
         // who is already looking at the result.
         await UpdateNotifier.shared.check(announce: false)
-        availableUpdate = UpdateNotifier.shared.available
-        if availableUpdate != nil {
-            UpdateNotifier.shared.installAvailableUpdate()
-        }
     }
 
     private func openBugReport() {

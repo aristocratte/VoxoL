@@ -151,3 +151,39 @@ struct MainRootView: View {
     MainRootView()
         .frame(width: 1120, height: 760)
 }
+
+#if DEBUG
+    /// Renders the real Hub with empty, in-memory stores. It never activates capture,
+    /// downloads models, checks for updates, or loads personal archives.
+    struct ProductAuditPreviewRoot: View {
+        @State private var theme = VoxoLTheme()
+        @State private var permissions = PermissionCoordinator()
+        @State private var session = DictationSessionCoordinator()
+        @State private var models = ModelInstallationStore()
+        @State private var transcripts = TranscriptStore(
+            directoryURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("voxol-product-audit-\(UUID().uuidString)"))
+        @State private var meetings = MeetingsStore()
+        @State private var personalization = PersonalizationStore()
+        @State private var reviews = TrainingReviewStore()
+
+        var body: some View {
+            HubView(languageCode: .constant("fr"), replayPreflight: {})
+                .environment(theme)
+                .environment(permissions)
+                .environment(session)
+                .environment(models)
+                .environment(transcripts)
+                .environment(meetings)
+                .environment(personalization)
+                .environment(reviews)
+                .environment(\.locale, Locale(identifier: "fr"))
+                .task {
+                    let state =
+                        UserDefaults.standard.string(forKey: "voxol.auditPreviewState") ?? "empty"
+                    transcripts.configureAuditPreview(state)
+                    if state == "meeting" { meetings.configurePreview("prose") }
+                }
+        }
+    }
+#endif

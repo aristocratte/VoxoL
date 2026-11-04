@@ -220,6 +220,84 @@ public struct TranscriptArchive: Codable, Equatable, Sendable {
     }
 }
 
+/// A failed read must never turn an existing archive into an empty, writable history.
+public enum TranscriptFileStoreError: Error, Equatable, Sendable {
+    case fileMissing
+    case unsupportedSchema(Int)
+    case recoveryRequired
+    case recoveryDestinationIsArchive
+}
+
+/// Serializes history access and protects an archive whose contents could not be read.
+public actor TranscriptFileStore {
+    private let directoryURL: URL
+    private let archiveURL: URL
+    private var canSave = false
+
+    /// An explicit directory makes recovery testable without accessing personal history.
+    public init(directoryURL: URL? = nil) {
+        let applicationSupport =
+            FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask
+            ).first ?? FileManager.default.temporaryDirectory
+        self.directoryURL =
+            directoryURL
+            ?? applicationSupport.appendingPathComponent("VoxoL", isDirectory: true)
+        archiveURL = self.directoryURL.appendingPathComponent("transcripts.json")
+    }
+
+    /// Reads a supported archive, enabling writes only after a successful read or confirmed absence.
+    public func load() throws -> TranscriptArchive {
+        canSave = false
+        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
+            canSave = true
+            throw TranscriptFileStoreError.fileMissing
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let archive = try decoder.decode(TranscriptArchive.self, from: Data(contentsOf: archiveURL))
+        guard archive.schemaVersion == TranscriptArchive.currentSchemaVersion else {
+            throw TranscriptFileStoreError.unsupportedSchema(archive.schemaVersion)
+        }
+        canSave = true
+        return archive
+    }
+
+    /// Atomically saves a previously loaded history, rejecting writes while recovery is required.
+    public func save(_ archive: TranscriptArchive) throws {
+        guard canSave else { throw TranscriptFileStoreError.recoveryRequired }
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(archive).write(
+            to: archiveURL, options: [.atomic, .completeFileProtection])
+    }
+
+    /// Saves a separate recovery copy without granting permission to overwrite an unreadable archive.
+    public func exportRecoveryCopy(_ archive: TranscriptArchive, to destination: URL) throws {
+        let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path
+        let originalPath = archiveURL.resolvingSymlinksInPath().standardizedFileURL.path
+        // Also reject case variants on the default case-insensitive macOS filesystem.
+        guard destinationPath.compare(originalPath, options: .caseInsensitive) != .orderedSame
+        else { throw TranscriptFileStoreError.recoveryDestinationIsArchive }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(archive).write(
+            to: destination, options: [.atomic, .completeFileProtection])
+    }
+
+    /// Resolves retained audio without permitting paths or symlinks outside the history directory.
+    public func audioURL(relativePath: String) -> URL? {
+        let root = directoryURL.resolvingSymlinksInPath().standardizedFileURL
+        let candidate = directoryURL.appendingPathComponent(relativePath)
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard candidate.path.hasPrefix(root.path + "/") else { return nil }
+        return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+    }
+}
+
 /// A word-level difference between what the microphone heard and what VoxoL wrote.
 ///
 /// The raw transcript is kept as the first revision of a record, so this compares two real

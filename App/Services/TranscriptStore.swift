@@ -1,16 +1,65 @@
 import AppKit
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
 final class TranscriptStore {
+    static weak var activeStore: TranscriptStore?
+
     var records: [TranscriptRecord] = []
     var isLoading = false
     var usesExampleData = false
-    var toast: TranscriptToast?
+    var toast: TranscriptToast? {
+        didSet {
+            if toast != nil { toastID = UUID() }
+        }
+    }
+    private(set) var toastID = UUID()
+    private(set) var historyIssue: TranscriptHistoryIssue?
 
-    private let fileStore = TranscriptFileStore()
+    @ObservationIgnored private let fileStore: TranscriptFileStore
+    @ObservationIgnored private var pendingChanges: [UUID: UUID] = [:]
+    @ObservationIgnored private var exportedChanges: [UUID: UUID] = [:]
+
+    init(directoryURL: URL? = nil) {
+        fileStore = TranscriptFileStore(directoryURL: directoryURL)
+        if directoryURL == nil { Self.activeStore = self }
+    }
+
+    var hasUnsavedChanges: Bool { !pendingChanges.isEmpty }
+    var hasUnprotectedChanges: Bool {
+        pendingChanges.contains { exportedChanges[$0.key] != $0.value }
+    }
+
+    func chooseRecoveryDestination() async {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "VoxoL-Recovery.json"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        _ = await exportRecoveryCopy(to: destination)
+    }
+
+    @discardableResult
+    func exportRecoveryCopy(to destination: URL) async -> Bool {
+        let changes = pendingChanges
+        do {
+            try await fileStore.exportRecoveryCopy(
+                TranscriptArchive(records: records), to: destination)
+            for (id, revision) in changes { exportedChanges[id] = revision }
+            toast = .recoveryExported
+            return true
+        } catch {
+            toast = .recoveryExportFailed
+            return false
+        }
+    }
+
+    func flushPendingSaves() async {
+        if hasUnsavedChanges { await retryHistory() }
+    }
 
     var metrics: TranscriptHistoryMetrics {
         TranscriptHistoryMetrics(records: records)
@@ -21,25 +70,32 @@ final class TranscriptStore {
             return
         }
         isLoading = true
-        defer { isLoading = false }
 
         do {
             let archive = try await fileStore.load()
-            records = archive.records.sorted { $0.createdAt > $1.createdAt }
+            let pending = records.filter { pendingChanges[$0.id] != nil }
+            records = (archive.records.filter { pendingChanges[$0.id] == nil } + pending)
+                .sorted { $0.createdAt > $1.createdAt }
             usesExampleData = false
+            historyIssue = pendingChanges.isEmpty ? nil : .saveFailed
         } catch TranscriptFileStoreError.fileMissing {
-            #if DEBUG
-                records = Self.exampleRecords
-                usesExampleData = true
-            #else
-                records = []
-                usesExampleData = false
-            #endif
-        } catch {
-            records = []
+            records = records.filter { pendingChanges[$0.id] != nil }
             usesExampleData = false
+            historyIssue = pendingChanges.isEmpty ? nil : .saveFailed
+        } catch {
+            // Keep in-memory results and leave the unreadable file untouched.
+            historyIssue = .loadFailed
             toast = .historyLoadFailed
         }
+        isLoading = false
+        if historyIssue != .loadFailed, !pendingChanges.isEmpty {
+            await persist()
+        }
+    }
+
+    func retryHistory() async {
+        guard !isLoading else { return }
+        await load()
     }
 
     func add(_ record: TranscriptRecord) async {
@@ -52,6 +108,7 @@ final class TranscriptStore {
             records = []
         }
         records.insert(record, at: 0)
+        pendingChanges[record.id] = UUID()
         usesExampleData = false
         await persist()
     }
@@ -72,6 +129,7 @@ final class TranscriptStore {
         }
         toast = .previousVersionRestored
         if !usesExampleData {
+            pendingChanges[id] = UUID()
             await persist()
         }
     }
@@ -85,6 +143,7 @@ final class TranscriptStore {
         }
         toast = .laterVersionRestored
         if !usesExampleData {
+            pendingChanges[id] = UUID()
             await persist()
         }
     }
@@ -100,6 +159,7 @@ final class TranscriptStore {
         }
         let rawTranscript = records[index].revisions.first?.text ?? records[index].text
         records[index].replaceText(with: trimmed)
+        pendingChanges[id] = UUID()
         let edit = TranscriptEdit(
             rawTranscript: rawTranscript,
             correctedText: trimmed,
@@ -148,15 +208,60 @@ final class TranscriptStore {
     }
 
     private func persist() async {
+        // Loading yields to other main-actor work. Wait until its records are merged
+        // before allowing a dictation that arrived during launch to write the archive.
+        guard !isLoading else { return }
+        let changesBeingSaved = pendingChanges
         do {
             try await fileStore.save(TranscriptArchive(records: records))
+            for (id, revision) in changesBeingSaved where pendingChanges[id] == revision {
+                pendingChanges.removeValue(forKey: id)
+                exportedChanges.removeValue(forKey: id)
+            }
+            if pendingChanges.isEmpty { historyIssue = nil }
         } catch {
+            if historyIssue != .loadFailed { historyIssue = .saveFailed }
             toast = .historySaveFailed
         }
     }
+
+    #if DEBUG
+        /// An explicit in-memory state for native UI review; never reads an archive.
+        func configureAuditPreview(_ state: String) {
+            if state == "history-error" || state == "history-error-populated" {
+                historyIssue = .loadFailed
+            }
+            if state == "loading" { isLoading = true }
+            if state == "populated" || state == "history-error-populated" {
+                records = [
+                    TranscriptRecord(
+                        createdAt: .now, applicationName: "Notes",
+                        text:
+                            "Exemple fictif : préparer la réunion de mercredi et vérifier le budget.",
+                        durationSeconds: 8),
+                    TranscriptRecord(
+                        createdAt: .now.addingTimeInterval(-120), applicationName: "Mail",
+                        text: "Exemple fictif : le café est prêt, rendez-vous à dix heures.",
+                        durationSeconds: 6),
+                    TranscriptRecord(
+                        createdAt: .now.addingTimeInterval(-90_000), applicationName: "Notes",
+                        text:
+                            "Synthetic example: review the application before publishing the release.",
+                        durationSeconds: 7),
+                ]
+            }
+        }
+    #endif
+}
+
+enum TranscriptHistoryIssue: Equatable {
+    case loadFailed
+    case saveFailed
 }
 
 enum TranscriptToast: Equatable {
+    case recoveryExported
+    case recoveryExportFailed
     case copied
     case previousVersionRestored
     case laterVersionRestored
@@ -172,69 +277,6 @@ struct TranscriptEdit: Equatable, Sendable {
     let rawTranscript: String
     let correctedText: String
     let applicationBundleIdentifier: String?
-}
-
-private enum TranscriptFileStoreError: Error {
-    case fileMissing
-    case unsupportedSchema(Int)
-}
-
-private actor TranscriptFileStore {
-    private let directoryURL: URL
-    private let archiveURL: URL
-
-    init() {
-        let applicationSupport =
-            FileManager.default.urls(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask
-            ).first ?? FileManager.default.temporaryDirectory
-        directoryURL = applicationSupport.appendingPathComponent("VoxoL", isDirectory: true)
-        archiveURL = directoryURL.appendingPathComponent("transcripts.json")
-    }
-
-    func load() throws -> TranscriptArchive {
-        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
-            throw TranscriptFileStoreError.fileMissing
-        }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let archive = try decoder.decode(
-            TranscriptArchive.self,
-            from: Data(contentsOf: archiveURL)
-        )
-        guard archive.schemaVersion == TranscriptArchive.currentSchemaVersion else {
-            throw TranscriptFileStoreError.unsupportedSchema(archive.schemaVersion)
-        }
-        return archive
-    }
-
-    func save(_ archive: TranscriptArchive) throws {
-        try FileManager.default.createDirectory(
-            at: directoryURL,
-            withIntermediateDirectories: true
-        )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        // Sorted keys keep diffs readable; pretty printing only made a file nobody reads by
-        // hand a third larger, and it is rewritten in full after every dictation.
-        encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(archive).write(
-            to: archiveURL, options: [.atomic, .completeFileProtection])
-    }
-
-    func audioURL(relativePath: String) -> URL? {
-        let root = directoryURL.resolvingSymlinksInPath().standardizedFileURL
-        let candidate =
-            directoryURL
-            .appendingPathComponent(relativePath)
-            .resolvingSymlinksInPath()
-            .standardizedFileURL
-        guard candidate.path.hasPrefix(root.path + "/") else {
-            return nil
-        }
-        return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
-    }
 }
 
 private extension TranscriptStore {

@@ -957,6 +957,10 @@ struct HomeStudioView: View {
     @ViewBuilder
     private func toastLabel(_ toast: TranscriptToast) -> some View {
         switch toast {
+        case .recoveryExported:
+            Label("Recovery copy exported", systemImage: "checkmark")
+        case .recoveryExportFailed:
+            Label("Recovery copy could not be exported", systemImage: "exclamationmark.triangle")
         case .copied:
             Label("Copied", systemImage: "checkmark")
         case .previousVersionRestored:

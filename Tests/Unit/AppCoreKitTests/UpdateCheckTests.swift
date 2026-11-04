@@ -96,9 +96,41 @@ final class UpdateCheckTests: XCTestCase {
         XCTAssertEqual(releases.map(\.version), ["0.4.0"])
     }
 
-    func testUnexpectedPayloadShapeYieldsNoReleases() throws {
+    func testAPIErrorIsNotMistakenForAnEmptyReleaseFeed() throws {
         let payload = #"{"message":"Not Found"}"#.data(using: .utf8)!
+        XCTAssertThrowsError(try UpdateCheck.releases(fromGitHubJSON: payload)) {
+            XCTAssertEqual($0 as? UpdateCheck.FeedError, .unexpectedPayload)
+        }
+    }
 
-        XCTAssertEqual(try UpdateCheck.releases(fromGitHubJSON: payload).count, 0)
+    func testHTTPFailureIsRejectedEvenWithAValidArrayBody() {
+        XCTAssertThrowsError(
+            try UpdateCheck.releases(fromGitHubJSON: Data("[]".utf8), statusCode: 403)
+        ) {
+            XCTAssertEqual($0 as? UpdateCheck.FeedError, .httpStatus(403))
+        }
+    }
+
+    func testFailedCheckCanBeRetriedAndDoesNotReportCurrent() {
+        var state = UpdateCheck.State()
+        XCTAssertTrue(state.begin())
+        XCTAssertFalse(state.begin())
+        state.fail()
+        XCTAssertEqual(state.phase, .failed)
+        XCTAssertNil(state.available)
+        XCTAssertTrue(state.begin())
+        state.finish(current: "1.0.0", releases: [release("1.0.0")])
+        XCTAssertEqual(state.phase, .current)
+    }
+
+    func testFailedRefreshPreservesPreviouslyDiscoveredUpdate() {
+        var state = UpdateCheck.State()
+        state.begin()
+        state.finish(current: "1.0.0", releases: [release("1.1.0")])
+        XCTAssertEqual(state.phase, .available)
+        state.begin()
+        state.fail()
+        XCTAssertEqual(state.phase, .failed)
+        XCTAssertEqual(state.available, release("1.1.0"))
     }
 }

@@ -84,8 +84,6 @@ struct HubView: View {
     @State private var selection = HubView.initialDestination
     @State private var settingsSection = EditorialSettingsSection.general
     @State private var toastVisible = false
-    /// Set once the corner has actually asked the feed, so "up to date" is an answer, not a guess.
-    @State private var updateCheckedOnce = false
     @Namespace private var sidebarNamespace
 
     var body: some View {
@@ -136,18 +134,21 @@ struct HubView: View {
             settingsSection = .setup
             selection = .settings
         }
-        .onChange(of: transcripts.toast) { _, toast in
-            guard toast != nil else { return }
+        .task(id: transcripts.toastID) {
+            guard transcripts.toast != nil else { return }
             withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
                 toastVisible = true
             }
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(1.6))
-                withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
-                    toastVisible = false
-                }
-                transcripts.dismissToast()
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
             }
+            guard !Task.isCancelled else { return }
+            withAnimation(reduceMotion ? nil : EditorialMotion.soft) {
+                toastVisible = false
+            }
+            transcripts.dismissToast()
         }
     }
 
@@ -187,6 +188,24 @@ struct HubView: View {
 
             Spacer(minLength: 12)
 
+            if transcripts.historyIssue != nil {
+                Button {
+                    select(.today)
+                } label: {
+                    sidebarRow(
+                        compact: compact,
+                        icon: Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 13)),
+                        tint: theme.warning,
+                        tintSoft: theme.selection,
+                        title: "History needs attention",
+                        detail: Text("Review and retry")
+                    )
+                }
+                .buttonStyle(SignalPressButtonStyle())
+                .padding(.bottom, 8)
+            }
+
             // The runtime, on every screen: its state, the shortcut, and a place to hold and
             // dictate without going back to Today first.
             dictationCard(compact: compact)
@@ -196,7 +215,7 @@ struct HubView: View {
             // news belongs where the eye already goes to check that things are fine. Once the
             // setup is complete the readiness row has nothing left to say, so the corner becomes
             // the one place to ask for a new version instead of repeating that everything works.
-            if systemReady || UpdateNotifier.shared.available != nil {
+            if systemReady || UpdateNotifier.shared.state.phase != .idle {
                 updateRow(compact: compact)
             }
 
@@ -230,7 +249,6 @@ struct HubView: View {
             } else {
                 Task {
                     await notifier.check(announce: false)
-                    updateCheckedOnce = true
                 }
             }
         } label: {
@@ -255,7 +273,16 @@ struct HubView: View {
                     title: LocalizedStringKey(versionTitle),
                     detail: Text("Checking…")
                 )
-            } else if updateCheckedOnce {
+            } else if notifier.state.phase == .failed {
+                sidebarRow(
+                    compact: compact,
+                    icon: updateGlyph,
+                    tint: theme.warning,
+                    tintSoft: theme.selection,
+                    title: "Could not check for updates",
+                    detail: Text("Retry")
+                )
+            } else if notifier.state.phase == .current {
                 sidebarRow(
                     compact: compact,
                     icon: EditorialIcon(name: "check", size: 13),
@@ -550,6 +577,8 @@ struct HubView: View {
 
     private func toastTitle(_ toast: TranscriptToast) -> LocalizedStringKey {
         switch toast {
+        case .recoveryExported: "Recovery copy exported"
+        case .recoveryExportFailed: "Recovery copy could not be exported"
         case .copied: "Copied to clipboard"
         case .previousVersionRestored: "Previous version restored"
         case .laterVersionRestored: "Later version restored"
