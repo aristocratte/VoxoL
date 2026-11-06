@@ -3,6 +3,15 @@
 Tous les résultats sont des observations associées à un environnement, un commit et un schéma;
 ils ne deviennent jamais des promesses produit sans corpus et protocole publiés.
 
+## Alignement des raccords sur dictées réelles — 5 novembre 2026
+
+Même binaire, 63 enregistrements réels de plus de 30 s, `VOXOL_ASR_SEAM_ALIGNMENT=0` contre le
+défaut de l'arbre : 17 raccords dupliqués (« compréhension.ion ») et 28 points en milieu de phrase
+sans alignement, 0 et 16 avec. Le texte capté en direct à l'époque en comptait 17 et 27 : couper
+l'alignement reproduit donc le comportement réel. Il change 219 tokens sur 54 fichiers ; les trois
+modifications touchant un chiffre ou une négation retirent un doublon ou complètent un mot tronqué.
+Aucune référence humaine, pas de corpus public : l'alignement est activé sur cette preuve naturelle.
+
 ## Décodage par brouillons de la transcription — 4 novembre 2026
 
 La dictée active maintenant `promptLookupTokenCount = 16` (`QwenPolisherGenerationConfiguration.dictation`).

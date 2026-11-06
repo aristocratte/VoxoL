@@ -327,7 +327,7 @@ enum Pipeline {
         var totalFrameOffset = 0
         var previousChunk: ChunkResult?
         var orderedChunks = results.ordered(count: chunks.count)
-        if ProcessInfo.processInfo.environment["VOXOL_ASR_SEAM_ALIGNMENT"] == "1",
+        if ProcessInfo.processInfo.environment["VOXOL_ASR_SEAM_ALIGNMENT"] != "0",
             orderedChunks.count > 1
         {
             for index in 1..<orderedChunks.count {
