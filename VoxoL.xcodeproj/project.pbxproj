@@ -634,7 +634,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = L4452G7VZN;
 				ENABLE_APP_SANDBOX = NO;
@@ -646,7 +646,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone when you dictate or record a meeting.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "VoxoL displays upcoming meetings from your calendars when you choose to connect them.";
 				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "VoxoL captures call audio only when you start a meeting recording.";
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;
@@ -666,7 +666,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 15;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = L4452G7VZN;
 				ENABLE_APP_SANDBOX = NO;
@@ -678,7 +678,7 @@
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoxoL uses the microphone when you dictate or record a meeting.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "VoxoL displays upcoming meetings from your calendars when you choose to connect them.";
 				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "VoxoL captures call audio only when you start a meeting recording.";
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.voxol.VoxoL;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = macosx;

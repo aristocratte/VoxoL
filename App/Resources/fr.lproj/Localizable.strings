@@ -1609,3 +1609,6 @@
 "Your clipboard comes back two seconds after the paste. If the text doesn’t land, it stays on the clipboard and VoxoL tells you." = "Votre presse-papiers revient deux secondes après le collage. Si le texte n’arrive pas, il y reste et VoxoL vous le signale.";
 "Long dictations join cleanly" = "Les raccords des longues dictées sont corrigés";
 "Words are no longer doubled or cut where two stretches of speech meet." = "Les mots ne sont plus doublés ni coupés là où deux passages se rejoignent.";
+
+/* Notes de version 0.1.10 */
+"A new Hub interface." = "Nouvelle interface du Hub.";

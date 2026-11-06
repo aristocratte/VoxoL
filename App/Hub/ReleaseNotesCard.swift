@@ -25,6 +25,11 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.10",
+                headline: "A new Hub interface.",
+                items: []
+            ),
+            Entry(
                 version: "0.1.9",
                 headline: "Dictation starts sooner and lands more reliably.",
                 items: [
