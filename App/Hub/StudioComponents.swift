@@ -633,6 +633,7 @@ struct TranscriptDiffLegend: View {
 /// pretending.
 struct AudioInputPicker: View {
     @Environment(VoxoLTheme.self) private var theme
+    @Environment(\.locale) private var locale
 
     @Binding var selectedUID: String
     /// Compact hides the leading label, for placement beside a primary action.
@@ -656,7 +657,7 @@ struct AudioInputPicker: View {
             options.append(
                 EditorialDropdownOption(
                     id: selectedUID,
-                    verbatim: String(localized: "Microphone disconnected")
+                    verbatim: String("Microphone disconnected", in: locale)
                 )
             )
         }
@@ -682,11 +683,11 @@ struct AudioInputPicker: View {
     private var title: String {
         guard !selectedUID.isEmpty else {
             let fallback = devices.first { $0.isDefault } ?? devices.first
-            return fallback?.name ?? String(localized: "System default")
+            return fallback?.name ?? String("System default", in: locale)
         }
         guard let device = devices.first(where: { $0.id == selectedUID })
         else {
-            return String(localized: "Microphone disconnected")
+            return String("Microphone disconnected", in: locale)
         }
         return device.name
     }
@@ -791,14 +792,14 @@ struct EditorialDropdown: View {
                     .foregroundStyle(theme.secondaryInk)
                     .rotationEffect(.degrees(isOpen ? 180 : 0))
             }
-            .font(VoxoLTypography.font(size: 11.5, weight: .medium, relativeTo: .caption))
+            .font(VoxoLTypography.font(size: 13, weight: .medium))
             .foregroundStyle(warns ? theme.warning : theme.ink)
             .padding(.horizontal, 10)
             .frame(height: 28)
             .frame(maxWidth: maximumLabelWidth, alignment: .leading)
-            .background(hovering || isOpen ? theme.selection : theme.surface)
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(theme.line, lineWidth: 1))
+            .background(
+                hovering || isOpen ? theme.selection : theme.surface,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
         .buttonStyle(.plain)
         .fixedSize()
@@ -846,13 +847,7 @@ private struct EditorialDropdownPanel: View {
                                 .foregroundStyle(theme.cobalt)
                         }
                     }
-                    .font(
-                        VoxoLTypography.font(
-                            size: 12,
-                            weight: option.id == request.selectedID ? .semibold : .medium,
-                            relativeTo: .caption
-                        )
-                    )
+                    .font(VoxoLTypography.font(size: 13))
                     .foregroundStyle(theme.ink)
                     .padding(.horizontal, 10)
                     .frame(height: 30)
@@ -869,12 +864,8 @@ private struct EditorialDropdownPanel: View {
         .padding(6)
         .frame(width: 236)
         .background(theme.raisedSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(theme.line, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
     }
 }
 

@@ -26,6 +26,13 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
         markers.append(MeetingMarker(time: elapsed))
     }
 
+    /// A note typed during the meeting, kept at the moment it was written so the report can place it.
+    func addNote(_ text: String) {
+        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, state == .recording || state == .paused else { return }
+        markers.append(MeetingMarker(time: elapsed, note: clean))
+    }
+
     @ObservationIgnored private var microphone: AVAudioRecorder?
     @ObservationIgnored private var stream: SCStream?
     @ObservationIgnored private var output: MeetingCallOutput?

@@ -21,10 +21,17 @@ enum MeetingAttributedDocument {
         kind: MeetingDocumentBlock.Kind, run: MeetingTextRun = .init(""),
         printing: Bool = false
     ) -> [NSAttributedString.Key: Any] {
-        let size: CGFloat = kind == .heading ? 23 : kind == .subheading ? 18 : 15
+        let size: CGFloat =
+            printing
+            ? (kind == .heading ? 23 : kind == .subheading ? 18 : 15)
+            : (kind == .heading ? 19 : 16)
         let weight: NSFont.Weight =
             run.bold || kind == .heading || kind == .subheading ? .semibold : .regular
         var font = NSFont.systemFont(ofSize: size, weight: weight)
+        // On screen the report is set in New York, like the reading view it switches from.
+        if !printing, let serif = font.fontDescriptor.withDesign(.serif) {
+            font = NSFont(descriptor: serif, size: size) ?? font
+        }
         if run.italic { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
         let style = NSMutableParagraphStyle()
         style.lineSpacing = 5

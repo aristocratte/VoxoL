@@ -29,44 +29,79 @@ import SwiftUI
     }
 #endif
 
+/// Meetings: the list, one meeting's report, or the meeting being recorded.
 struct NativeMeetingsView: View {
-    private enum Page: String { case report, transcript, people }
+    @Environment(VoxoLTheme.self) private var theme
+    @Environment(MeetingsStore.self) private var meetings
+    @Environment(\.locale) private var locale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The list stays reachable while a meeting is being recorded.
+    @State private var browsingDuringCapture = false
+
+    private var french: Bool { locale.language.languageCode?.identifier == "fr" }
+    private var capturing: Bool {
+        meetings.recorder.active || meetings.recorder.completedURL != nil
+    }
+
+    var body: some View {
+        Group {
+            if capturing && !browsingDuringCapture {
+                MeetingLiveView(french: french, showList: { browsingDuringCapture = true })
+                    .transition(.opacity)
+            } else if let document = meetings.selected {
+                MeetingReportView(transcript: document, french: french)
+                    .id(document.id)
+                    .transition(.opacity)
+            } else {
+                MeetingsListView(french: french, showCapture: { browsingDuringCapture = false })
+                    .transition(.opacity)
+            }
+        }
+        .foregroundStyle(theme.ink)
+        .background(theme.surface)
+        .animation(reduceMotion ? nil : EditorialMotion.soft, value: meetings.selection)
+        .animation(reduceMotion ? nil : EditorialMotion.soft, value: capturing)
+        .animation(reduceMotion ? nil : EditorialMotion.soft, value: browsingDuringCapture)
+        .onChange(of: capturing) { _, now in if now { browsingDuringCapture = false } }
+    }
+}
+
+// MARK: - List
+
+private struct MeetingsListView: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(MeetingsStore.self) private var meetings
     @Environment(ModelInstallationStore.self) private var models
-    @Environment(\.locale) private var locale
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let french: Bool
+    let showCapture: () -> Void
+
+    private enum Filter: Hashable, CaseIterable { case all, toReview, favorites }
+
+    @State private var filter = Filter.all
+    @State private var search = ""
+    @State private var recording: RecordingRequest?
+    @FocusState private var searchFocused: Bool
 
     private struct RecordingRequest: Identifiable {
         let id = UUID()
         let title: String
-        var event: MeetingCalendarLink? = nil
+        var event: MeetingCalendarLink?
     }
-    @State private var recordingRequest: RecordingRequest?
 
-    @State private var page: Page = .report
-    @State private var search = ""
-    @State private var historyFilter = 0
-    @State private var recentOnly = false
-    @State private var includeExportSources = true
-    @State private var names: [Int: String] = [:]
-    @State private var copied = false
-    @State private var confirmDeletion = false
+    private var speakerPrefix: String { tr(french, "Intervenant", "Speaker") }
 
-    private var french: Bool { locale.language.languageCode?.identifier == "fr" }
-    private var speakerPrefix: String { s("Intervenant", "Speaker") }
-    private var unknownLabel: String { s("Intervenant incertain", "Uncertain speaker") }
-    private var filteredRecords: [SpeakerTranscript] {
+    private var records: [SpeakerTranscript] {
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return meetings.records.filter { record in
             let report = meetings.reports[record.id]
-            let matchesState =
-                historyFilter == 0 || (historyFilter == 1 && report?.reviewedAt == nil)
-                || (historyFilter == 2 && report?.reviewedAt != nil)
-                || (historyFilter == 3 && record.favorite == true)
-            let matchesDate =
-                !recentOnly || record.occurredAt >= Date().addingTimeInterval(-30 * 86_400)
+            let matchesFilter =
+                switch filter {
+                case .all: true
+                case .toReview: report?.reviewedAt == nil
+                case .favorites: record.favorite == true
+                }
             let matchesQuery =
                 query.isEmpty || record.title.localizedStandardContains(query)
                 || record.rawText.localizedStandardContains(query)
@@ -75,762 +110,262 @@ struct NativeMeetingsView: View {
                 || record.speakerIDs.contains {
                     record.name(for: $0, prefix: speakerPrefix).localizedStandardContains(query)
                 }
-            return matchesState && matchesDate && matchesQuery
-        }.sorted { $0.occurredAt > $1.occurredAt }
+            return matchesFilter && matchesQuery
+        }
+        .sorted { $0.occurredAt > $1.occurredAt }
+    }
+
+    private var days: [(day: Date, records: [SpeakerTranscript])] {
+        Dictionary(grouping: records) { Calendar.current.startOfDay(for: $0.occurredAt) }
+            .map { (day: $0.key, records: $0.value) }
+            .sorted { $0.day > $1.day }
     }
 
     var body: some View {
-        Group {
-            if let document = meetings.selected {
-                meetingPage(document)
-                    .transition(.opacity)
-            } else {
-                historyPage
-                    .transition(.opacity)
+        HubPage {
+            HubPageHeader(verbatim: tr(french, "Réunions", "Meetings"), meta: Text(verbatim: summary)) {
+                HStack(spacing: 6) {
+                    importButton
+                    Button {
+                        recording = RecordingRequest(title: tr(french, "Nouvelle réunion", "New meeting"))
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle().fill(theme.coral).frame(width: 7, height: 7)
+                            Text(tr(french, "Enregistrer", "Record"))
+                        }
+                    }
+                    .buttonStyle(HubButtonStyle(kind: .primary))
+                    .disabled(meetings.busy || meetings.recorder.completedURL != nil)
+                }
             }
-        }
-        .foregroundStyle(theme.ink)
-        .background(theme.canvas)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: meetings.selection)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: page)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: meetings.phase)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: meetings.recorder.state)
-        .sheet(item: $recordingRequest) { request in
-            MeetingRecordingSheet(
-                title: request.title, french: french, calendarEvent: request.event)
-        }
-        .onChange(of: meetings.selection) { _, _ in
-            page = .report
-            copied = false
-            names = meetings.selected?.names ?? [:]
-        }
-        .confirmationDialog(
-            s("Supprimer cette réunion ?", "Delete this meeting?"),
-            isPresented: $confirmDeletion, titleVisibility: .visible
-        ) {
-            Button(s("Supprimer la réunion", "Delete meeting"), role: .destructive) {
-                if let id = meetings.selection { Task { await meetings.remove(id) } }
+
+            if meetings.recorder.active || meetings.recorder.completedURL != nil {
+                captureRow.padding(.top, 20)
             }
-        } message: {
-            Text(
-                verbatim: s(
-                    "Le fichier audio d’origine restera sur votre Mac.",
-                    "The original audio file stays on your Mac."))
-        }
-    }
-
-    // MARK: History
-
-    private var historyPage: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .top, spacing: 28) {
-                        VStack(alignment: .leading, spacing: 11) {
-                            eyebrow(s("VOTRE ESPACE RÉUNION", "YOUR MEETING SPACE"))
-                            Text(verbatim: s("Les idées restent.", "Keep the ideas."))
-                                .font(VoxoLTypography.font(size: 38, weight: .semibold))
-                                .tracking(-1.4)
-                            Text(
-                                verbatim: s(
-                                    "Enregistrez la conversation. Retrouvez l’essentiel.",
-                                    "Record the conversation. Find what matters."
-                                )
-                            )
-                            .font(VoxoLTypography.font(size: 15))
-                            .foregroundStyle(theme.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: 560, alignment: .leading)
-                        }
-                        Spacer(minLength: 12)
-                        VStack(alignment: .trailing, spacing: 8) {
-                            recordButton
-                            importButton
-                        }
-                    }
-                    .padding(.bottom, 35)
-
-                    statusMessages
-
-                    MeetingAgendaView(french: french) { event in
-                        recordingRequest = RecordingRequest(title: event.title, event: event.link)
-                    }
-
-                    HStack(spacing: 14) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(verbatim: s("Historique", "History"))
-                                .font(VoxoLTypography.font(size: 20, weight: .semibold))
-                            Text(
-                                verbatim: s(
-                                    "\(meetings.records.count) réunion\(meetings.records.count > 1 ? "s" : "") · \(Int(meetings.records.reduce(0) { $0 + $1.duration } / 60)) min de conversations",
-                                    "\(meetings.records.count) meeting\(meetings.records.count == 1 ? "" : "s") · \(Int(meetings.records.reduce(0) { $0 + $1.duration } / 60)) min of conversations"
-                                )
-                            )
-                            .font(VoxoLTypography.font(size: 12))
-                            .foregroundStyle(theme.secondaryInk)
-                        }
-                        Spacer()
-                        HStack(spacing: 9) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 13))
-                                .foregroundStyle(theme.secondaryInk)
-                            TextField(s("Rechercher…", "Search…"), text: $search)
-                                .textFieldStyle(.plain)
-                                .font(VoxoLTypography.font(size: 13))
-                        }
-                        .padding(.horizontal, 13)
-                        .frame(width: 276, height: 40)
-                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 11))
-                        .overlay(RoundedRectangle(cornerRadius: 11).stroke(theme.line))
-                    }
-                    .padding(.bottom, 16)
-
+            if meetings.phase != .idle, meetings.processingID == nil || meetings.selected == nil {
+                MeetingProgressLine(french: french).padding(.top, 20)
+            }
+            if let failure = meetings.failure {
+                HubPanel {
                     HStack(spacing: 10) {
-                        Picker(
-                            s("Filtrer les réunions", "Filter meetings"), selection: $historyFilter
-                        ) {
-                            Text(s("Toutes", "All")).tag(0)
-                            Text(s("À relire", "To review")).tag(1)
-                            Text(s("Relues", "Reviewed")).tag(2)
-                            Text(s("Favoris", "Favorites")).tag(3)
-                        }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 420)
+                        Text(verbatim: failure)
+                            .font(VoxoLTypography.font(size: 13))
+                            .foregroundStyle(theme.warning)
+                            .fixedSize(horizontal: false, vertical: true)
                         Spacer()
-                        Toggle(s("30 derniers jours", "Last 30 days"), isOn: $recentOnly)
-                            .toggleStyle(.checkbox).font(.system(size: 12))
-                    }.padding(.bottom, 20)
-
-                    if meetings.records.isEmpty {
-                        historyEmptyState
-                    } else if filteredRecords.isEmpty {
-                        Text(
-                            verbatim: s(
-                                "Aucune réunion ne correspond à cette recherche.",
-                                "No meeting matches this search.")
-                        )
-                        .font(VoxoLTypography.font(size: 14))
-                        .foregroundStyle(theme.secondaryInk)
-                        .padding(30)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(theme.surface, in: RoundedRectangle(cornerRadius: 16))
-                    } else {
-                        LazyVStack(spacing: 9) {
-                            ForEach(filteredRecords) { record in
-                                historyRow(record)
-                            }
-                        }
+                        Button(tr(french, "Fermer", "Dismiss")) { meetings.failure = nil }
+                            .buttonStyle(HubButtonStyle(kind: .onWell))
                     }
-                    Text(
-                        verbatim: s(
-                            "TRAITEMENT LOCAL · LES FICHIERS RESTENT SUR CE MAC",
-                            "LOCAL PROCESSING · FILES STAY ON THIS MAC")
-                    )
-                    .font(VoxoLTypography.font(size: 10, weight: .semibold))
-                    .tracking(1.1)
-                    .foregroundStyle(theme.secondaryInk)
-                    .padding(.top, 28)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 38)
-                .padding(.vertical, 40)
-                .frame(maxWidth: 1120, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.top, 20)
             }
-            .scrollIndicators(.hidden)
-        }
-    }
 
-    private var historyEmptyState: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            VoxoLMark(size: 60)
-            Text(
-                verbatim: s(
-                    "De la conversation à l’action.", "From conversation to action.")
-            )
-            .font(VoxoLTypography.font(size: 23, weight: .semibold))
-            Text(
-                verbatim: s(
-                    "En présentiel ou en appel, gardez une trace claire des échanges, des décisions et des prochaines étapes. Vous pouvez aussi importer un audio ou une vidéo.",
-                    "In person or on a call, keep a clear record of discussions, decisions and next steps. You can also import audio or video."
-                )
-            )
-            .font(VoxoLTypography.font(size: 14))
-            .foregroundStyle(theme.secondaryInk)
-            .frame(maxWidth: 475, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 22) {
-                Label(s("Enregistrer", "Record"), systemImage: "waveform")
-                Image(systemName: "chevron.right").font(.system(size: 9))
-                Label(s("Transcrire", "Transcribe"), systemImage: "text.alignleft")
-                Image(systemName: "chevron.right").font(.system(size: 9))
-                Label(s("Décider", "Take action"), systemImage: "checklist")
+            MeetingUpcomingList(french: french) { event in
+                recording = RecordingRequest(title: event.title, event: event.link)
             }
-            .font(VoxoLTypography.font(size: 12, weight: .medium))
-            .foregroundStyle(theme.cobalt)
-            .padding(.top, 8)
-        }
-        .padding(35)
-        .frame(maxWidth: .infinity, minHeight: 260, alignment: .leading)
-        .background(theme.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(theme.line))
-    }
 
-    private func historyRow(_ record: SpeakerTranscript) -> some View {
-        Button {
-            meetings.selection = record.id
-        } label: {
-            HStack(spacing: 18) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(theme.cobalt)
-                    .frame(width: 52, height: 52)
-                    .background(theme.cobaltSoft, in: RoundedRectangle(cornerRadius: 14))
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(verbatim: record.title)
-                        .font(VoxoLTypography.font(size: 16, weight: .semibold))
-                        .lineLimit(1)
-                    HStack(spacing: 7) {
-                        Text(
-                            verbatim: record.occurredAt.formatted(
-                                Date.FormatStyle(date: .abbreviated, time: .shortened).locale(
-                                    locale)))
-                        Text("·")
-                        Text(verbatim: SpeakerTranscript.timestamp(record.duration))
-                        Text("·")
-                        Text(
-                            verbatim: s(
-                                "\(record.speakerIDs.count) intervenant\(record.speakerIDs.count > 1 ? "s" : "")",
-                                "\(record.speakerIDs.count) speaker\(record.speakerIDs.count == 1 ? "" : "s")"
-                            ))
-                    }
-                    .font(VoxoLTypography.font(size: 11.5))
-                    .foregroundStyle(theme.secondaryInk)
-                    if let report = meetings.reports[record.id], !report.content.plainText.isEmpty {
-                        Text(
-                            report.content.blocks.first(where: { $0.kind == .paragraph })?.text
-                                ?? ""
-                        )
-                        .font(.system(size: 12)).foregroundStyle(theme.secondaryInk).lineLimit(1)
+            HubSectionHeader(verbatim: tr(french, "Récentes", "Recent")) {
+                HubSearchField(text: $search, focus: $searchFocused)
+            }
+            if !meetings.records.isEmpty {
+                HubSegmented(options: Filter.allCases, selection: $filter) { option in
+                    switch option {
+                    case .all: Text(tr(french, "Toutes", "All"))
+                    case .toReview: Text(tr(french, "À relire", "To review"))
+                    case .favorites: Text(tr(french, "Favoris", "Favorites"))
                     }
                 }
-                Spacer(minLength: 8)
-                if record.favorite == true {
-                    Image(systemName: "star.fill").foregroundStyle(theme.warning)
-                }
-                Text(
-                    verbatim: meetings.processingID == record.id && meetings.phase == .reporting
-                        ? s("En rédaction", "Writing")
-                        : meetings.reports[record.id]?.proposal != nil
-                            ? s("Nouvelle version", "New version")
-                            : meetings.reports[record.id]?.reviewedAt != nil
-                                ? s("Relue", "Reviewed") : s("À relire", "To review")
-                )
-                .font(VoxoLTypography.font(size: 11, weight: .medium))
-                .foregroundStyle(
-                    meetings.reports[record.id]?.generator == nil
-                        ? theme.secondaryInk : theme.cobalt
-                )
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    meetings.reports[record.id]?.generator == nil
-                        ? theme.selection : theme.cobaltSoft, in: Capsule())
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(theme.secondaryInk)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(theme.surface, in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(theme.line))
-            .contentShape(RoundedRectangle(cornerRadius: 15))
-        }
-        .buttonStyle(SignalPressButtonStyle())
-        .accessibilityLabel("\(record.title), \(s("ouvrir la réunion", "open meeting"))")
-    }
 
-    private var importButton: some View {
-        Button {
-            if meetings.modelReady, let root = models.installedDirectory(for: .asr) {
-                meetings.importAudio(asrDirectory: root, french: french)
-            } else if !meetings.modelReady {
-                meetings.installModel()
-            }
-        } label: {
-            Label(
-                meetings.modelReady
-                    ? s("Importer un audio ou une vidéo", "Import audio or video")
-                    : s("Installer la reconnaissance vocale", "Install speaker recognition"),
-                systemImage: meetings.modelReady ? "arrow.up.doc" : "arrow.down.to.line"
-            )
-        }
-        .buttonStyle(MeetingQuietButtonStyle())
-        .disabled(
-            meetings.busy || (meetings.modelReady && models.installedDirectory(for: .asr) == nil)
-        )
-        .help(
-            models.installedDirectory(for: .asr) == nil && meetings.modelReady
-                ? s(
-                    "Installez d’abord le modèle de transcription dans Réglages.",
-                    "Install the transcription model in Settings first.")
-                : "")
-    }
-
-    private var recordButton: some View {
-        Button {
-            recordingRequest = RecordingRequest(title: s("Nouvelle réunion", "New meeting"))
-        } label: {
-            Label(s("Enregistrer une réunion", "Record a meeting"), systemImage: "record.circle")
-        }
-        .buttonStyle(MeetingAccentButtonStyle())
-        .disabled(meetings.busy || meetings.recorder.completedURL != nil)
-    }
-
-    // MARK: Meeting workspace
-
-    private func meetingPage(_ document: SpeakerTranscript) -> some View {
-        VStack(spacing: 0) {
-            meetingToolbar(document)
-            Rectangle().fill(theme.line).frame(height: 1)
-            statusMessages.padding(.horizontal, 24)
-                .padding(.top, meetings.busy || meetings.failure != nil ? 12 : 0)
-            compactNavigation
-            documentContent(document).id(document.id)
-        }
-    }
-
-    private func meetingToolbar(_ document: SpeakerTranscript) -> some View {
-        HStack(spacing: 14) {
-            Button {
-                meetings.selection = nil
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.left")
-                    Text(verbatim: s("Réunions", "Meetings"))
-                }
-            }
-            .buttonStyle(MeetingQuietButtonStyle())
-            Rectangle().fill(theme.line).frame(width: 1, height: 22)
-            Text(verbatim: document.title)
-                .font(VoxoLTypography.font(size: 13, weight: .medium))
-                .lineLimit(1)
-                .foregroundStyle(theme.secondaryInk)
-            Spacer(minLength: 6)
-            Button {
-                meetings.updateMeeting(document.id) { $0.favorite = !($0.favorite ?? false) }
-            } label: {
-                Image(systemName: document.favorite == true ? "star.fill" : "star")
-            }
-            .buttonStyle(MeetingQuietButtonStyle()).help(s("Favori", "Favorite"))
-            if let draft = meetings.reports[document.id] {
-                Menu {
-                    Toggle(s("Inclure les sources", "Include sources"), isOn: $includeExportSources)
-                    Divider()
-                    Button("Word (.docx)") {
-                        meetings.exportWord(
-                            draft, title: document.title, includeSources: includeExportSources)
-                    }
-                    Button("PDF") {
-                        meetings.exportPDF(
-                            draft, title: document.title, includeSources: includeExportSources)
-                    }
-                    Button("Markdown") {
-                        meetings.exportReport(
-                            draft, title: document.title, includeSources: includeExportSources)
-                    }
-                    Divider()
-                    Button(s("Copier le document", "Copy document")) { meetings.copyReport(draft) }
-                } label: {
-                    Label(s("Exporter", "Export"), systemImage: "square.and.arrow.up")
-                }
-                .menuStyle(.borderlessButton).fixedSize()
-                .padding(.horizontal, 13).padding(.vertical, 10)
-                .background(theme.canvas, in: RoundedRectangle(cornerRadius: 10))
-            }
-            Menu {
-                Button(s("Supprimer la réunion", "Delete meeting"), role: .destructive) {
-                    confirmDeletion = true
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-            }
-            .menuStyle(.borderlessButton).fixedSize().frame(width: 30)
-        }
-        .padding(.horizontal, 22)
-        .frame(height: 68)
-        .background(theme.surface)
-    }
-
-    private var compactNavigation: some View {
-        HStack(spacing: 5) {
-            navigationButton(.report, title: s("Compte rendu", "Report"), icon: "text.alignleft")
-            navigationButton(.transcript, title: s("Transcription", "Transcript"), icon: "waveform")
-            navigationButton(.people, title: s("Intervenants", "Speakers"), icon: "person.2")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(theme.surface.opacity(0.7))
-    }
-
-    private func navigationButton(_ target: Page, title: String, icon: String) -> some View {
-        Button {
-            page = target
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon).frame(width: 17)
-                Text(verbatim: title).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .font(VoxoLTypography.font(size: 12.5, weight: page == target ? .semibold : .medium))
-            .foregroundStyle(page == target ? theme.cobalt : theme.secondaryInk)
-            .padding(.horizontal, 13)
-            .frame(height: 39)
-            .background(
-                page == target ? theme.cobaltSoft : Color.clear,
-                in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(SignalPressButtonStyle())
-        .padding(.horizontal, 7)
-    }
-
-    @ViewBuilder
-    private func documentContent(_ document: SpeakerTranscript) -> some View {
-        switch page {
-        case .report:
-            reportPage(document)
-        case .transcript:
-            transcriptPage(document)
-        case .people:
-            peoplePage(document)
-        }
-    }
-
-    // MARK: Report document and editor
-
-    private func reportPage(_ document: SpeakerTranscript) -> some View {
-        MeetingDocumentWorkspace(transcript: document, french: french)
-    }
-
-    // MARK: Transcript and people
-
-    private func transcriptPage(_ document: SpeakerTranscript) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                documentTopline(document, label: s("TRANSCRIPTION", "TRANSCRIPT"))
-                HStack(alignment: .top) {
+            if meetings.records.isEmpty {
+                HubDitherCard(art: "DitherCabin") {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(verbatim: s("La conversation", "The conversation"))
-                            .font(VoxoLTypography.font(size: 30, weight: .semibold))
+                        Text(tr(french, "Aucune réunion pour l’instant", "No meeting yet"))
+                            .font(VoxoLTypography.font(size: 15, weight: .semibold))
+                            .foregroundStyle(theme.ink)
                         Text(
-                            verbatim: s(
-                                "Cliquez sur le nom d’un intervenant pour corriger une attribution.",
-                                "Click a speaker name to correct an assignment."
-                            )
+                            tr(french, "Enregistre une réunion en présentiel ou en appel, ou importe un audio ou une vidéo. Tout reste sur ce Mac.", "Record a meeting in person or on a call, or import audio or video. Everything stays on this Mac.")
                         )
                         .font(VoxoLTypography.font(size: 13))
                         .foregroundStyle(theme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer()
-                    Button {
-                        meetings.copy(document, french: french)
-                        copied = true
-                    } label: {
-                        Label(
-                            copied ? s("Copié", "Copied") : s("Copier", "Copy"),
-                            systemImage: copied ? "checkmark" : "doc.on.doc")
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle())
-                    Menu {
-                        Button(s("Texte (.txt)", "Text (.txt)")) {
-                            meetings.export(document, format: "txt", french: french)
-                        }
-                        Button(s("Sous-titres (.srt)", "Subtitles (.srt)")) {
-                            meetings.export(document, format: "srt", french: french)
-                        }
-                        Button(s("Données (.json)", "Structured data (.json)")) {
-                            meetings.export(document, format: "json", french: french)
-                        }
-                    } label: {
-                        Label(s("Exporter", "Export"), systemImage: "square.and.arrow.up")
-                            .font(VoxoLTypography.font(size: 12, weight: .medium))
-                            .foregroundStyle(theme.ink)
-                            .padding(.horizontal, 11)
-                            .frame(height: 34)
-                            .background(theme.canvas, in: RoundedRectangle(cornerRadius: 9))
-                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(theme.line))
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
                 }
-                .padding(.bottom, 30)
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(document.turns) { turn in
-                        HStack(alignment: .top, spacing: 20) {
-                            Text(verbatim: SpeakerTranscript.timestamp(turn.start))
-                                .font(VoxoLTypography.font(size: 11))
-                                .monospacedDigit()
-                                .foregroundStyle(theme.secondaryInk)
-                                .frame(width: 70, alignment: .leading)
-                                .padding(.top, 5)
-                            VStack(alignment: .leading, spacing: 9) {
-                                HStack(spacing: 8) {
-                                    Circle().fill(
-                                        turn.displayedSpeakerIDs.first.map(color)
-                                            ?? theme.secondaryInk
-                                    )
-                                    .frame(width: 8, height: 8)
-                                    Menu {
-                                        ForEach(document.speakerIDs, id: \.self) { speaker in
-                                            Button(
-                                                document.name(for: speaker, prefix: speakerPrefix)
-                                            ) {
-                                                Task {
-                                                    await meetings.assign(
-                                                        speaker: speaker, turn: turn.id,
-                                                        document: document.id)
-                                                }
-                                            }
-                                        }
-                                        Button(unknownLabel) {
-                                            Task {
-                                                await meetings.assign(
-                                                    speaker: nil, turn: turn.id,
-                                                    document: document.id)
-                                            }
-                                        }
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Text(
-                                                verbatim: document.label(
-                                                    for: turn, prefix: speakerPrefix,
-                                                    unknown: unknownLabel))
-                                        }
-                                        .font(VoxoLTypography.font(size: 12, weight: .semibold))
-                                        .foregroundStyle(theme.cobalt)
-                                    }
-                                    .menuStyle(.borderlessButton)
-                                    .fixedSize()
-                                    if turn.displayedOverlap {
-                                        Text(verbatim: s("Voix superposées", "Overlapping voices"))
-                                            .font(VoxoLTypography.font(size: 10))
-                                            .foregroundStyle(theme.coral)
-                                    }
-                                }
-                                Text(
-                                    verbatim: turn.text.trimmingCharacters(
-                                        in: .whitespacesAndNewlines)
-                                )
-                                .font(VoxoLTypography.font(size: 15))
-                                .lineSpacing(4)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            } else if records.isEmpty {
+                Text(tr(french, "Aucune réunion ne correspond.", "No meeting matches."))
+                    .font(VoxoLTypography.font(size: 13))
+                    .foregroundStyle(theme.secondaryInk)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(days, id: \.day) { day in
+                        Text(verbatim: dayTitle(day.day))
+                            .font(VoxoLTypography.font(size: 13, weight: .medium))
+                            .foregroundStyle(theme.secondaryInk)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 14)
+                            .padding(.bottom, 4)
+                        ForEach(day.records) { record in
+                            MeetingRow(record: record, french: french)
                         }
-                        .padding(.vertical, 19)
-                        Rectangle().fill(theme.line).frame(height: 1)
                     }
                 }
             }
-            .padding(.horizontal, 44)
-            .padding(.vertical, 36)
-            .frame(maxWidth: 840, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .scrollIndicators(.hidden)
-        .background(theme.surface)
+        .sheet(item: $recording) { request in
+            MeetingRecordingSheet(title: request.title, french: french, calendarEvent: request.event)
+                .environment(theme)
+                .environment(meetings)
+        }
     }
 
-    private func peoplePage(_ document: SpeakerTranscript) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                documentTopline(document, label: s("INTERVENANTS", "SPEAKERS"))
-                Text(verbatim: s("Les personnes de cette réunion", "People in this meeting"))
-                    .font(VoxoLTypography.font(size: 30, weight: .semibold))
-                Text(
-                    verbatim: s(
-                        "Renommez les voix après vérification. Les noms et les corrections restent propres à cette réunion.",
-                        "Rename voices after reviewing them. Names and corrections apply only to this meeting."
-                    )
-                )
-                .font(VoxoLTypography.font(size: 14))
-                .foregroundStyle(theme.secondaryInk)
-                .padding(.bottom, 10)
-                ForEach(document.speakerIDs, id: \.self) { speaker in
-                    HStack(spacing: 15) {
-                        Circle().fill(color(speaker)).frame(width: 11, height: 11)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(verbatim: s("VOIX \(speaker + 1)", "VOICE \(speaker + 1)"))
-                                .font(VoxoLTypography.font(size: 10, weight: .semibold))
-                                .tracking(1)
-                                .foregroundStyle(theme.secondaryInk)
-                            TextField(
-                                "\(speakerPrefix) \(speaker + 1)",
-                                text: Binding(
-                                    get: { names[speaker] ?? document.names[speaker] ?? "" },
-                                    set: { names[speaker] = $0 }
-                                )
-                            )
-                            .textFieldStyle(.plain)
-                            .font(VoxoLTypography.font(size: 16, weight: .medium))
-                            .onSubmit { rename(speaker, in: document) }
-                        }
-                        Spacer()
-                        Button(s("Enregistrer", "Save")) { rename(speaker, in: document) }
-                            .buttonStyle(SignalSecondaryButtonStyle())
-                    }
-                    .padding(18)
-                    .background(theme.canvas, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.line))
-                }
-                if let report = meetings.reports[document.id], !report.isCurrent(for: document) {
-                    inlineNotice(
-                        s(
-                            "Les noms du compte rendu peuvent être anciens. Relisez ou régénérez le document.",
-                            "Names in the report may be outdated. Review or regenerate the document."
-                        ), tone: theme.coral)
-                }
-            }
-            .padding(.horizontal, 44)
-            .padding(.vertical, 36)
-            .frame(maxWidth: 840, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
-        }
-        .scrollIndicators(.hidden)
-        .background(theme.surface)
+    private var summary: String {
+        let count = meetings.records.count
+        let minutes = Int(meetings.records.reduce(0) { $0 + $1.duration } / 60)
+        let duration = minutes >= 60 ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
+        let noun = french ? (count > 1 ? "réunions" : "réunion") : (count == 1 ? "meeting" : "meetings")
+        return "\(count) \(noun) · \(duration)"
     }
 
-    // MARK: Shared elements
-
-    private func documentTopline(_ document: SpeakerTranscript, label: String) -> some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 2).fill(theme.cobalt).frame(width: 23, height: 4)
-            eyebrow(label)
-            Spacer()
-            Text(verbatim: SpeakerTranscript.timestamp(document.duration))
-                .font(VoxoLTypography.font(size: 11))
-                .monospacedDigit()
-                .foregroundStyle(theme.secondaryInk)
-        }
-        .padding(.bottom, 25)
-    }
-
-    private func eyebrow(_ title: String) -> some View {
-        Text(verbatim: title)
-            .font(VoxoLTypography.font(size: 10, weight: .semibold))
-            .tracking(1.35)
-            .foregroundStyle(theme.secondaryInk)
-    }
-
-    private func inlineNotice(_ text: String, tone: Color) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: "info.circle").foregroundStyle(tone)
-            Text(verbatim: text)
-                .foregroundStyle(theme.secondaryInk)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(VoxoLTypography.font(size: 12))
-        .padding(13)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(tone.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-        .padding(.bottom, 15)
+    private func dayTitle(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return tr(french, "Aujourd’hui", "Today") }
+        if calendar.isDateInYesterday(day) { return tr(french, "Hier", "Yesterday") }
+        let locale = Locale(identifier: tr(french, "fr", "en"))
+        return day.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
+            .sentenceCased
     }
 
     @ViewBuilder
-    private var statusMessages: some View {
-        if let failure = meetings.failure {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle").foregroundStyle(theme.coral)
-                Text(verbatim: failure).textSelection(.enabled)
-                Spacer()
-                Button {
-                    meetings.failure = nil
-                } label: {
-                    Image(systemName: "xmark")
+    private var importButton: some View {
+        if meetings.modelReady {
+            Button(tr(french, "Importer", "Import")) {
+                if let root = models.installedDirectory(for: .asr) {
+                    meetings.importAudio(asrDirectory: root, french: french)
                 }
-                .buttonStyle(MeetingQuietButtonStyle())
             }
-            .font(VoxoLTypography.font(size: 12))
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(theme.coralSoft, in: RoundedRectangle(cornerRadius: 12))
-            .padding(.bottom, 15)
-        }
-        if meetings.recorder.active || meetings.recorder.completedURL != nil {
-            MeetingCaptureCard(french: french)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-        }
-        if meetings.phase != .idle {
-            MeetingProgressCard(french: french, label: phaseLabel)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-        }
-    }
-
-    private var phaseLabel: String {
-        switch meetings.phase {
-        case .idle: s("Prêt", "Ready")
-        case .checking:
-            s("Vérification de la reconnaissance des voix…", "Checking speaker recognition…")
-        case .downloading:
-            s("Installation de la reconnaissance des voix…", "Installing speaker recognition…")
-        case .reading: s("Préparation de la piste audio…", "Preparing audio track…")
-        case .transcribing: s("Transcription de la conversation…", "Transcribing the conversation…")
-        case .speakers: s("Identification des intervenants…", "Identifying speaker turns…")
-        case .reporting: s("Rédaction du compte rendu local…", "Writing the local report…")
-        case .cancelling: s("Annulation…", "Cancelling…")
+            .buttonStyle(HubButtonStyle(kind: .secondary))
+            .disabled(meetings.busy || models.installedDirectory(for: .asr) == nil)
+            .help(
+                models.installedDirectory(for: .asr) == nil
+                    ? (tr(french, "Installe d’abord le moteur de transcription dans Réglages.", "Install the transcription engine in Settings first."))
+                    : (tr(french, "Importer un audio ou une vidéo", "Import audio or video")))
+        } else {
+            Button(tr(french, "Installer la reconnaissance des voix", "Install speaker recognition")) {
+                meetings.installModel()
+            }
+            .buttonStyle(HubButtonStyle(kind: .secondary))
+            .disabled(meetings.busy)
         }
     }
 
-    private func rename(_ speaker: Int, in document: SpeakerTranscript) {
-        Task { await meetings.rename(speaker: speaker, to: names[speaker] ?? "", in: document.id) }
-    }
-
-    private func color(_ speaker: Int) -> Color {
-        [theme.cobalt, theme.coral, theme.success, .purple, .orange, .teal, .indigo, .brown][
-            speaker % 8]
-    }
-
-    private func s(_ french: String, _ english: String) -> String {
-        self.french ? french : english
+    private var captureRow: some View {
+        let recorder = meetings.recorder
+        return Button(action: showCapture) {
+            HStack(spacing: 10) {
+                Circle().fill(recorder.active ? theme.coral : theme.secondaryInk).frame(width: 8, height: 8)
+                Text(verbatim: recorder.title)
+                    .font(VoxoLTypography.font(size: 14, weight: .medium))
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(1)
+                Text(
+                    verbatim: recorder.active
+                        ? MeetingTime.short(recorder.elapsed)
+                        : (tr(french, "Prêt à transcrire", "Ready to transcribe"))
+                )
+                .font(VoxoLTypography.font(size: 13))
+                .foregroundStyle(theme.secondaryInk)
+                .monospacedDigit()
+                Spacer()
+                Text(tr(french, "Revenir", "Return"))
+                    .font(VoxoLTypography.font(size: 13, weight: .medium))
+                    .foregroundStyle(theme.ink)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
-struct MeetingAccentButtonStyle: ButtonStyle {
+/// One past meeting: its printed conversation, title, time and length, its voices, its state.
+private struct MeetingRow: View {
     @Environment(VoxoLTheme.self) private var theme
-    @Environment(\.isEnabled) private var enabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(MeetingsStore.self) private var meetings
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(VoxoLTypography.font(size: 13, weight: .semibold))
-            .foregroundStyle(theme.surface)
-            .padding(.horizontal, 18)
-            .frame(height: 42)
-            .background(
-                enabled ? theme.cobalt : theme.secondaryInk,
-                in: RoundedRectangle(cornerRadius: 11)
-            )
-            .opacity(enabled ? 1 : 0.55)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.14), value: configuration.isPressed)
+    let record: SpeakerTranscript
+    let french: Bool
+
+    @State private var hovering = false
+    @State private var envelope: [Double] = []
+
+    var body: some View {
+        Button {
+            meetings.selection = record.id
+        } label: {
+            HStack(spacing: 14) {
+                ConversationPrint(envelope: envelope, duration: record.duration, tint: theme.secondaryInk)
+                    .frame(width: 76, height: 20)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(verbatim: record.title)
+                            .font(VoxoLTypography.font(size: 14, weight: .medium))
+                            .foregroundStyle(theme.ink)
+                            .lineLimit(1)
+                        if record.favorite == true {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(theme.secondaryInk)
+                        }
+                    }
+                    Text(verbatim: detail)
+                        .font(VoxoLTypography.font(size: 12))
+                        .foregroundStyle(theme.secondaryInk)
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: -5) {
+                    ForEach(record.speakerIDs.prefix(4), id: \.self) { id in
+                        MeetingSpeakerBadge(
+                            speaker: id, name: record.name(for: id, prefix: tr(french, "Intervenant", "Speaker")))
+                            .overlay(Circle().stroke(hovering ? theme.well : theme.surface, lineWidth: 2))
+                    }
+                }
+                Text(verbatim: state)
+                    .font(VoxoLTypography.font(size: 13))
+                    .foregroundStyle(theme.secondaryInk)
+                    .frame(width: 96, alignment: .trailing)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 52)
+            .hubRowHover(hovering)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .task(id: record.turns.count) { envelope = ConversationPrint.envelope(of: record, slices: 60) }
+        .accessibilityLabel(Text(verbatim: "\(record.title), \(detail), \(state)"))
     }
-}
 
-struct MeetingQuietButtonStyle: ButtonStyle {
-    @Environment(VoxoLTheme.self) private var theme
-    @Environment(\.isEnabled) private var enabled
+    private var detail: String {
+        let locale = Locale(identifier: tr(french, "fr", "en"))
+        let minutes = max(1, Int((record.duration / 60).rounded()))
+        return "\(record.occurredAt.formatted(.dateTime.hour().minute().locale(locale))) · \(minutes) min"
+    }
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(VoxoLTypography.font(size: 12, weight: .medium))
-            .foregroundStyle(theme.ink)
-            .padding(.horizontal, 9)
-            .frame(minHeight: 34)
-            .background(
-                configuration.isPressed ? theme.selection : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .opacity(enabled ? 1 : 0.45)
-            .animation(.easeOut(duration: 0.13), value: configuration.isPressed)
+    private var state: String {
+        if meetings.processingID == record.id && meetings.phase == .reporting {
+            return tr(french, "En rédaction", "Writing")
+        }
+        guard let report = meetings.reports[record.id] else { return "" }
+        if report.proposal != nil { return tr(french, "Nouvelle version", "New version") }
+        if report.content.blocks.allSatisfy({ $0.text.isEmpty }) { return tr(french, "Sans compte rendu", "No report") }
+        return report.reviewedAt == nil ? (tr(french, "À relire", "To review")) : (tr(french, "Relue", "Reviewed"))
     }
 }

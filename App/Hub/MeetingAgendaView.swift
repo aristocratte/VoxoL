@@ -1,178 +1,127 @@
-import EventKit
 import SpeakerKit
 import SwiftUI
 
-struct MeetingAgendaView: View {
+/// The meetings coming up in the Mac's calendars, today and the next few days.
+struct MeetingUpcomingList: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(MeetingsStore.self) private var meetings
+
     let french: Bool
     let record: (MeetingCalendarStore.Event) -> Void
-    @State private var selectedDay = Calendar.current.startOfDay(for: Date())
 
-    private var days: [Date] {
-        let today = Calendar.current.startOfDay(for: Date())
-        return (0..<7).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: today) }
-    }
     private var events: [MeetingCalendarStore.Event] {
-        meetings.calendar.events.filter {
-            Calendar.current.isDate($0.start, inSameDayAs: selectedDay)
-        }
+        let now = Date()
+        let horizon = Calendar.current.date(byAdding: .day, value: 3, to: now) ?? now
+        return meetings.calendar.events
+            .filter { $0.end > now && $0.start < horizon }
+            .sorted { $0.start < $1.start }
+            .prefix(4)
+            .map { $0 }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 12) {
-                Image(systemName: "calendar").font(.system(size: 18)).foregroundStyle(theme.cobalt)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(french ? "À venir" : "Coming up").font(
-                        VoxoLTypography.font(size: 20, weight: .semibold))
-                    Text(french ? "Votre semaine de conversations" : "Your week of conversations")
-                        .font(.system(size: 12)).foregroundStyle(theme.secondaryInk)
-                }
-                Spacer()
-                if meetings.calendar.connected {
-                    Menu {
-                        ForEach(meetings.calendar.calendars) { calendar in
-                            Toggle(
-                                calendar.title,
-                                isOn: Binding(
-                                    get: {
-                                        !meetings.calendar.hiddenCalendars.contains(calendar.id)
-                                    },
-                                    set: { _ in meetings.calendar.toggleCalendar(calendar.id) }))
-                        }
-                    } label: {
-                        Label(
-                            french ? "Calendriers" : "Calendars",
-                            systemImage: "line.3.horizontal.decrease")
-                    }
-                    .menuStyle(.borderlessButton).fixedSize().font(.system(size: 12))
-                    Button {
-                        meetings.calendar.refresh()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .buttonStyle(MeetingQuietButtonStyle()).help(french ? "Actualiser" : "Refresh")
-                } else if meetings.calendar.denied {
-                    Button(
-                        french ? "Autoriser dans Réglages" : "Allow in Settings",
-                        action: meetings.calendar.openSettings
-                    )
-                    .buttonStyle(MeetingQuietButtonStyle())
-                } else {
-                    Button(french ? "Connecter le calendrier" : "Connect calendar") {
-                        Task { await meetings.calendar.connect() }
-                    }.buttonStyle(MeetingQuietButtonStyle()).disabled(meetings.calendar.loading)
-                }
-                if meetings.calendar.loading { ProgressView().controlSize(.small) }
-            }
+        HubSectionHeader(verbatim: tr(french, "À venir", "Coming up")) {
             if meetings.calendar.connected {
-                HStack(spacing: 8) {
-                    ForEach(days, id: \.self) { day in
-                        dayButton(day)
+                Menu {
+                    ForEach(meetings.calendar.calendars) { calendar in
+                        Toggle(
+                            calendar.title,
+                            isOn: Binding(
+                                get: { !meetings.calendar.hiddenCalendars.contains(calendar.id) },
+                                set: { _ in meetings.calendar.toggleCalendar(calendar.id) }))
                     }
+                    Divider()
+                    Button(tr(french, "Actualiser", "Refresh")) { meetings.calendar.refresh() }
+                } label: {
+                    Text(tr(french, "Calendriers", "Calendars"))
                 }
-                if events.isEmpty {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sun.max").foregroundStyle(theme.secondaryInk)
-                        Text(
-                            french
-                                ? "Aucune réunion prévue ce jour-là."
-                                : "No meetings scheduled for this day."
-                        )
-                        .font(.system(size: 13)).foregroundStyle(theme.secondaryInk)
-                    }.padding(.vertical, 10)
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).tint(theme.secondaryInk).fixedSize()
+            }
+        }
+
+        if !meetings.calendar.connected {
+            HStack(spacing: 10) {
+                Text(
+                    meetings.calendar.denied
+                        ? (tr(french, "L’accès au calendrier est refusé.", "Calendar access is denied."))
+                        : (tr(french, "Tes réunions du calendrier apparaîtront ici.", "Your calendar meetings will appear here."))
+                )
+                .font(VoxoLTypography.font(size: 13))
+                .foregroundStyle(theme.secondaryInk)
+                Spacer()
+                if meetings.calendar.denied {
+                    Button(tr(french, "Ouvrir les Réglages", "Open Settings"), action: meetings.calendar.openSettings)
+                        .buttonStyle(HubButtonStyle(kind: .secondary))
                 } else {
-                    ForEach(events) { event in
-                        MeetingAgendaEventRow(
-                            event: event, french: french,
-                            disabled: meetings.busy || meetings.recorder.completedURL != nil,
-                            record: { record(event) })
-                        if event.id != events.last?.id { Divider().overlay(theme.line) }
+                    Button(tr(french, "Connecter le calendrier", "Connect calendar")) {
+                        Task { await meetings.calendar.connect() }
                     }
+                    .buttonStyle(HubButtonStyle(kind: .secondary))
                 }
-            } else {
-                Text(
-                    french
-                        ? "Retrouvez les événements des comptes iCloud, Google ou Exchange configurés dans Calendrier sur ce Mac. Vous pouvez aussi enregistrer une réunion spontanée."
-                        : "See events from iCloud, Google or Exchange accounts set up in Calendar on this Mac. You can also record a spontaneous meeting."
-                )
-                .font(.system(size: 13)).foregroundStyle(theme.secondaryInk).lineSpacing(4)
             }
-            if let error = meetings.calendar.failure {
-                Text(error).font(.system(size: 12)).foregroundStyle(theme.warning)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 40)
+        } else if events.isEmpty {
+            Text(tr(french, "Rien de prévu dans les trois prochains jours.", "Nothing planned in the next three days."))
+                .font(VoxoLTypography.font(size: 13))
+                .foregroundStyle(theme.secondaryInk)
+                .padding(.horizontal, 10)
+        } else {
+            VStack(spacing: 2) {
+                ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                    row(event, next: index == 0)
+                }
             }
-        }
-        .padding(24).background(theme.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(theme.line))
-        .padding(.bottom, 30)
-        .task { meetings.calendar.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
-            meetings.calendar.refresh()
-        }
-        .onReceive(
-            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-        ) { _ in
-            meetings.calendar.refresh()
         }
     }
 
-    private func dayButton(_ day: Date) -> some View {
-        let selected = Calendar.current.isDate(day, inSameDayAs: selectedDay)
-        let count = meetings.calendar.events.filter {
-            Calendar.current.isDate($0.start, inSameDayAs: day)
-        }.count
-        return Button {
-            selectedDay = day
-        } label: {
-            VStack(spacing: 7) {
-                Text(day, format: .dateTime.weekday(.abbreviated)).font(
-                    .system(size: 10, weight: .medium))
-                Text(day, format: .dateTime.day()).font(.system(size: 18, weight: .semibold))
-                Circle().fill(count > 0 ? (selected ? theme.cobalt : theme.secondaryInk) : .clear)
-                    .frame(width: 4, height: 4)
+    private func row(_ event: MeetingCalendarStore.Event, next: Bool) -> some View {
+        HStack(spacing: 14) {
+            Text(verbatim: time(event.start))
+                .font(VoxoLTypography.font(size: 13, weight: .medium))
+                .foregroundStyle(theme.ink)
+                .monospacedDigit()
+                .frame(width: 88, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: event.title)
+                    .font(VoxoLTypography.font(size: 14, weight: .medium))
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(1)
+                Text(verbatim: detail(event))
+                    .font(VoxoLTypography.font(size: 12))
+                    .foregroundStyle(theme.secondaryInk)
+                    .lineLimit(1)
             }
-            .foregroundStyle(selected ? theme.cobalt : theme.secondaryInk)
-            .frame(maxWidth: .infinity).padding(.vertical, 10)
-            .background(
-                selected ? theme.cobaltSoft.opacity(0.65) : theme.canvas.opacity(0.5),
-                in: RoundedRectangle(cornerRadius: 11))
-        }.buttonStyle(.plain)
-            .accessibilityLabel(day.formatted(date: .complete, time: .omitted))
-            .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-private struct MeetingAgendaEventRow: View {
-    @Environment(VoxoLTheme.self) private var theme
-    let event: MeetingCalendarStore.Event
-    let french: Bool
-    let disabled: Bool
-    let record: () -> Void
-
-    var body: some View {
-        HStack(spacing: 16) {
-            Text(event.start, format: .dateTime.hour().minute())
-                .font(.system(size: 14, weight: .medium)).monospacedDigit().frame(
-                    width: 58, alignment: .leading)
-            RoundedRectangle(cornerRadius: 2).fill(theme.cobalt.opacity(0.4)).frame(
-                width: 3, height: 32)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(event.title).font(.system(size: 14, weight: .medium)).lineLimit(1)
-                Text(
-                    "\(event.calendar) · \(max(1, Int(event.end.timeIntervalSince(event.start) / 60))) min"
-                )
-                .font(.system(size: 11)).foregroundStyle(theme.secondaryInk)
-            }
-            Spacer()
+            Spacer(minLength: 8)
             if let url = event.joinURL {
-                Link(destination: url) { Image(systemName: "video") }
-                    .buttonStyle(MeetingQuietButtonStyle()).help(french ? "Rejoindre" : "Join")
+                Button(tr(french, "Rejoindre", "Join")) { NSWorkspace.shared.open(url) }
+                    .buttonStyle(HubButtonStyle(kind: next ? .onWell : .ghost))
             }
-            Button(action: record) {
-                Label(french ? "Enregistrer" : "Record", systemImage: "record.circle")
-            }
-            .buttonStyle(MeetingQuietButtonStyle()).disabled(disabled)
+            Button(tr(french, "Enregistrer", "Record")) { record(event) }
+                .buttonStyle(HubButtonStyle(kind: next ? .onWell : .ghost))
+                .disabled(meetings.busy || meetings.recorder.completedURL != nil)
         }
+        .padding(.horizontal, 10)
+        .frame(height: 52)
+        .background(
+            next ? theme.well : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func time(_ date: Date) -> String {
+        let locale = Locale(identifier: tr(french, "fr", "en"))
+        let hour = date.formatted(.dateTime.hour().minute().locale(locale))
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return hour }
+        if calendar.isDateInTomorrow(date) { return tr(french, "Demain \(hour)", "Tomorrow \(hour)") }
+        return "\(date.formatted(.dateTime.weekday(.abbreviated).locale(locale))) \(hour)"
+    }
+
+    private func detail(_ event: MeetingCalendarStore.Event) -> String {
+        let minutes = Int(event.end.timeIntervalSince(event.start) / 60)
+        var parts = ["\(minutes) min", event.calendar]
+        if let host = event.joinURL?.host(percentEncoded: false) {
+            parts.insert(host.replacingOccurrences(of: "www.", with: ""), at: 1)
+        }
+        return parts.joined(separator: " · ")
     }
 }

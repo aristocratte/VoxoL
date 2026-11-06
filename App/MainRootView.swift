@@ -183,6 +183,11 @@ struct MainRootView: View {
                         UserDefaults.standard.string(forKey: "voxol.auditPreviewState") ?? "empty"
                     transcripts.configureAuditPreview(state)
                     if state == "meeting" { meetings.configurePreview("prose") }
+                    if state == "meeting-report" { meetings.configurePreview("report") }
+                    if state == "meeting-list" {
+                        meetings.configurePreview("report")
+                        meetings.selection = nil
+                    }
                 }
         }
     }

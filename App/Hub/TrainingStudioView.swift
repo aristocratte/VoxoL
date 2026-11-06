@@ -64,11 +64,6 @@ struct TrainingStudioView: View {
             }
         }
         .background(theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(theme.line, lineWidth: 1)
-        }
         .task {
             if !reviews.isLoaded { await reviews.load() }
             selectFirstAvailable()
@@ -89,7 +84,7 @@ struct TrainingStudioView: View {
         HStack(alignment: .top, spacing: 20) {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Review your recordings")
-                    .font(VoxoLTypography.font(size: 16, weight: .semibold, relativeTo: .body))
+                    .font(VoxoLTypography.font(size: 22, weight: .semibold))
                     .foregroundStyle(theme.ink)
                 Text(
                     "Listen and correct saved dictations to create trusted examples for quality checks."
@@ -621,24 +616,24 @@ struct TrainingStudioView: View {
 
     private func preview(for session: TrainingReviewSession) -> String {
         let text = session.faithfulText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? String(localized: "Recording without text") : text
+        return text.isEmpty ? String("Recording without text", in: locale) : text
     }
 
     private func dateTitle(for session: TrainingReviewSession) -> String {
         session.capturedAt?.formatted(
             .dateTime.day().month(.abbreviated).year().hour().minute().locale(locale))
-            ?? String(localized: "Saved recording")
+            ?? String("Saved recording", in: locale)
     }
 
     private func rowMetadata(for session: TrainingReviewSession) -> String {
         let date =
             session.capturedAt?.formatted(.dateTime.day().month(.abbreviated).locale(locale))
-            ?? String(localized: "Undated")
+            ?? String("Undated", in: locale)
         return "\(date) · \(appName(for: session)) · \(duration(for: session))"
     }
 
     private func appName(for session: TrainingReviewSession) -> String {
-        guard session.application != "unknown" else { return String(localized: "Unknown app") }
+        guard session.application != "unknown" else { return String("Unknown app", in: locale) }
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: session.application)
         {
             return url.deletingPathExtension().lastPathComponent

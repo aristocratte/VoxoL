@@ -96,7 +96,12 @@
 		00000000000000000000009A /* ParityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009B /* ParityTypes.swift */; settings = {COMPILER_FLAGS = "-O"; }; };
 		00000000000000000000009C /* Outfit-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009D /* Outfit-Variable.ttf */; };
 		00000000000000000000009E /* SignalIcons in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000009F /* SignalIcons */; };
-		0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A1 /* SignalEditorialScreens.swift */; };
+		C3A000000000000000000001 /* HubKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A000000000000000000002 /* HubKit.swift */; };
+		C3A000000000000000000003 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A000000000000000000004 /* HomeView.swift */; };
+		C3A000000000000000000005 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A000000000000000000006 /* StatisticsView.swift */; };
+		C3A000000000000000000007 /* PersonalizeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A000000000000000000008 /* PersonalizeViews.swift */; };
+		C3A000000000000000000009 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A00000000000000000000A /* SettingsView.swift */; };
+		0000000000000000000000A0 /* HubRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000000A1 /* HubRuntime.swift */; };
 		000000000000000000001001 /* TrainingReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001011 /* TrainingReview.swift */; };
 		000000000000000000001002 /* TrainingReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001012 /* TrainingReviewStore.swift */; };
 		000000000000000000001003 /* TrainingStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001013 /* TrainingStudioView.swift */; };
@@ -188,7 +193,12 @@
 		00000000000000000000009B /* ParityTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParityTypes.swift; sourceTree = "<group>"; };
 		00000000000000000000009D /* Outfit-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Docs/ui-redesign/signal-editorial-prototype/assets/fonts/Outfit-Variable.ttf"; sourceTree = SOURCE_ROOT; };
 		00000000000000000000009F /* SignalIcons */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Docs/ui-redesign/signal-editorial-prototype/assets/icons"; sourceTree = SOURCE_ROOT; };
-		0000000000000000000000A1 /* SignalEditorialScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalEditorialScreens.swift; sourceTree = "<group>"; };
+		C3A000000000000000000002 /* HubKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubKit.swift; sourceTree = "<group>"; };
+		C3A000000000000000000004 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		C3A000000000000000000006 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
+		C3A000000000000000000008 /* PersonalizeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizeViews.swift; sourceTree = "<group>"; };
+		C3A00000000000000000000A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		0000000000000000000000A1 /* HubRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubRuntime.swift; sourceTree = "<group>"; };
 		000000000000000000001011 /* TrainingReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingReview.swift; path = Packages/AppCoreKit/Sources/TrainingReview.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000001012 /* TrainingReviewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingReviewStore.swift; sourceTree = "<group>"; };
 		000000000000000000001013 /* TrainingStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStudioView.swift; sourceTree = "<group>"; };
@@ -259,6 +269,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000024 /* VoxoLTheme.swift */,
+				C3A000000000000000000002 /* HubKit.swift */,
 				0000000000000000000000A2 /* VoxoLSignal.metal */,
 				0000000000000000000000A4 /* VoxoLSignalField.swift */,
 			);
@@ -270,7 +281,11 @@
 			children = (
 				000000000000000000000025 /* HubView.swift */,
 				000000000000000000000FA6 /* ReleaseNotesCard.swift */,
-				0000000000000000000000A1 /* SignalEditorialScreens.swift */,
+				0000000000000000000000A1 /* HubRuntime.swift */,
+				C3A00000000000000000000A /* SettingsView.swift */,
+				C3A000000000000000000008 /* PersonalizeViews.swift */,
+				C3A000000000000000000006 /* StatisticsView.swift */,
+				C3A000000000000000000004 /* HomeView.swift */,
 				000000000000000000001013 /* TrainingStudioView.swift */,
 				000000000000000000000044 /* HomeDashboardView.swift */,
 				000000000000000000000026 /* StudioComponents.swift */,
@@ -490,7 +505,12 @@
 				0000000000000000000000A5 /* VoxoLSignalField.swift in Sources */,
 				00000000000000000000001A /* HubView.swift in Sources */,
 				000000000000000000000FA5 /* ReleaseNotesCard.swift in Sources */,
-				0000000000000000000000A0 /* SignalEditorialScreens.swift in Sources */,
+				0000000000000000000000A0 /* HubRuntime.swift in Sources */,
+				C3A000000000000000000009 /* SettingsView.swift in Sources */,
+				C3A000000000000000000007 /* PersonalizeViews.swift in Sources */,
+				C3A000000000000000000005 /* StatisticsView.swift in Sources */,
+				C3A000000000000000000003 /* HomeView.swift in Sources */,
+				C3A000000000000000000001 /* HubKit.swift in Sources */,
 				000000000000000000001003 /* TrainingStudioView.swift in Sources */,
 				00000000000000000000001B /* StudioComponents.swift in Sources */,
 				00000000000000000000001C /* WorkspaceStudios.swift in Sources */,

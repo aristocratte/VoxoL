@@ -1,57 +1,47 @@
 import AppKit
-import CoreText
 import Observation
 import SwiftUI
 
 @MainActor
 @Observable
 final class VoxoLTheme {
-    let canvas = Color(nsColor: .voxol(light: 0xF4F1E8, dark: 0x191816))
-    let surface = Color(nsColor: .voxol(light: 0xFFFDF8, dark: 0x22201D))
-    let raisedSurface = Color(nsColor: .voxol(light: 0xFFFFFF, dark: 0x292621))
-    let ink = Color(nsColor: .voxol(light: 0x171713, dark: 0xF5F1E9))
-    let secondaryInk = Color(nsColor: .voxol(light: 0x69655D, dark: 0xB8B1A6))
-    let line = Color(nsColor: .voxol(light: 0xE8E8E2, dark: 0x3A3631))
-    let selection = Color(nsColor: .voxol(light: 0xEEEBE2, dark: 0x34302B))
+    /// The neutral ground of the window: the sidebar and everything around the page.
+    let canvas = Color(nsColor: .voxol(light: 0xEDECE8, dark: 0x191918))
+    /// The page itself.
+    let surface = Color(nsColor: .voxol(light: 0xFFFFFF, dark: 0x222221))
+    let raisedSurface = Color(nsColor: .voxol(light: 0xFFFFFF, dark: 0x2A2A28))
+    /// One step below the page: grouped settings, the latest result, hovered rows.
+    let well = Color(nsColor: .voxol(light: 0xF5F4F0, dark: 0x2A2A28))
+    let ink = Color(nsColor: .voxol(light: 0x161614, dark: 0xF4F3EF))
+    let secondaryInk = Color(nsColor: .voxol(light: 0x6B6A64, dark: 0xA9A8A1))
+    let line = Color(nsColor: .voxol(light: 0xE6E5E0, dark: 0x343432))
+    /// Pressed and selected controls, the active sidebar row.
+    let selection = Color(nsColor: .voxol(light: 0xE6E5E0, dark: 0x343432))
     let recording = Color(nsColor: .voxol(light: 0xC84D45, dark: 0xE06A62))
     let warning = Color(nsColor: .voxol(light: 0xA66B20, dark: 0xD39A4A))
-    let success = Color(nsColor: .voxol(light: 0x2E6B51, dark: 0x71A27F))
+    let success = Color(nsColor: .voxol(light: 0x2F7A55, dark: 0x71A27F))
+    /// The one data colour: today, the selected value, what VoxoL changed.
     let cobalt = Color(nsColor: .voxol(light: 0x2449F8, dark: 0x7892FF))
     let cobaltSoft = Color(nsColor: .voxol(light: 0xDCE4FF, dark: 0x263257))
+    /// The live voice only.
     let coral = Color(nsColor: .voxol(light: 0xFF7048, dark: 0xFF8A68))
     let coralSoft = Color(nsColor: .voxol(light: 0xFFE1D7, dark: 0x4B2C26))
     let sageSoft = Color(nsColor: .voxol(light: 0xDEEEE4, dark: 0x253A2D))
-
-    init() {
-        VoxoLTypography.registerOutfit()
-    }
 }
 
+/// SF Pro for the interface; New York, the serif macOS ships with, for the words the user dictated.
 enum VoxoLTypography {
     static func font(
         size: CGFloat,
         weight: Font.Weight = .regular,
         relativeTo textStyle: Font.TextStyle = .body
     ) -> Font {
-        registerOutfit()
-        return .custom("Outfit", size: size, relativeTo: textStyle).weight(weight)
+        .system(size: size, weight: weight)
     }
 
-    static func registerOutfit() {
-        _ = outfitRegistration
+    static func serif(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .serif)
     }
-
-    private static let outfitRegistration: Void = {
-        guard
-            let fontURL = Bundle.main.url(
-                forResource: "Outfit-Variable",
-                withExtension: "ttf"
-            )
-        else {
-            return
-        }
-        CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
-    }()
 }
 
 private extension NSColor {

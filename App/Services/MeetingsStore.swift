@@ -211,6 +211,10 @@ final class MeetingsStore {
             archiveWritable = false
             reportArchiveWritable = false
             modelReady = true
+            if state == "report" {
+                configureReportPreview()
+                return
+            }
             if state == "prose" {
                 let turns: [SpeakerTurn] = [
                     .init(
@@ -274,6 +278,77 @@ final class MeetingsStore {
             case "reporting": phase = .reporting; reportProgress = 0.65; selection = document.id
             default: phase = .idle
             }
+        }
+    #endif
+
+    #if DEBUG
+        /// A 47-minute meeting with a topic-structured report whose passages cite their turns, so
+        /// the report screen can be judged with timecodes, chapters and the transcript beside it.
+        private func configureReportPreview() {
+            let lines: [(Double, Double, Int, String)] = [
+                (40, 58, 0, "Bon, l’idée aujourd’hui c’est d’arrêter la date de sortie de la 1.5 et de voir ce qu’on met autour : tarifs, essai, page de présentation."),
+                (252, 281, 2, "J’ai les retours de quarante-deux testeurs. Sur le français, ils trouvent la dictée meilleure que ce qu’ils utilisaient avant."),
+                (284, 302, 2, "Par contre deux personnes ont perdu le raccourci après une mise en veille un peu longue."),
+                (570, 592, 0, "Je l’ai reproduit deux fois sur macOS 27. Le correctif est prêt, je peux le livrer lundi au plus tard."),
+                (738, 751, 1, "Donc si on regarde le calendrier, la page de présentation me prend une semaine, les captures comprises."),
+                (760, 776, 1, "Alors je propose le mardi 18. Ça nous laisse la semaine pour la page et les notes de version, et on évite le lundi."),
+                (782, 795, 2, "Le 18 me va. Je préviens les testeurs la veille pour qu’ils aient le build en premier."),
+                (801, 818, 0, "D’accord, on part sur le 18, à condition que le correctif soit validé d’ici jeudi."),
+                (832, 840, 1, "Parfait. Je note : lancement le 18 novembre."),
+                (910, 926, 1, "Je m’occupe de la page et des captures, ce sera prêt vendredi."),
+                (1275, 1302, 0, "Sur le prix, je ne change rien : huit euros par mois, soixante-douze par an."),
+                (1320, 1349, 2, "Pour l’essai, quatorze jours ça suffit, au-delà les gens oublient qu’ils l’ont installé."),
+                (1352, 1380, 1, "Moi je dirais trente jours, il faut le temps de prendre l’habitude de dicter."),
+                (1625, 1641, 0, "Et on garde le correcteur désactivé par défaut à la sortie, on l’activera quand les mesures seront bonnes."),
+                (2020, 2041, 2, "Je relance aussi ceux qui n’ont pas répondu au questionnaire."),
+                (2478, 2496, 0, "Je rédige les notes de version avant le 14."),
+            ]
+            let turns = lines.enumerated().map { index, line in
+                SpeakerTurn(id: index, start: line.0, end: line.1, speakerIDs: [line.2], overlapping: false, text: line.3)
+            }
+            var transcript = SpeakerTranscript(
+                title: "Revue du lancement 1.5", duration: 2832,
+                rawText: turns.map(\.text).joined(separator: " "), turns: turns,
+                diarizationRevision: "synthetic-preview")
+            transcript.names = [0: "Aristide", 1: "Claire", 2: "Marc"]
+            transcript.markers = [
+                MeetingMarker(time: 125, note: "Claire veut avancer la date si le correctif est prêt"),
+                MeetingMarker(time: 408, note: "Demander à Marc les retours qu’on peut citer"),
+            ]
+            func block(_ kind: MeetingDocumentBlock.Kind, _ text: String, _ sources: [Int], checked: Bool = false) -> MeetingDocumentBlock {
+                MeetingDocumentBlock(kind: kind, runs: MeetingTextRun.parseInline(text), sourceTurnIDs: sources, checked: checked)
+            }
+            let document = MeetingDocument(title: transcript.title, blocks: [
+                block(.paragraph, "La réunion devait arrêter la date de sortie de VoxoL 1.5 après trois semaines de bêta, et décider de ce qui accompagne le lancement : tarifs, essai gratuit et page de présentation.", [0]),
+                block(.heading, "Retours de la bêta", [1]),
+                block(.paragraph, "Marc a présenté les retours de quarante-deux testeurs. La qualité de dictée en français est jugée meilleure que celle des outils comparés, mais deux personnes ont perdu le raccourci après une mise en veille prolongée.", [1, 2]),
+                block(.paragraph, "Aristide a reproduit le problème deux fois sur macOS 27 ; le correctif est prêt et sera inclus dans la version de lancement.", [3]),
+                block(.heading, "Date de lancement", [5]),
+                block(.paragraph, "Claire a proposé le **mardi 18 novembre**, ce qui laisse une semaine pour la page de présentation et les notes de version. Personne ne s’y est opposé ; la date est retenue sous réserve du correctif de veille.", [5, 6, 7]),
+                block(.heading, "Tarifs et essai gratuit", [10]),
+                block(.paragraph, "Le prix reste à 8 € par mois ou 72 € par an. La durée de l’essai fait débat : quatorze jours suffisent pour Marc, trente jours selon Claire pour laisser le temps de prendre l’habitude de dicter.", [10, 11, 12]),
+                block(.heading, "Décisions", [8]),
+                block(.bullet, "Lancement public le mardi 18 novembre.", [8]),
+                block(.bullet, "Prix maintenu à 8 € par mois, 72 € par an.", [10]),
+                block(.bullet, "Le correcteur reste désactivé par défaut à la sortie.", [13]),
+                block(.heading, "Suites à donner", [9]),
+                block(.task, "Claire prépare la page de présentation et les captures pour vendredi.", [9], checked: true),
+                block(.task, "Aristide livre le correctif du raccourci après la veille d’ici lundi.", [3]),
+                block(.task, "Marc relance les testeurs qui n’ont pas répondu.", [14]),
+                block(.task, "Aristide rédige les notes de version avant le 14.", [15]),
+                block(.heading, "Points ouverts", [11]),
+                block(.bullet, "Essai gratuit de quatorze ou de trente jours ?", [11, 12]),
+            ])
+            records = [transcript]
+            selection = transcript.id
+            if let fingerprint = try? MeetingReportDraft.fingerprint(of: transcript) {
+                var draft = MeetingReportDraft(
+                    transcriptID: transcript.id, sourceFingerprint: fingerprint,
+                    generator: "Aperçu synthétique", markdown: "")
+                draft.document = document
+                reports[transcript.id] = draft
+            }
+            phase = .idle
         }
     #endif
 
