@@ -30,6 +30,8 @@ enum MetricsRecorder {
         language: String,
         bundleIdentifier: String?,
         route: String,
+        pressToCapsuleMilliseconds: Int? = nil,
+        pressToAudioMilliseconds: Int? = nil,
         releaseToTextMilliseconds: Int?,
         releaseToASRMilliseconds: Int? = nil,
         insertionMilliseconds: Int? = nil,
@@ -59,6 +61,8 @@ enum MetricsRecorder {
             "latencyEndpoint": "deliveryReturnNotObservedVisibility",
             // The release-to-text wait splits into these three; reused calls are the ones
             // the prefetch had already polished while the user spoke.
+            "pressToCapsuleMs": pressToCapsuleMilliseconds as Any? ?? NSNull(),
+            "pressToAudioMs": pressToAudioMilliseconds as Any? ?? NSNull(),
             "asrMs": releaseToASRMilliseconds as Any? ?? NSNull(),
             "insertMs": insertionMilliseconds as Any? ?? NSNull(),
             "polishMs": polishingMilliseconds as Any? ?? NSNull(),
@@ -70,6 +74,17 @@ enum MetricsRecorder {
             "partialRecoveryCount": partialRecoveryCount,
             "v3ShadowStatus": v3ShadowStatus as Any? ?? NSNull(),
             "v3ShadowReason": v3ShadowReason as Any? ?? NSNull(),
+        ])
+    }
+
+    /// A paste that was posted but never reached the field. The dictation stays on the
+    /// clipboard, so this is the rate of silent failures the delivery path used to hide.
+    static func recordPasteUnconfirmed(bundleIdentifier: String?) {
+        append([
+            "type": "pasteUnconfirmed",
+            "id": UUID().uuidString,
+            "ts": Int(Date().timeIntervalSince1970),
+            "app": bundleIdentifier ?? "unknown",
         ])
     }
 

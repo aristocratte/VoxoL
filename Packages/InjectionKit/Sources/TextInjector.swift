@@ -137,6 +137,84 @@ public enum InsertionVerificationPolicy {
         guard let before, let after else { return true }
         return after != before
     }
+
+    /// Whether a posted paste reached the field: nil when the field can't be read either time,
+    /// so a host that exposes no value is never accused of having dropped the text.
+    public static func pasteLanded(before: String?, after: String?) -> Bool? {
+        guard let before, let after else { return nil }
+        return after != before
+    }
+}
+
+/// Lends the clipboard to a dictation and hands it back once the destination had time to read it.
+///
+/// The destination reads the clipboard when it handles the paste, not when the keystroke is
+/// posted. Giving it back after a fixed 180 ms meant a busy Electron window read the owner's old
+/// content, or nothing, while the insertion reported success.
+@MainActor
+public final class ClipboardLease {
+    private let pasteboard: NSPasteboard
+    private let holdDuration: Duration
+    private var snapshot: PasteboardSnapshot?
+    private var lentChangeCount = 0
+    private var pendingReturn: Task<Void, Never>?
+
+    /// Creates a lease that keeps the dictation available for `holdDuration` after the paste.
+    public init(pasteboard: NSPasteboard, holdDuration: Duration) {
+        self.pasteboard = pasteboard
+        self.holdDuration = holdDuration
+    }
+
+    /// Saves the owner's clipboard and runs `write`; a failed write gives it straight back.
+    ///
+    /// While a previous dictation still holds the clipboard, its saved content stays the
+    /// original: saving again would make that dictation the thing handed back.
+    public func borrow(write: () -> Bool) -> Bool {
+        pendingReturn?.cancel()
+        pendingReturn = nil
+        if snapshot == nil || pasteboard.changeCount != lentChangeCount {
+            snapshot = PasteboardSnapshot(pasteboard: pasteboard)
+        }
+        pasteboard.clearContents()
+        guard write() else {
+            snapshot?.restore(to: pasteboard)
+            snapshot = nil
+            return false
+        }
+        lentChangeCount = pasteboard.changeCount
+        return true
+    }
+
+    /// Hands the clipboard back after the hold, unless the owner copied something meanwhile.
+    public func scheduleReturn() {
+        pendingReturn?.cancel()
+        pendingReturn = Task { @MainActor [weak self, holdDuration] in
+            try? await Task.sleep(for: holdDuration)
+            guard !Task.isCancelled else { return }
+            self?.returnNow()
+        }
+    }
+
+    /// Leaves the dictation on the clipboard, for a paste that can't be confirmed.
+    public func keep() {
+        pendingReturn?.cancel()
+        pendingReturn = nil
+        snapshot = nil
+    }
+
+    /// Hands the clipboard back immediately.
+    public func returnNow() {
+        pendingReturn?.cancel()
+        pendingReturn = nil
+        defer { snapshot = nil }
+        guard let snapshot,
+            InsertionPolicy.shouldRestorePasteboard(
+                injectedChangeCount: lentChangeCount,
+                currentChangeCount: pasteboard.changeCount
+            )
+        else { return }
+        snapshot.restore(to: pasteboard)
+    }
 }
 
 /// Destination application and optional Accessibility element captured when dictation begins.
@@ -150,15 +228,22 @@ public struct TextInsertionTarget {
 @MainActor
 public final class TextInjector {
     private let pasteboard: NSPasteboard
-    private let restoreDelay: Duration
+    private let clipboardLease: ClipboardLease
+    private let pasteConfirmationWindow: Duration
+
+    /// Called when a paste was posted but the destination's text never changed; the dictation
+    /// is then left on the clipboard for a manual paste.
+    public var onPasteUnconfirmed: (() -> Void)?
 
     /// Creates an injector backed by the system clipboard.
     public init(
         pasteboard: NSPasteboard = .general,
-        restoreDelay: Duration = .milliseconds(180)
+        clipboardHold: Duration = .seconds(2),
+        pasteConfirmationWindow: Duration = .milliseconds(1_500)
     ) {
         self.pasteboard = pasteboard
-        self.restoreDelay = restoreDelay
+        clipboardLease = ClipboardLease(pasteboard: pasteboard, holdDuration: clipboardHold)
+        self.pasteConfirmationWindow = pasteConfirmationWindow
     }
 
     /// Reads everything the destination control currently holds, when the
@@ -272,7 +357,7 @@ public final class TextInjector {
         else {
             throw TextInjectionError.focusedElementUnavailable
         }
-        try await pasteWithClipboardFallback(text, richText: richText)
+        try pasteWithClipboardFallback(text, richText: richText, into: target?.element)
         return .clipboardFallback
     }
 
@@ -417,14 +502,13 @@ private extension TextInjector {
         return pasteboard.writeObjects([item])
     }
 
-    func pasteWithClipboardFallback(_ text: String, richText: RichInsertionText?) async throws {
-        let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
-        pasteboard.clearContents()
-        guard writePasteboard(text, richText: richText) else {
-            snapshot.restore(to: pasteboard)
+    func pasteWithClipboardFallback(
+        _ text: String, richText: RichInsertionText?, into element: AXUIElement?
+    ) throws {
+        let textBefore = element.flatMap(readableText(of:))
+        guard clipboardLease.borrow(write: { writePasteboard(text, richText: richText) }) else {
             throw TextInjectionError.pasteboardWriteFailed
         }
-        let injectedChangeCount = pasteboard.changeCount
 
         guard
             let source = CGEventSource(stateID: .hidSystemState),
@@ -439,7 +523,7 @@ private extension TextInjector {
                 keyDown: false
             )
         else {
-            snapshot.restore(to: pasteboard)
+            clipboardLease.returnNow()
             throw TextInjectionError.pasteEventUnavailable
         }
 
@@ -448,12 +532,40 @@ private extension TextInjector {
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
 
-        try? await Task.sleep(for: restoreDelay)
-        if InsertionPolicy.shouldRestorePasteboard(
-            injectedChangeCount: injectedChangeCount,
-            currentChangeCount: pasteboard.changeCount
-        ) {
-            snapshot.restore(to: pasteboard)
+        clipboardLease.scheduleReturn()
+        if let element, let textBefore {
+            confirmPaste(into: element, textBefore: textBefore)
+        }
+    }
+
+    /// The field's text, read with a short bound: this runs on the main thread after the paste.
+    func readableText(of element: AXUIElement) -> String? {
+        AXUIElementSetMessagingTimeout(element, 0.25)
+        defer { AXUIElementSetMessagingTimeout(element, 0) }
+        var value: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value)
+                == .success
+        else { return nil }
+        return value as? String
+    }
+
+    /// Watches the field after a paste that the system reported as posted, which says nothing
+    /// about whether the destination took it. Runs shorter than the clipboard hold, so an
+    /// unconfirmed dictation is still there to keep.
+    func confirmPaste(into element: AXUIElement, textBefore: String) {
+        Task { @MainActor [weak self, pasteConfirmationWindow] in
+            let deadline = ContinuousClock.now.advanced(by: pasteConfirmationWindow)
+            while ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard let self else { return }
+                let verdict = InsertionVerificationPolicy.pasteLanded(
+                    before: textBefore, after: self.readableText(of: element))
+                if verdict != false { return }
+            }
+            guard let self else { return }
+            self.clipboardLease.keep()
+            self.onPasteUnconfirmed?()
         }
     }
 }
@@ -482,7 +594,7 @@ private extension InsertionTextPolicy {
 }
 
 @MainActor
-private struct PasteboardSnapshot {
+struct PasteboardSnapshot {
     struct Item {
         let values: [(type: NSPasteboard.PasteboardType, data: Data)]
     }

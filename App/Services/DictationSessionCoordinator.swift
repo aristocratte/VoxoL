@@ -177,6 +177,9 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private var destinationBundleIdentifier: String?
     @ObservationIgnored private var destinationInsertionTarget: TextInsertionTarget?
     @ObservationIgnored private var destinationContext: ContextSnapshot?
+    @ObservationIgnored private var dictationPressedAt: ContinuousClock.Instant?
+    @ObservationIgnored private var pressToCapsuleMilliseconds: Int?
+    @ObservationIgnored private var pressToAudioMilliseconds: Int?
     @ObservationIgnored private var availabilityTask: Task<Void, Never>?
     @ObservationIgnored private var modelPreparationTask: Task<Void, Never>?
     @ObservationIgnored private var polisherPreparationTask: Task<Void, Never>?
@@ -200,6 +203,9 @@ final class DictationSessionCoordinator {
         self.injector = injector
         hotkeyMonitor = GlobalHotkeyMonitor { [weak self] action in
             self?.handle(action)
+        }
+        injector.onPasteUnconfirmed = { [weak self] in
+            self?.pasteWasNotConfirmed()
         }
     }
 
@@ -560,6 +566,9 @@ private extension DictationSessionCoordinator {
     func handle(_ action: GlobalHotkeyAction) {
         switch action {
         case .dictationPressed:
+            if !toggleSessionIsActive {
+                dictationPressedAt = ContinuousClock().now
+            }
             if usesToggleToTalk {
                 if toggleSessionIsActive {
                     toggleSessionIsActive = false
@@ -626,7 +635,25 @@ private extension DictationSessionCoordinator {
             return
         }
 
+        // The capsule and the microphone come before anything else. Reading the destination is
+        // synchronous IPC into a possibly busy app: done first, it delayed the capsule by up to
+        // several half-second timeouts and lost the first words spoken after the press.
+        let clock = ContinuousClock()
+        VoiceCapsuleController.shared.show(.listening)
+        CATransaction.flush()
+        pressToCapsuleMilliseconds = millisecondsSincePress(clock.now)
+
         do {
+            audioCapture.retainsNativeAudio =
+                setting("voxol.correctionCapture", default: false)
+                && !setting("voxol.privateMode", default: false)
+            audioCapture.maximumNativeDurationSeconds = 180
+            try audioCapture.start()
+            pressToAudioMilliseconds = millisecondsSincePress(clock.now)
+            holdToTalk.handle(.captureStarted)
+            state = .listening
+            startStatusPolling()
+
             let destination = NSWorkspace.shared.frontmostApplication
             destinationApplicationName = destination?.localizedName ?? "Unknown"
             destinationBundleIdentifier = destination?.bundleIdentifier
@@ -662,20 +689,12 @@ private extension DictationSessionCoordinator {
                 prefetchSpeechRuntime = speechRuntime
                 await textProcessor.beginPrefetchSession(id)
                 await speechRuntime?.beginDictationSession(id)
+                // Stopping during these hops already finished the capture.
                 guard shortcutHeld else {
                     cancelTextPrefetch()
                     return
                 }
             }
-            audioCapture.retainsNativeAudio =
-                setting("voxol.correctionCapture", default: false)
-                && !setting("voxol.privateMode", default: false)
-            audioCapture.maximumNativeDurationSeconds = 180
-            try audioCapture.start()
-            holdToTalk.handle(.captureStarted)
-            state = .listening
-            VoiceCapsuleController.shared.show(.listening)
-            startStatusPolling()
             startPartialTranscription()
         } catch {
             toggleSessionIsActive = false
@@ -688,6 +707,21 @@ private extension DictationSessionCoordinator {
             VoiceCapsuleController.shared.showError(.microphoneUnavailable)
             dismissCapsule(after: .seconds(2))
         }
+    }
+
+    func millisecondsSincePress(_ now: ContinuousClock.Instant) -> Int? {
+        dictationPressedAt.map { Int(seconds($0.duration(to: now)) * 1_000) }
+    }
+
+    /// The system accepted the paste but the destination's text never changed. The dictation is
+    /// still on the clipboard, so the owner gets a recourse rather than a silent loss.
+    func pasteWasNotConfirmed() {
+        MetricsRecorder.recordPasteUnconfirmed(bundleIdentifier: destinationBundleIdentifier)
+        logger.notice("Paste unconfirmed; dictation left on the clipboard")
+        guard !audioCapture.isRecording, transcriptionTask == nil else { return }
+        state = .copiedForManualPaste
+        VoiceCapsuleController.shared.show(.copiedFallback)
+        dismissCapsule(after: .seconds(3))
     }
 
     func startStatusPolling() {
@@ -1211,6 +1245,8 @@ private extension DictationSessionCoordinator {
                     language: dictationLanguagePreference.rawValue,
                     bundleIdentifier: bundleIdentifier,
                     route: processed.route.rawValue,
+                    pressToCapsuleMilliseconds: pressToCapsuleMilliseconds,
+                    pressToAudioMilliseconds: pressToAudioMilliseconds,
                     releaseToTextMilliseconds: lastReport?.releaseToPasteDurationSeconds
                         .map { Int($0 * 1_000) },
                     releaseToASRMilliseconds: lastReport?.releaseToASRDurationSeconds
