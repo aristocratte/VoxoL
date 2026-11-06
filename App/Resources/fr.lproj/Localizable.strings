@@ -1536,3 +1536,12 @@
 "Dictation cleanup is about twice as fast." = "La correction des dictées est environ deux fois plus rapide.";
 "Faster cleanup" = "Une correction plus rapide";
 "Cleanup now checks drafts taken from what you said instead of writing every word, which halves its usual time." = "La correction vérifie maintenant des brouillons tirés de ce que vous avez dit au lieu d’écrire chaque mot, ce qui divise par deux son temps habituel.";
+
+/* Notes de version 0.1.9 */
+"Dictation starts sooner and lands more reliably." = "La dictée démarre plus tôt et arrive plus sûrement.";
+"The bubble appears as soon as you press" = "La bulle apparaît dès le raccourci";
+"It no longer waits for the destination app, and the microphone starts with it." = "Elle n’attend plus l’application de destination, et le micro démarre avec elle.";
+"Pasting is more reliable" = "Le collage est plus fiable";
+"Your clipboard comes back two seconds after the paste. If the text doesn’t land, it stays on the clipboard and VoxoL tells you." = "Votre presse-papiers revient deux secondes après le collage. Si le texte n’arrive pas, il y reste et VoxoL vous le signale.";
+"Long dictations join cleanly" = "Les raccords des longues dictées sont corrigés";
+"Words are no longer doubled or cut where two stretches of speech meet." = "Les mots ne sont plus doublés ni coupés là où deux passages se rejoignent.";

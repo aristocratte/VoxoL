@@ -25,6 +25,27 @@ enum ReleaseNotes {
     static var all: [Entry] {
         [
             Entry(
+                version: "0.1.9",
+                headline: "Dictation starts sooner and lands more reliably.",
+                items: [
+                    Item(
+                        title: "The bubble appears as soon as you press",
+                        detail:
+                            "It no longer waits for the destination app, and the microphone starts with it."
+                    ),
+                    Item(
+                        title: "Pasting is more reliable",
+                        detail:
+                            "Your clipboard comes back two seconds after the paste. If the text doesn’t land, it stays on the clipboard and VoxoL tells you."
+                    ),
+                    Item(
+                        title: "Long dictations join cleanly",
+                        detail:
+                            "Words are no longer doubled or cut where two stretches of speech meet."
+                    ),
+                ]
+            ),
+            Entry(
                 version: "0.1.8",
                 headline: "Dictation cleanup is about twice as fast.",
                 items: [
