@@ -1257,7 +1257,9 @@ private extension DeterministicTextProcessor {
 
     static func collapseImmediateWordRepetitions(in input: String) -> String {
         var result = input
-        let pattern = #"(?iu)\b([\p{L}][\p{L}'’\-]{1,})\b(?:[ ,]+\1\b)+"#
+        // Whole words only, on both sides: `\b` alone let a match start after a hyphen or an
+        // elision, so "peut-être être" lost its verb and "c'est est-ce" became "c'est-ce".
+        let pattern = #"(?iu)(?<![\p{L}'’\-])([\p{L}][\p{L}'’\-]{1,})\b(?:[ ,]+\1(?![\p{L}'’\-]))+"#
         guard let regex = try? RegularExpressionCache.shared.expression(pattern: pattern) else {
             return input
         }
@@ -1275,7 +1277,13 @@ private extension DeterministicTextProcessor {
                     continue
                 }
                 let word = String(next[wordRange])
-                guard !spokenNumberWords.contains(folded(word)) else {
+                let key = folded(word)
+                guard !spokenNumberWords.contains(key), !emphaticRepetitionWords.contains(key)
+                else {
+                    continue
+                }
+                // "Ça, ça marche": a pronoun repeated across a comma is a dislocation.
+                if dislocatedPronouns.contains(key), next[repetitionRange].contains(",") {
                     continue
                 }
                 next.replaceSubrange(repetitionRange, with: word)
@@ -1299,6 +1307,16 @@ private extension DeterministicTextProcessor {
         result = replace(#" {2,}"#, in: result, with: " ")
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    /// Doubled on purpose ("très très", "very very"): the owner's review of his own dictations
+    /// counted every collapse of these as a lost word.
+    static let emphaticRepetitionWords: Set<String> = [
+        "tres", "trop", "ultra", "hyper", "super", "plein", "tout", "vite", "non", "oui", "si",
+        "bien", "encore", "beaucoup", "vraiment", "jamais", "toujours",
+        "very", "so", "really", "too", "much", "no", "yes",
+    ]
+
+    static let dislocatedPronouns: Set<String> = ["ca", "moi", "toi", "lui", "eux", "nous", "vous"]
 
     static let spokenNumberWords: Set<String> = [
         "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight",

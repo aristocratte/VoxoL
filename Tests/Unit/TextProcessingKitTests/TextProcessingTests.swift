@@ -4,6 +4,33 @@ import XCTest
 @testable import TextProcessingKit
 
 final class TextProcessingTests: XCTestCase {
+    func testRepetitionCollapseNeverStartsInsideAHyphenatedOrElidedWord() {
+        for text in [
+            "Ça doit peut-être être le cache et les modèles.",
+            "Tu peux vérifier, c'est est-ce que tu veux ?",
+            "Il a vu l'été été chaud.",
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: text, preferredLanguage: .french))
+            XCTAssertEqual(preparation.normalizedText, text)
+        }
+        // Emphasis and dislocation are his wording, not a stutter.
+        for text in [
+            "C'est très très lent et trop trop long.",
+            "Ça, ça marche, mais moi, moi je préfère attendre.",
+            "Non non, c'est plein plein de bugs, it is very very slow.",
+        ] {
+            let preparation = DeterministicTextProcessor.prepare(
+                TextProcessingRequest(rawTranscript: text, preferredLanguage: .french))
+            XCTAssertEqual(preparation.normalizedText, text)
+        }
+        let stutter = DeterministicTextProcessor.prepare(
+            TextProcessingRequest(
+                rawTranscript: "Je relis le le texte, peut-être peut-être demain.",
+                preferredLanguage: .french))
+        XCTAssertEqual(stutter.normalizedText, "Je relis le texte, peut-être demain.")
+    }
+
     func testFrenchElisionKeepsOuiAndConsonantalYNames() {
         let text = "Je confirme que oui et que Yann arrive."
         let preparation = DeterministicTextProcessor.prepare(
