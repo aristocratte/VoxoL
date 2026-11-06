@@ -53,9 +53,7 @@ enum MeetingAttributedDocument {
             value[.backgroundColor] = NSColor.systemYellow.withAlphaComponent(
                 printing ? 0.35 : 0.22)
         }
-        if let address = run.link, let url = URL(string: address),
-            ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "")
-        {
+        if let url = run.safeURL {
             value[.link] = url
         }
         return value
@@ -286,9 +284,7 @@ final class MeetingEditorController {
         let all = NSRange(location: 0, length: content.length)
         if address.isEmpty {
             content.removeAttribute(.link, range: all)
-        } else if let url = URL(string: address),
-            ["https", "http", "mailto"].contains(url.scheme ?? "")
-        {
+        } else if let url = MeetingTextRun.safeURL(address) {
             content.addAttribute(.link, value: url, range: all)
         } else {
             return

@@ -934,7 +934,7 @@ private struct MeetingBlockRow: View {
             piece.font = font
             piece.foregroundColor = theme.ink
             if run.highlighted { piece.backgroundColor = theme.cobaltSoft.opacity(0.7) }
-            if let link = run.link, let url = URL(string: link) {
+            if let url = run.safeURL {
                 piece.link = url
                 piece.underlineStyle = .single
             }

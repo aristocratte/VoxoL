@@ -78,9 +78,7 @@ public enum MeetingWordDocument {
                     + (run.highlighted ? "<w:highlight w:val=\"yellow\"/>" : "")
                 var value =
                     "<w:r><w:rPr>\(properties)</w:rPr><w:t xml:space=\"preserve\">\(xml(run.text))</w:t></w:r>"
-                if let link = run.link, let url = URL(string: link),
-                    ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "")
-                {
+                if let link = run.link, run.safeURL != nil {
                     let id = "link\(relationships.count)"
                     relationships.append(
                         "<Relationship Id=\"\(id)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"\(xml(link))\" TargetMode=\"External\"/>"

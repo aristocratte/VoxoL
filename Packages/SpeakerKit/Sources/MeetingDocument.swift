@@ -64,9 +64,7 @@ public struct MeetingDocument: Codable, Equatable, Sendable {
                 if run.bold { text = "**\(text)**" }
                 if run.italic { text = "*\(text)*" }
                 // Highlight is a visual style; plain Markdown intentionally retains its text.
-                if let link = run.link, let url = URL(string: link),
-                    ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "")
-                {
+                if let url = run.safeURL {
                     text =
                         "[\(text)](\(url.absoluteString.replacingOccurrences(of: ")", with: "%29")))"
                 }
@@ -151,6 +149,17 @@ public struct MeetingTextRun: Codable, Equatable, Sendable {
         self.highlighted = highlighted; self.link = link
     }
 
+    /// The link as a URL, when it may become live.
+    public var safeURL: URL? { link.flatMap(Self.safeURL) }
+
+    /// The one check every renderer applies: only these schemes ever become live links.
+    public static func safeURL(_ address: String) -> URL? {
+        guard let url = URL(string: address),
+            ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "")
+        else { return nil }
+        return url
+    }
+
     /// Imports the inline Markdown subset supported by existing meeting drafts.
     public static func parseInline(_ text: String) -> [Self] {
         var runs = [Self]()
@@ -180,9 +189,7 @@ public struct MeetingTextRun: Codable, Equatable, Sendable {
                 let end = text[close.upperBound...].firstIndex(of: ")")
             {
                 let address = String(text[close.upperBound..<end])
-                if let url = URL(string: address),
-                    ["https", "http", "mailto"].contains(url.scheme ?? "")
-                {
+                if safeURL(address) != nil {
                     flush()
                     runs.append(
                         Self(
