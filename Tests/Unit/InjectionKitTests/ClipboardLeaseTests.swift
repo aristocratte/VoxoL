@@ -81,6 +81,18 @@ final class ClipboardLeaseTests: XCTestCase {
         XCTAssertEqual(board.string(forType: .string), "original")
     }
 
+    func testManualPasteCopyIsHiddenFromClipboardManagers() throws {
+        let board = NSPasteboard(name: NSPasteboard.Name("VoxoL.tests.\(UUID())"))
+        defer { board.releaseGlobally() }
+
+        try TextInjector(pasteboard: board).copyForManualPaste("dictée privée")
+
+        XCTAssertEqual(board.string(forType: .string), "dictée privée")
+        let types = board.pasteboardItems?.first?.types.map(\.rawValue) ?? []
+        XCTAssertTrue(types.contains("org.nspasteboard.TransientType"))
+        XCTAssertTrue(types.contains("org.nspasteboard.ConcealedType"))
+    }
+
     func testPasteVerdictNeedsBothReadings() {
         XCTAssertNil(InsertionVerificationPolicy.pasteLanded(before: nil, after: "texte"))
         XCTAssertNil(InsertionVerificationPolicy.pasteLanded(before: "texte", after: nil))

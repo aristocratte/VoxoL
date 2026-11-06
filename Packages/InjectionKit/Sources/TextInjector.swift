@@ -499,6 +499,13 @@ private extension TextInjector {
                 item.setData(richText.html, forType: .html)
             else { return false }
         }
+        // Clipboard managers following nspasteboard.org leave these out of their history: a
+        // dictation only passes through the clipboard, and may come from private mode.
+        for marker in ["org.nspasteboard.TransientType", "org.nspasteboard.ConcealedType"] {
+            guard item.setData(Data(), forType: NSPasteboard.PasteboardType(marker)) else {
+                return false
+            }
+        }
         return pasteboard.writeObjects([item])
     }
 
