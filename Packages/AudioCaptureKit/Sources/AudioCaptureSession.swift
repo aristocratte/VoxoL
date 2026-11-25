@@ -178,7 +178,8 @@ public final class AudioCaptureSession {
     public var maximumNativeDurationSeconds: Int = 15
     private var engine: AVAudioEngine?
     private var processor: AudioTapProcessor?
-    private let sampleDrainQueue = DispatchQueue(label: "voxol.audio-capture-drain", qos: .userInitiated)
+    private let sampleDrainQueue = DispatchQueue(
+        label: "voxol.audio-capture-drain", qos: .userInitiated)
     private var sampleDrainTimer: DispatchSourceTimer?
     /// Feeds the render side of the voice-processing unit without ever
     /// playing a sample.

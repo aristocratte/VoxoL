@@ -459,7 +459,8 @@ enum GreedyTDTDecoder {
             return argmax(array)
         }
         if useNonPositiveBiasFastPath,
-           let winner = unchangedWinnerForNonPositiveBias(array, bias: bias) {
+            let winner = unchangedWinnerForNonPositiveBias(array, bias: bias)
+        {
             return winner
         }
         let pointer = array.dataPointer.bindMemory(

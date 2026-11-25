@@ -300,9 +300,10 @@ public final class ParakeetTranscriber: @unchecked Sendable {
             return configuration
         }
         let decoderConfiguration = MLModelConfiguration()
-        let decoderComputeUnits = ProcessInfo.processInfo.environment[
-            "VOXOL_ASR_DECODER_COMPUTE_UNITS"
-        ].flatMap(ParakeetComputeUnits.init(rawValue:))?.mlComputeUnits ?? .cpuOnly
+        let decoderComputeUnits =
+            ProcessInfo.processInfo.environment[
+                "VOXOL_ASR_DECODER_COMPUTE_UNITS"
+            ].flatMap(ParakeetComputeUnits.init(rawValue:))?.mlComputeUnits ?? .cpuOnly
         decoderConfiguration.computeUnits = decoderComputeUnits
         if ProcessInfo.processInfo.environment["VOXOL_ASR_DECODER_FAST_PREDICTION"] == "1" {
             var hints = decoderConfiguration.optimizationHints

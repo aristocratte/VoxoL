@@ -71,7 +71,9 @@ struct MeetingReportView: View {
                 try? await Task.sleep(for: .milliseconds(250))
             }
         }
-        .onChange(of: transcript.turns) { _, _ in envelope = ConversationPrint.envelope(of: transcript) }
+        .onChange(of: transcript.turns) { _, _ in
+            envelope = ConversationPrint.envelope(of: transcript)
+        }
         .onChange(of: editor.selectedBlock) { _, id in if editing { focusedBlock = id } }
         .onDisappear { playback.stop() }
         .sheet(isPresented: $showProposal) {
@@ -80,8 +82,13 @@ struct MeetingReportView: View {
                     current: draft.content, proposed: proposal.document, french: french,
                     canAccept: (try? MeetingReportDraft.fingerprint(of: transcript))
                         == proposal.sourceFingerprint,
-                    accept: { meetings.acceptProposal(for: transcript.id); showProposal = false },
-                    discard: { meetings.discardProposal(for: transcript.id); showProposal = false })
+                    accept: {
+                        meetings.acceptProposal(for: transcript.id); showProposal = false
+                    },
+                    discard: {
+                        meetings.discardProposal(for: transcript.id); showProposal = false
+                    }
+                )
                 .environment(theme)
             }
         }
@@ -106,7 +113,9 @@ struct MeetingReportView: View {
             }
         } message: {
             Text(
-                verbatim: tr(french, "Le fichier audio d’origine restera sur ton Mac.", "The original audio file stays on your Mac."))
+                verbatim: tr(
+                    french, "Le fichier audio d’origine restera sur ton Mac.",
+                    "The original audio file stays on your Mac."))
         }
     }
 
@@ -155,7 +164,11 @@ struct MeetingReportView: View {
                 }
             }
             Divider()
-            Button(isEmpty ? (tr(french, "Rédiger", "Write")) : (tr(french, "Rédiger à nouveau", "Write again"))) {
+            Button(
+                isEmpty
+                    ? (tr(french, "Rédiger", "Write"))
+                    : (tr(french, "Rédiger à nouveau", "Write again"))
+            ) {
                 meetings.generateReport(for: transcript.id, french: french)
             }
             .disabled(meetings.busy || !meetings.reportModelAvailable)
@@ -168,19 +181,26 @@ struct MeetingReportView: View {
     private var exportMenu: some View {
         Menu {
             if let draft {
-                Toggle(tr(french, "Inclure les timecodes", "Include timecodes"), isOn: $includeExportSources)
+                Toggle(
+                    tr(french, "Inclure les timecodes", "Include timecodes"),
+                    isOn: $includeExportSources)
                 Divider()
                 Button("Word (.docx)") {
-                    meetings.exportWord(draft, title: transcript.title, includeSources: includeExportSources)
+                    meetings.exportWord(
+                        draft, title: transcript.title, includeSources: includeExportSources)
                 }
                 Button("PDF") {
-                    meetings.exportPDF(draft, title: transcript.title, includeSources: includeExportSources)
+                    meetings.exportPDF(
+                        draft, title: transcript.title, includeSources: includeExportSources)
                 }
                 Button("Markdown") {
-                    meetings.exportReport(draft, title: transcript.title, includeSources: includeExportSources)
+                    meetings.exportReport(
+                        draft, title: transcript.title, includeSources: includeExportSources)
                 }
                 Divider()
-                Button(tr(french, "Copier le compte rendu", "Copy report")) { meetings.copyReport(draft) }
+                Button(tr(french, "Copier le compte rendu", "Copy report")) {
+                    meetings.copyReport(draft)
+                }
             }
         } label: {
             menuLabel(tr(french, "Exporter", "Export"))
@@ -295,7 +315,9 @@ struct MeetingReportView: View {
                 text: Binding(
                     get: { transcript.title },
                     set: { title in
-                        meetings.updateMeeting(transcript.id) { $0.title = String(title.prefix(240)) }
+                        meetings.updateMeeting(transcript.id) {
+                            $0.title = String(title.prefix(240))
+                        }
                     }),
                 axis: .vertical
             )
@@ -368,7 +390,9 @@ struct MeetingReportView: View {
         }
         if let draft, !draft.isCurrent(for: transcript), !isEmpty {
             notice(
-                tr(french, "Les intervenants ont changé depuis la rédaction.", "Speakers changed since this report was written."),
+                tr(
+                    french, "Les intervenants ont changé depuis la rédaction.",
+                    "Speakers changed since this report was written."),
                 tone: theme.warning,
                 action: (
                     tr(french, "Rédiger à nouveau", "Write again"),
@@ -377,7 +401,9 @@ struct MeetingReportView: View {
             )
         }
         if let failure = meetings.failure {
-            notice(failure, tone: theme.warning, action: (tr(french, "Fermer", "Dismiss"), { meetings.failure = nil }))
+            notice(
+                failure, tone: theme.warning,
+                action: (tr(french, "Fermer", "Dismiss"), { meetings.failure = nil }))
         }
         if let error = playback.error {
             notice(
@@ -409,7 +435,8 @@ struct MeetingReportView: View {
         return VStack(alignment: .leading, spacing: 6) {
             ConversationPrint(
                 envelope: envelope, duration: transcript.duration,
-                position: playback.player == nil && playback.position == 0 ? nil : playback.position,
+                position: playback.player == nil && playback.position == 0
+                    ? nil : playback.position,
                 chapters: chapters.map(\.time),
                 seek: { time in
                     if playback.player == nil {
@@ -420,7 +447,10 @@ struct MeetingReportView: View {
                 }
             )
             .frame(height: 52)
-            .help(tr(french, "Cliquer pour écouter depuis ce moment", "Click to listen from this moment"))
+            .help(
+                tr(
+                    french, "Cliquer pour écouter depuis ce moment",
+                    "Click to listen from this moment"))
             chapterLabels(chapters)
         }
     }
@@ -428,7 +458,8 @@ struct MeetingReportView: View {
     private func chapterLabels(_ chapters: [(time: Double, title: String)]) -> some View {
         GeometryReader { proxy in
             ForEach(Array(chapters.enumerated()), id: \.offset) { index, chapter in
-                let end = index + 1 < chapters.count ? chapters[index + 1].time : transcript.duration
+                let end =
+                    index + 1 < chapters.count ? chapters[index + 1].time : transcript.duration
                 let width = (end - chapter.time) / max(1, transcript.duration) * proxy.size.width
                 let current = playback.position >= chapter.time && playback.position < end
                 // A title shows whole or not at all: a cut-off chapter name reads as a glitch.
@@ -438,7 +469,8 @@ struct MeetingReportView: View {
                         .foregroundStyle(current ? theme.ink : theme.secondaryInk)
                         .fixedSize()
                         .onTapGesture {
-                            playback.play(transcript.audioReference, at: chapter.time, french: french)
+                            playback.play(
+                                transcript.audioReference, at: chapter.time, french: french)
                         }
                     Color.clear.frame(width: 0)
                 }
@@ -475,7 +507,9 @@ struct MeetingReportView: View {
                     time: startTime(of: block),
                     current: currentBlock == block.id,
                     focused: focusedBlock == block.id,
-                    play: { time in playback.play(transcript.audioReference, at: time, french: french) },
+                    play: { time in
+                        playback.play(transcript.audioReference, at: time, french: french)
+                    },
                     toggle: { toggleTask(block.id) },
                     focus: { focusedBlock = focusedBlock == block.id ? nil : block.id }
                 )
@@ -494,8 +528,13 @@ struct MeetingReportView: View {
                         .foregroundStyle(theme.ink)
                     Text(
                         meetings.reportModelAvailable
-                            ? (tr(french, "VoxoL le rédige sur ce Mac à partir de la conversation.", "VoxoL writes it on this Mac from the conversation."))
-                            : (tr(french, "Installe le moteur de rédaction dans Réglages, ou écris-le toi-même.", "Install the writing engine in Settings, or write it yourself."))
+                            ? (tr(
+                                french, "VoxoL le rédige sur ce Mac à partir de la conversation.",
+                                "VoxoL writes it on this Mac from the conversation."))
+                            : (tr(
+                                french,
+                                "Installe le moteur de rédaction dans Réglages, ou écris-le toi-même.",
+                                "Install the writing engine in Settings, or write it yourself."))
                     )
                     .font(VoxoLTypography.font(size: 13))
                     .foregroundStyle(theme.secondaryInk)
@@ -519,7 +558,8 @@ struct MeetingReportView: View {
     @ViewBuilder
     private var notes: some View {
         let markers = (transcript.markers ?? []).sorted { $0.time < $1.time }
-        let personal = transcript.personalNotes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let personal =
+            transcript.personalNotes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !markers.isEmpty || !personal.isEmpty {
             Text(tr(french, "Tes notes", "Your notes"))
                 .font(VoxoLTypography.serif(size: 19, weight: .semibold))
@@ -544,7 +584,9 @@ struct MeetingReportView: View {
                             get: { marker.note },
                             set: { text in
                                 meetings.updateMeeting(transcript.id) { record in
-                                    if let index = record.markers?.firstIndex(where: { $0.id == marker.id }) {
+                                    if let index = record.markers?.firstIndex(where: {
+                                        $0.id == marker.id
+                                    }) {
                                         record.markers?[index].note = text
                                     }
                                 }
@@ -563,7 +605,9 @@ struct MeetingReportView: View {
                     "",
                     text: Binding(
                         get: { transcript.personalNotes ?? "" },
-                        set: { text in meetings.updateMeeting(transcript.id) { $0.personalNotes = text } }),
+                        set: { text in
+                            meetings.updateMeeting(transcript.id) { $0.personalNotes = text }
+                        }),
                     axis: .vertical
                 )
                 .textFieldStyle(.plain)
@@ -594,10 +638,17 @@ struct MeetingReportView: View {
             } label: {
                 menuLabel(kindName(editor.kind))
             }
-            .menuStyle(.borderlessButton).tint(theme.secondaryInk).fixedSize().padding(.horizontal, 6)
-            formatButton("bold", help: tr(french, "Gras · ⌘B", "Bold · ⌘B")) { editor.toggle("bold") }
-            formatButton("italic", help: tr(french, "Italique · ⌘I", "Italic · ⌘I")) { editor.toggle("italic") }
-            formatButton("highlighter", help: tr(french, "Surligner", "Highlight")) { editor.toggle("highlight") }
+            .menuStyle(.borderlessButton).tint(theme.secondaryInk).fixedSize().padding(
+                .horizontal, 6)
+            formatButton("bold", help: tr(french, "Gras · ⌘B", "Bold · ⌘B")) {
+                editor.toggle("bold")
+            }
+            formatButton("italic", help: tr(french, "Italique · ⌘I", "Italic · ⌘I")) {
+                editor.toggle("italic")
+            }
+            formatButton("highlighter", help: tr(french, "Surligner", "Highlight")) {
+                editor.toggle("highlight")
+            }
             formatButton("link", help: tr(french, "Lien", "Link")) { showLink = true }
                 .disabled(editor.selectedText.isEmpty)
                 .popover(isPresented: $showLink) {
@@ -605,9 +656,13 @@ struct MeetingReportView: View {
                         Text(tr(french, "Lien du passage sélectionné", "Link for selected text"))
                         TextField("https://", text: $link).textFieldStyle(.roundedBorder)
                         HStack {
-                            Button(tr(french, "Retirer", "Remove")) { editor.setLink(""); showLink = false }
+                            Button(tr(french, "Retirer", "Remove")) {
+                                editor.setLink(""); showLink = false
+                            }
                             Spacer()
-                            Button(tr(french, "Appliquer", "Apply")) { editor.setLink(link); showLink = false }
+                            Button(tr(french, "Appliquer", "Apply")) {
+                                editor.setLink(link); showLink = false
+                            }
                         }
                     }
                     .padding(18).frame(width: 320)
@@ -619,7 +674,9 @@ struct MeetingReportView: View {
                 Button(tr(french, "Raccourcir", "Shorten")) {
                     rewrite("Make the prose more concise without losing its important facts.")
                 }
-                Button(tr(french, "Développer depuis la conversation", "Expand from the conversation")) {
+                Button(
+                    tr(french, "Développer depuis la conversation", "Expand from the conversation")
+                ) {
                     rewrite(
                         "Explain this point in more detail, only when the supplied passages support those details."
                     )
@@ -627,10 +684,14 @@ struct MeetingReportView: View {
             } label: {
                 menuLabel(tr(french, "Réécrire", "Rewrite"))
             }
-            .menuStyle(.borderlessButton).tint(theme.secondaryInk).fixedSize().padding(.horizontal, 6)
+            .menuStyle(.borderlessButton).tint(theme.secondaryInk).fixedSize().padding(
+                .horizontal, 6
+            )
             .disabled(meetings.busy || !meetings.reportModelAvailable || selectedSources.isEmpty)
-            formatButton("arrow.uturn.backward", help: tr(french, "Annuler", "Undo"), action: editor.undo)
-            formatButton("arrow.uturn.forward", help: tr(french, "Rétablir", "Redo"), action: editor.redo)
+            formatButton(
+                "arrow.uturn.backward", help: tr(french, "Annuler", "Undo"), action: editor.undo)
+            formatButton(
+                "arrow.uturn.forward", help: tr(french, "Rétablir", "Redo"), action: editor.redo)
             Spacer(minLength: 8)
             Text(verbatim: saveCaption)
                 .font(VoxoLTypography.font(size: 12))
@@ -641,7 +702,9 @@ struct MeetingReportView: View {
         .background(theme.well)
     }
 
-    private func formatButton(_ icon: String, help: String, action: @escaping () -> Void) -> some View {
+    private func formatButton(_ icon: String, help: String, action: @escaping () -> Void)
+        -> some View
+    {
         Button(action: action) {
             Image(systemName: icon).font(.system(size: 12, weight: .medium))
         }
@@ -702,10 +765,12 @@ struct MeetingReportView: View {
                             .background(theme.ink, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(playback.playing ? Text("Pause") : Text(tr(french, "Lire", "Play")))
+                    .accessibilityLabel(
+                        playback.playing ? Text("Pause") : Text(tr(french, "Lire", "Play")))
                     Button(String("+15")) { playback.skip(15, limit: transcript.duration) }
                         .buttonStyle(HubButtonStyle(kind: .ghost))
-                        .accessibilityLabel(tr(french, "Avancer de 15 secondes", "Forward 15 seconds"))
+                        .accessibilityLabel(
+                            tr(french, "Avancer de 15 secondes", "Forward 15 seconds"))
                     (Text(verbatim: MeetingTime.short(playback.position))
                         .foregroundColor(theme.ink)
                         + Text(verbatim: " / \(MeetingTime.short(transcript.duration))")
@@ -716,8 +781,11 @@ struct MeetingReportView: View {
                     Button {
                         playback.cycleRate()
                     } label: {
-                        Text(verbatim: playback.rate == 1 ? "1×" : String(format: "%g×", playback.rate))
-                            .monospacedDigit()
+                        Text(
+                            verbatim: playback.rate == 1
+                                ? "1×" : String(format: "%g×", playback.rate)
+                        )
+                        .monospacedDigit()
                     }
                     .buttonStyle(HubButtonStyle(kind: .ghost))
                     .help(tr(french, "Vitesse de lecture", "Playback speed"))
@@ -904,7 +972,10 @@ private struct MeetingBlockRow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text(block.text))
-                .accessibilityValue(Text(verbatim: block.checked ? tr(french, "Fait", "Done") : tr(french, "À faire", "To do")))
+                .accessibilityValue(
+                    Text(
+                        verbatim: block.checked
+                            ? tr(french, "Fait", "Done") : tr(french, "À faire", "To do")))
                 body(size: 16)
                     .strikethrough(block.checked, color: theme.secondaryInk.opacity(0.5))
                     .foregroundStyle(block.checked ? theme.secondaryInk : theme.ink)
@@ -965,7 +1036,11 @@ private struct MeetingVoicesSheet: View {
             HubPanel {
                 ForEach(transcript.speakerIDs, id: \.self) { speaker in
                     HStack(spacing: 12) {
-                        MeetingSpeakerBadge(speaker: speaker, name: names[speaker] ?? transcript.name(for: speaker, prefix: tr(french, "Intervenant", "Speaker")))
+                        MeetingSpeakerBadge(
+                            speaker: speaker,
+                            name: names[speaker]
+                                ?? transcript.name(
+                                    for: speaker, prefix: tr(french, "Intervenant", "Speaker")))
                         TextField(
                             "\(tr(french, "Intervenant", "Speaker")) \(speaker + 1)",
                             text: Binding(
@@ -1029,22 +1104,33 @@ private struct MeetingProposalSheet: View {
                     Text(tr(french, "Ton document", "Your document"))
                         .font(VoxoLTypography.font(size: 13, weight: .semibold))
                         .foregroundStyle(theme.secondaryInk)
-                    MeetingRichEditor(document: .constant(current), controller: left, editable: false)
-                        .background(theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    MeetingRichEditor(
+                        document: .constant(current), controller: left, editable: false
+                    )
+                    .background(
+                        theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tr(french, "Nouvelle version", "New version"))
                         .font(VoxoLTypography.font(size: 13, weight: .semibold))
                         .foregroundStyle(theme.secondaryInk)
-                    MeetingRichEditor(document: .constant(proposed), controller: right, editable: false)
-                        .background(theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    MeetingRichEditor(
+                        document: .constant(proposed), controller: right, editable: false
+                    )
+                    .background(
+                        theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
             }
             HStack {
                 Text(
                     canAccept
-                        ? (tr(french, "Ton document actuel reste dans les versions.", "Your current document stays in version history."))
-                        : (tr(french, "La transcription a changé depuis cette version. Relance la rédaction.", "The transcript changed after this version. Write it again."))
+                        ? (tr(
+                            french, "Ton document actuel reste dans les versions.",
+                            "Your current document stays in version history."))
+                        : (tr(
+                            french,
+                            "La transcription a changé depuis cette version. Relance la rédaction.",
+                            "The transcript changed after this version. Write it again."))
                 )
                 .font(VoxoLTypography.font(size: 12))
                 .foregroundStyle(canAccept ? theme.secondaryInk : theme.warning)
@@ -1095,11 +1181,15 @@ private struct MeetingVersionSheet: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                MeetingRichEditor(document: .constant(version.document), controller: editor, editable: false)
-                    .background(theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                MeetingRichEditor(
+                    document: .constant(version.document), controller: editor, editable: false
+                )
+                .background(theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 HStack {
                     Text(
-                        tr(french, "Restaurer garde aussi le document actuel.", "Restoring also keeps the current document.")
+                        tr(
+                            french, "Restaurer garde aussi le document actuel.",
+                            "Restoring also keeps the current document.")
                     )
                     .font(VoxoLTypography.font(size: 12))
                     .foregroundStyle(theme.secondaryInk)
@@ -1109,7 +1199,10 @@ private struct MeetingVersionSheet: View {
                 }
             } else {
                 Text(
-                    tr(french, "Aucune version précédente. Tes modifications et les nouvelles rédactions en créeront.", "No previous version. Your edits and new drafts will create them.")
+                    tr(
+                        french,
+                        "Aucune version précédente. Tes modifications et les nouvelles rédactions en créeront.",
+                        "No previous version. Your edits and new drafts will create them.")
                 )
                 .font(VoxoLTypography.font(size: 13))
                 .foregroundStyle(theme.secondaryInk)

@@ -100,7 +100,8 @@ enum DatasetBuilderCLI {
 
         let examples = try readExamples(from: URL(fileURLWithPath: input))
         let aiExperiment = arguments.contains("--ai-experiment")
-        let result = aiExperiment
+        let result =
+            aiExperiment
             ? DatasetBuilder.buildAIExperiment(examples) : DatasetBuilder.build(examples)
         let outputURL = URL(fileURLWithPath: output, isDirectory: true)
         try FileManager.default.createDirectory(

@@ -9,17 +9,24 @@ import XCTest
 final class FunctionWordSwapTests: XCTestCase {
     func testFunctionWordSwapIsRejected() {
         for (source, candidate, language) in [
-            ("On parle du module de paiement.", "On parle que module de paiement.", TextLanguage.french),
+            (
+                "On parle du module de paiement.", "On parle que module de paiement.",
+                TextLanguage.french
+            ),
             ("Je vérifie les fichiers de la base.", "Je vérifie les fichiers en la base.", .french),
             ("Envoie mes notes demain.", "Envoie tes notes demain.", .french),
-            ("Il faut des tests avant la livraison.", "Il faut mais tests avant la livraison.", .french),
+            (
+                "Il faut des tests avant la livraison.", "Il faut mais tests avant la livraison.",
+                .french
+            ),
             ("Send the report to Nora.", "Send the report for Nora.", .english),
             ("Send it to the team and the client.", "Send it to the team or the client.", .english),
         ] {
             let decision = FidelityValidator.validate(
                 candidate: candidate, against: prepared(source, language: language))
             XCTAssertFalse(decision.usedModelOutput, "\(source) -> \(candidate)")
-            XCTAssertEqual(decision.rejectionReason, .functionWordChanged, "\(source) -> \(candidate)")
+            XCTAssertEqual(
+                decision.rejectionReason, .functionWordChanged, "\(source) -> \(candidate)")
         }
     }
 
@@ -35,7 +42,8 @@ final class FunctionWordSwapTests: XCTestCase {
         // The deterministic layer already collapses most stutters, so the rule is called directly.
         XCTAssertFalse(
             FidelityValidator.functionWordChanged(
-                source: "Je relis le le texte.", candidate: "Je relis le texte.", language: .french))
+                source: "Je relis le le texte.", candidate: "Je relis le texte.", language: .french)
+        )
     }
 
     func testHomophoneAndAuxiliaryFixesStayAccepted() {
@@ -58,7 +66,8 @@ final class FunctionWordSwapTests: XCTestCase {
             candidate: "Les documents sont complets. On parle que module de paiement.",
             against: prepared("Les document sont complet. On parle du module de paiement."))
         XCTAssertTrue(decision.usedModelOutput)
-        XCTAssertEqual(decision.text, "Les documents sont complets. On parle du module de paiement.")
+        XCTAssertEqual(
+            decision.text, "Les documents sont complets. On parle du module de paiement.")
         XCTAssertEqual(decision.repairedSentenceCount, 1)
     }
 
@@ -71,7 +80,10 @@ final class FunctionWordSwapTests: XCTestCase {
 
     func testElisionFixIsAccepted() {
         for (source, candidate) in [
-            ("Je vais envoyer le email au client demain.", "Je vais envoyer l'email au client demain."),
+            (
+                "Je vais envoyer le email au client demain.",
+                "Je vais envoyer l'email au client demain."
+            ),
             ("Il faut tester le endpoint ce soir.", "Il faut tester l'endpoint ce soir."),
             ("On contacte la entreprise lundi.", "On contacte l'entreprise lundi."),
         ] {
@@ -83,7 +95,10 @@ final class FunctionWordSwapTests: XCTestCase {
 
     func testRepairNeverStacksAnArticleOnAnElision() {
         for (source, candidate) in [
-            ("Je vais envoyer le email au client demain.", "Je vais envoyer l'email au client demain."),
+            (
+                "Je vais envoyer le email au client demain.",
+                "Je vais envoyer l'email au client demain."
+            ),
             ("Je parle de Apple ce matin.", "Je parle d'Apple ce matin."),
         ] {
             let text = FidelityValidator.validateWithRepair(
@@ -104,7 +119,8 @@ final class FunctionWordSwapTests: XCTestCase {
             ("On parle de le projet.", "On parle du projet."),
             ("Le la voiture est garée.", "La voiture est garée."),
         ] {
-            let decision = FidelityValidator.validate(candidate: candidate, against: prepared(source))
+            let decision = FidelityValidator.validate(
+                candidate: candidate, against: prepared(source))
             XCTAssertTrue(
                 decision.usedModelOutput,
                 "\(source) -> \(candidate): \(String(describing: decision.rejectionReason))")

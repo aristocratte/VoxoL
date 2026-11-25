@@ -984,8 +984,10 @@ extension FidelityValidator {
         else { return [] }
         let nsText = text as NSString
         return regex.matches(in: text, range: NSRange(location: 0, length: nsText.length)).map {
-            (normalizeWord(nsText.substring(with: $0.range)),
-             $0.range.location..<($0.range.location + $0.range.length))
+            (
+                normalizeWord(nsText.substring(with: $0.range)),
+                $0.range.location..<($0.range.location + $0.range.length)
+            )
         }
     }
 

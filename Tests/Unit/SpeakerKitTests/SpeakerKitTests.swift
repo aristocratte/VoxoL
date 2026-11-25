@@ -304,9 +304,10 @@ struct SpeakerKitTests {
                     "Le choix final n'est pas encore décidé.",
                     "Final approval has not been given yet.",
                 ])
-        #expect(extraction.summaryPoints.allSatisfy { point in
-            evidence.values.contains { $0.text == point.quote && $0.turnID == point.turnID }
-        })
+        #expect(
+            extraction.summaryPoints.allSatisfy { point in
+                evidence.values.contains { $0.text == point.quote && $0.turnID == point.turnID }
+            })
     }
 
     @Test func daqReportRejectsMalformedInventedAndDuplicateReferences() throws {
@@ -585,7 +586,10 @@ struct SpeakerKitTests {
             transcript: document, extractions: [extracted], french: true,
             narratives: [narrative])
         #expect(markdown.contains("## Synthèse"))
-        #expect(markdown.contains("Le prototype fonctionne. Une autre intervention porte sur la préparation des chiffres.\n_Sources : [00:00:01] · [00:00:08]_"))
+        #expect(
+            markdown.contains(
+                "Le prototype fonctionne. Une autre intervention porte sur la préparation des chiffres.\n_Sources : [00:00:01] · [00:00:08]_"
+            ))
         #expect(!markdown.contains("\n- "))
         #expect(!markdown.contains("Le prototype a été approuvé."))
         let invented = output.replacingOccurrences(
@@ -599,12 +603,16 @@ struct SpeakerKitTests {
     @Test func reportNarrativeRejectsUncitedFactsAndUnsupportedApproval() throws {
         let document = SpeakerTranscript(
             title: "Budget", duration: 12, rawText: "Le budget de 40 euros reste à confirmer.",
-            turns: [.init(id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
-                          text: "Le budget de 40 euros reste à confirmer.")],
+            turns: [
+                .init(
+                    id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
+                    text: "Le budget de 40 euros reste à confirmer.")
+            ],
             diarizationRevision: "test")
         let evidence = [
-            0: MeetingReportEvidence(id: 0, turnID: 3,
-                                     text: "Le budget de 40 euros reste à confirmer.")
+            0: MeetingReportEvidence(
+                id: 0, turnID: 3,
+                text: "Le budget de 40 euros reste à confirmer.")
         ]
         for output in [
             #"{"p":[{"t":"Le budget de 50 euros reste à confirmer.","e":[0]}]}"#,
@@ -624,14 +632,18 @@ struct SpeakerKitTests {
         let settled = SpeakerTranscript(
             title: "Budget", duration: 12,
             rawText: "Le budget est approuvé. La date reste à confirmer.",
-            turns: [.init(id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
-                          text: "Le budget est approuvé. La date reste à confirmer.")],
+            turns: [
+                .init(
+                    id: 3, start: 2, end: 8, speakerIDs: [0], overlapping: false,
+                    text: "Le budget est approuvé. La date reste à confirmer.")
+            ],
             diarizationRevision: "test")
         let mixedEvidence = [
             0: MeetingReportEvidence(id: 0, turnID: 3, text: "Le budget est approuvé."),
             1: MeetingReportEvidence(id: 1, turnID: 3, text: "La date reste à confirmer."),
         ]
-        let claimedApproval = #"{"p":[{"t":"La date a été approuvée pendant la réunion.","e":[1]}]}"#
+        let claimedApproval =
+            #"{"p":[{"t":"La date a été approuvée pendant la réunion.","e":[1]}]}"#
         #expect(throws: MeetingReportGenerationError.self) {
             try MeetingReportNarrative.parse(
                 claimedApproval, evidence: mixedEvidence, transcript: settled,

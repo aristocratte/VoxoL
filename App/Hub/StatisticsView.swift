@@ -76,7 +76,8 @@ struct StatisticsModel {
         let speaking = entries.reduce(0) { $0 + $1.seconds }
         words = usesFixture ? 1_443 : totalWords
         averageWPM =
-            usesFixture ? 135 : speaking > 0 ? Int((Double(totalWords) / speaking * 60).rounded()) : 0
+            usesFixture
+            ? 135 : speaking > 0 ? Int((Double(totalWords) / speaking * 60).rounded()) : 0
         let speakingSeconds = usesFixture ? Double(words) / 135 * 60 : speaking
         recoveredMinutes = max(0, Int(((Double(words) / 40 * 60 - speakingSeconds) / 60).rounded()))
         activeDays =
@@ -100,9 +101,12 @@ struct StatisticsModel {
         case .week, .month:
             let count = period.days ?? 7
             var buckets: [Date: Int] = [:]
-            for entry in entries { buckets[calendar.startOfDay(for: entry.date), default: 0] += entry.words }
+            for entry in entries {
+                buckets[calendar.startOfDay(for: entry.date), default: 0] += entry.words
+            }
             for offset in 0..<count {
-                guard let day = calendar.date(byAdding: .day, value: offset - (count - 1), to: today)
+                guard
+                    let day = calendar.date(byAdding: .day, value: offset - (count - 1), to: today)
                 else { continue }
                 let label: String =
                     period == .week
@@ -165,12 +169,18 @@ struct StatisticsModel {
         // Applications, by dictations, the five busiest then the rest together.
         if usesFixture {
             apps = [
-                AppRow(id: "Slack", name: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap", count: 24),
+                AppRow(
+                    id: "Slack", name: "Slack", bundleIdentifier: "com.tinyspeck.slackmacgap",
+                    count: 24),
                 AppRow(id: "Mail", name: "Mail", bundleIdentifier: "com.apple.mail", count: 19),
                 AppRow(id: "Notes", name: "Notes", bundleIdentifier: "com.apple.Notes", count: 18),
-                AppRow(id: "Xcode", name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", count: 12),
-                AppRow(id: "Messages", name: "Messages", bundleIdentifier: "com.apple.MobileSMS", count: 9),
-                AppRow(id: "other", name: String("Other", in: locale), bundleIdentifier: nil, count: 8),
+                AppRow(
+                    id: "Xcode", name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode", count: 12),
+                AppRow(
+                    id: "Messages", name: "Messages", bundleIdentifier: "com.apple.MobileSMS",
+                    count: 9),
+                AppRow(
+                    id: "other", name: String("Other", in: locale), bundleIdentifier: nil, count: 8),
             ]
         } else {
             let grouped = Dictionary(grouping: inPeriod, by: \.applicationName)
@@ -208,7 +218,8 @@ struct StatisticsModel {
                     Self.bands.firstIndex { hour >= $0.start && hour < $0.end }
                     ?? (Self.bands.count - 1)
                 let row =
-                    (calendar.component(.weekday, from: record.createdAt) - calendar.firstWeekday + 7)
+                    (calendar.component(.weekday, from: record.createdAt) - calendar.firstWeekday
+                        + 7)
                     % 7
                 grid[row][column] += 1
             }
@@ -329,7 +340,8 @@ struct StatisticsView: View {
 
     private func recovered(_ minutes: Int) -> Text {
         guard minutes >= 60 else { return Text("\(minutes)") + unit("min") }
-        return Text("\(minutes / 60)") + unit("h") + Text(verbatim: String(format: " %02d", minutes % 60))
+        return Text("\(minutes / 60)") + unit("h")
+            + Text(verbatim: String(format: " %02d", minutes % 60))
             + unit("min")
     }
 
@@ -353,7 +365,8 @@ struct StatisticsView: View {
                         Capsule()
                             .fill(index == 0 ? theme.ink : theme.selection)
                             .frame(
-                                width: max(4, geometry.size.width * CGFloat(app.count) / CGFloat(top)),
+                                width: max(
+                                    4, geometry.size.width * CGFloat(app.count) / CGFloat(top)),
                                 height: 4
                             )
                             .frame(maxHeight: .infinity)
@@ -433,7 +446,9 @@ private struct DotColumns: View {
     }
 
     /// A column dithered like the prints: every dot present at the foot, fewer toward the top.
-    static func dots(x: CGFloat, width: CGFloat, height: CGFloat, base: CGFloat, cell: CGFloat) -> Path {
+    static func dots(x: CGFloat, width: CGFloat, height: CGFloat, base: CGFloat, cell: CGFloat)
+        -> Path
+    {
         var path = Path()
         let columns = max(1, Int((width / cell).rounded()))
         let rows = max(1, Int((height / cell).rounded()))
@@ -441,8 +456,9 @@ private struct DotColumns: View {
             for row in 0..<rows {
                 let t = rows == 1 ? 0 : Double(row) / Double(rows - 1)
                 let edge = (columns > 2 && (column == 0 || column == columns - 1)) ? 0.7 : 1
-                guard grain(Double(x / cell) + Double(column) * 1.7, Double(row) * 1.3)
-                    <= (0.97 - 0.55 * t) * edge
+                guard
+                    grain(Double(x / cell) + Double(column) * 1.7, Double(row) * 1.3)
+                        <= (0.97 - 0.55 * t) * edge
                 else { continue }
                 let radius = cell * (0.3 + 0.14 * grain(Double(row), Double(x) + Double(column)))
                 path.addEllipse(
@@ -498,7 +514,10 @@ private struct DotMatrix: View {
                         ? 2 + CGFloat(count) / CGFloat(maximum) * min(cellWidth, cellHeight) * 0.3
                         : 1.3
                     context.fill(
-                        Path(ellipseIn: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)),
+                        Path(
+                            ellipseIn: CGRect(
+                                x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)
+                        ),
                         with: .color(count > 0 ? theme.ink : theme.selection))
                 }
             }
@@ -507,7 +526,8 @@ private struct DotMatrix: View {
                     Text(verbatim: label)
                         .font(VoxoLTypography.font(size: 11))
                         .foregroundColor(theme.secondaryInk),
-                    at: CGPoint(x: labelWidth + CGFloat(column) * cellWidth + cellWidth / 2, y: size.height),
+                    at: CGPoint(
+                        x: labelWidth + CGFloat(column) * cellWidth + cellWidth / 2, y: size.height),
                     anchor: .bottom)
             }
         }

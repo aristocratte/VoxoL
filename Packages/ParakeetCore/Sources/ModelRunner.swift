@@ -324,7 +324,8 @@ final class ModelRunner: @unchecked Sendable {
                 sampleCount: samples.count,
                 maximumSampleCount: maximumSampleCount,
                 prepareMilliseconds: Self.milliseconds(prepareStart.duration(to: predictionStart)),
-                predictionMilliseconds: Self.milliseconds(predictionStart.duration(to: outputStart)),
+                predictionMilliseconds: Self.milliseconds(
+                    predictionStart.duration(to: outputStart)),
                 outputMilliseconds: Self.milliseconds(outputStart.duration(to: end))
             )
         }

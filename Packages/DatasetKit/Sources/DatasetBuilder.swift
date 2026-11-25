@@ -242,7 +242,8 @@ public enum DatasetBuilder {
 
     /// Explicit experimental lane. AI curation never sets the human approval flag.
     /// Its outputs are development data, not human-reviewed promotion evidence.
-    public static func buildAIExperiment(_ examples: [CleanupDatasetExample]) -> DatasetBuildResult {
+    public static func buildAIExperiment(_ examples: [CleanupDatasetExample]) -> DatasetBuildResult
+    {
         build(examples, aiExperiment: true)
     }
 
@@ -311,7 +312,8 @@ public enum DatasetBuilder {
 
 private extension DatasetBuilder {
     static func isValid(_ example: CleanupDatasetExample, aiExperiment: Bool) -> Bool {
-        let reviewEligible = aiExperiment
+        let reviewEligible =
+            aiExperiment
             ? (!example.approved && example.source == "ai-curated-experimental")
             : example.approved
         guard reviewEligible, !example.id.isEmpty, !example.rawTranscript.isEmpty,

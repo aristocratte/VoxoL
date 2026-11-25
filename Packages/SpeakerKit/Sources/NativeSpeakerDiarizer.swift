@@ -141,7 +141,8 @@ public enum SpeakerAudio {
     public static func streamMono16k(
         _ url: URL,
         samplesPerChunk: Int = 40_960,
-        _ consume: (_ samples: [Float], _ processedSamples: Int, _ estimatedSamples: Int) throws -> Void
+        _ consume: (_ samples: [Float], _ processedSamples: Int, _ estimatedSamples: Int) throws ->
+            Void
     ) throws -> Int {
         guard samplesPerChunk > 0 else { throw SpeakerError.invalidAudio }
         let file = try AVAudioFile(forReading: url)

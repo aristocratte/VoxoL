@@ -91,7 +91,8 @@ public struct MeetingReportNarrative: Equatable, Sendable {
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
             guard seen.insert(key).inserted else { continue }
-            unique.append(Source(turnID: source.turnID, text: text, prioritized: source.prioritized))
+            unique.append(
+                Source(turnID: source.turnID, text: text, prioritized: source.prioritized))
         }
         guard !unique.isEmpty else { return [:] }
 
@@ -129,13 +130,14 @@ public struct MeetingReportNarrative: Equatable, Sendable {
             }
         }
 
-        return Dictionary(uniqueKeysWithValues: selected.sorted().enumerated().map { newID, index in
-            let source = unique[index]
-            return (
-                newID,
-                MeetingReportEvidence(id: newID, turnID: source.turnID, text: source.text)
-            )
-        })
+        return Dictionary(
+            uniqueKeysWithValues: selected.sorted().enumerated().map { newID, index in
+                let source = unique[index]
+                return (
+                    newID,
+                    MeetingReportEvidence(id: newID, turnID: source.turnID, text: source.text)
+                )
+            })
     }
 
     private static func evenlySpaced(_ indices: [Int], count: Int) -> [Int] {
@@ -218,7 +220,8 @@ public struct MeetingReportNarrative: Equatable, Sendable {
 
             let sources = item.e.compactMap { evidence[$0] }
             let sourceText = sources.map { source in
-                let speaker = transcript.turns.first { $0.id == source.turnID }
+                let speaker =
+                    transcript.turns.first { $0.id == source.turnID }
                     .map { transcript.label(for: $0) } ?? ""
                 return speaker + " " + source.text
             }.joined(separator: " ")
@@ -229,9 +232,10 @@ public struct MeetingReportNarrative: Equatable, Sendable {
             {
                 throw MeetingReportGenerationError.invalidSource
             }
-            paragraphs.append(Paragraph(
-                text: prose,
-                sourceTurnIDs: Array(Set(sources.map(\.turnID))).sorted()))
+            paragraphs.append(
+                Paragraph(
+                    text: prose,
+                    sourceTurnIDs: Array(Set(sources.map(\.turnID))).sorted()))
         }
         return Self(paragraphs: paragraphs)
     }
@@ -252,38 +256,47 @@ public struct MeetingReportNarrative: Equatable, Sendable {
             let speaker = transcript.turns.first { $0.id == source.turnID }
                 .flatMap { turn -> String? in
                     guard turn.displayedSpeakerIDs.count == 1,
-                        let id = turn.displayedSpeakerIDs.first else { return nil }
+                        let id = turn.displayedSpeakerIDs.first
+                    else { return nil }
                     return transcript.name(for: id, prefix: french ? "Intervenant" : "Speaker")
                 }
-            let introduction = speaker.map {
-                french ? "\($0) indique" : "\($0) says"
-            } ?? (french ? "Un passage indique" : "One passage states")
+            let introduction =
+                speaker.map {
+                    french ? "\($0) indique" : "\($0) says"
+                } ?? (french ? "Un passage indique" : "One passage states")
             return "\(introduction) : « \(source.text) »"
         }
         return Self(
-            paragraphs: [Paragraph(
-                text: sentences.map { $0.hasSuffix(".") ? $0 : $0 + "." }
-                    .joined(separator: " "),
-                sourceTurnIDs: Array(Set(selected.map(\.turnID))).sorted())],
+            paragraphs: [
+                Paragraph(
+                    text: sentences.map { $0.hasSuffix(".") ? $0 : $0 + "." }
+                        .joined(separator: " "),
+                    sourceTurnIDs: Array(Set(selected.map(\.turnID))).sorted())
+            ],
             usesVerbatimFallback: true)
     }
 
     private static func numericAnchors(in text: String) -> Set<String> {
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        return Set(numberPattern.matches(in: text, range: range).compactMap {
-            Range($0.range, in: text).map { String(text[$0]) }
-        })
+        return Set(
+            numberPattern.matches(in: text, range: range).compactMap {
+                Range($0.range, in: text).map { String(text[$0]) }
+            })
     }
 
     private static let numberPattern = try! NSRegularExpression(
         pattern: #"(?<![\p{L}\p{N}])\d+(?:[.,:/-]\d+)*(?![\p{L}\p{N}])"#)
 
     private static func assertsSettledDecision(_ text: String) -> Bool {
-        let folded = text.folding(options: [.caseInsensitive, .diacriticInsensitive],
-                                  locale: Locale(identifier: "en_US_POSIX")).lowercased()
-        return ["a ete approuv", "a ete valid", "ont approuv", "ont valid",
-                "a ete decide", "ont decide", "a ete acte", "was approved",
-                "was decided", "was agreed", "were approved"].contains {
+        let folded = text.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        ).lowercased()
+        return [
+            "a ete approuv", "a ete valid", "ont approuv", "ont valid",
+            "a ete decide", "ont decide", "a ete acte", "was approved",
+            "was decided", "was agreed", "were approved",
+        ].contains {
             folded.contains($0)
         }
     }

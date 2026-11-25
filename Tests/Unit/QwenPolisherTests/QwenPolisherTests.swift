@@ -39,7 +39,8 @@ final class QwenPolisherTests: XCTestCase {
     func testStructuredGenerationStopsAfterFirstCompleteJSONObject() {
         XCTAssertEqual(
             QwenPolisherRuntime.firstCompleteJSONObject(
-                in: "preface {\"d\":[\"E16\"],\"x\":{\"note\":\"brace } and \\\"quote\\\"\"}} trailing"
+                in:
+                    "preface {\"d\":[\"E16\"],\"x\":{\"note\":\"brace } and \\\"quote\\\"\"}} trailing"
             ),
             "{\"d\":[\"E16\"],\"x\":{\"note\":\"brace } and \\\"quote\\\"\"}}"
         )

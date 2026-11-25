@@ -90,7 +90,9 @@ struct SettingsView: View {
                         select: { languageCode = $0 }
                     )
                 }
-                HubField(title: "Guided setup", detail: Text("Replay the tour and re-check this Mac")) {
+                HubField(
+                    title: "Guided setup", detail: Text("Replay the tour and re-check this Mac")
+                ) {
                     Button("Replay", action: replayPreflight)
                         .buttonStyle(HubButtonStyle(kind: .onWell))
                 }
@@ -135,7 +137,9 @@ struct SettingsView: View {
                             EditorialDropdownOption(id: $0.rawValue, $0.title)
                         },
                         selectedID: language.rawValue,
-                        select: { language = DictationLanguagePreference(rawValue: $0) ?? .preferred }
+                        select: {
+                            language = DictationLanguagePreference(rawValue: $0) ?? .preferred
+                        }
                     )
                 }
             }
@@ -354,7 +358,8 @@ struct SettingsView: View {
                     Toggle("Private mode", isOn: $privateMode).toggleStyle(HubSwitchStyle())
                 }
                 HubField(
-                    title: "Local history", detail: Text("Keep successful transcriptions on this Mac")
+                    title: "Local history",
+                    detail: Text("Keep successful transcriptions on this Mac")
                 ) {
                     Toggle("Local history", isOn: $historyEnabled)
                         .toggleStyle(HubSwitchStyle())

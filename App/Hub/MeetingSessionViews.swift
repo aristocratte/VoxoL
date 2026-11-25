@@ -14,14 +14,22 @@ struct MeetingProgressLine: View {
     private var label: String {
         switch meetings.phase {
         case .idle: tr(french, "Prêt", "Ready")
-        case .checking: tr(french, "Vérification de la reconnaissance des voix…", "Checking speaker recognition…")
-        case .downloading: tr(french, "Installation de la reconnaissance des voix…", "Installing speaker recognition…")
+        case .checking:
+            tr(
+                french, "Vérification de la reconnaissance des voix…",
+                "Checking speaker recognition…")
+        case .downloading:
+            tr(
+                french, "Installation de la reconnaissance des voix…",
+                "Installing speaker recognition…")
         case .reading: tr(french, "Préparation de l’audio…", "Preparing the audio…")
-        case .transcribing: tr(french, "Transcription de la conversation…", "Transcribing the conversation…")
+        case .transcribing:
+            tr(french, "Transcription de la conversation…", "Transcribing the conversation…")
         case .speakers: tr(french, "Identification des voix…", "Identifying the voices…")
         case .reporting:
             meetings.reportStage.isEmpty
-                ? (tr(french, "Rédaction du compte rendu…", "Writing the report…")) : meetings.reportStage
+                ? (tr(french, "Rédaction du compte rendu…", "Writing the report…"))
+                : meetings.reportStage
         case .cancelling: tr(french, "Annulation…", "Cancelling…")
         }
     }
@@ -104,13 +112,20 @@ struct MeetingRecordingSheet: View {
                 HubField(
                     verbatim: tr(french, "Son", "Sound"),
                     detail: source == .call
-                        ? Text(tr(french, "Micro et son du Mac. Un casque évite l’écho.", "Mic and Mac audio. Headphones avoid echo."))
+                        ? Text(
+                            tr(
+                                french, "Micro et son du Mac. Un casque évite l’écho.",
+                                "Mic and Mac audio. Headphones avoid echo."))
                         : Text(tr(french, "Le micro de ce Mac.", "This Mac’s microphone."))
                 ) {
                     HubSegmented(
-                        options: MeetingRecorder.Source.allCases, selection: $source, track: theme.selection
+                        options: MeetingRecorder.Source.allCases, selection: $source,
+                        track: theme.selection
                     ) {
-                        Text($0 == .microphone ? (tr(french, "En présentiel", "In person")) : (tr(french, "En appel", "On a call")))
+                        Text(
+                            $0 == .microphone
+                                ? (tr(french, "En présentiel", "In person"))
+                                : (tr(french, "En appel", "On a call")))
                     }
                     .disabled(meetings.recorder.active)
                 }
@@ -118,7 +133,11 @@ struct MeetingRecordingSheet: View {
             .padding(.top, 16)
 
             Text(
-                tr(french, "Préviens les participants avant de commencer. Une heure au plus ; la transcription démarre à l’arrêt.", "Tell participants before you start. One hour at most; transcription starts when you stop.")
+                tr(
+                    french,
+                    "Préviens les participants avant de commencer. Une heure au plus ; la transcription démarre à l’arrêt.",
+                    "Tell participants before you start. One hour at most; transcription starts when you stop."
+                )
             )
             .font(VoxoLTypography.font(size: 12))
             .foregroundStyle(theme.secondaryInk)
@@ -141,7 +160,8 @@ struct MeetingRecordingSheet: View {
                     .disabled(meetings.recorder.active)
                 Button(tr(french, "Choisir le fichier et démarrer", "Choose file and start")) {
                     Task {
-                        await meetings.recorder.start(title: title, source: source, event: calendarEvent)
+                        await meetings.recorder.start(
+                            title: title, source: source, event: calendarEvent)
                         if meetings.recorder.state == .recording { dismiss() }
                     }
                 }
@@ -180,10 +200,13 @@ struct MeetingLiveView: View {
             toolbar
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(verbatim: recorder.title.isEmpty ? (tr(french, "Nouvelle réunion", "New meeting")) : recorder.title)
-                        .font(VoxoLTypography.serif(size: 30, weight: .semibold))
-                        .foregroundStyle(theme.ink)
-                        .accessibilityAddTraits(.isHeader)
+                    Text(
+                        verbatim: recorder.title.isEmpty
+                            ? (tr(french, "Nouvelle réunion", "New meeting")) : recorder.title
+                    )
+                    .font(VoxoLTypography.serif(size: 30, weight: .semibold))
+                    .foregroundStyle(theme.ink)
+                    .accessibilityAddTraits(.isHeader)
                     HStack(spacing: 10) {
                         Circle()
                             .fill(recorder.state == .recording ? theme.coral : theme.secondaryInk)
@@ -249,9 +272,11 @@ struct MeetingLiveView: View {
             .buttonStyle(HubButtonStyle(kind: .ghost))
             Spacer()
             if live {
-                Button(tr(french, "Marquer ce moment", "Mark this moment")) { recorder.markMoment() }
-                    .buttonStyle(HubButtonStyle(kind: .secondary))
-                    .keyboardShortcut("m", modifiers: .command)
+                Button(tr(french, "Marquer ce moment", "Mark this moment")) {
+                    recorder.markMoment()
+                }
+                .buttonStyle(HubButtonStyle(kind: .secondary))
+                .keyboardShortcut("m", modifiers: .command)
                 Button(recorder.state == .paused ? (tr(french, "Reprendre", "Resume")) : "Pause") {
                     recorder.togglePause()
                 }
@@ -329,7 +354,8 @@ struct MeetingLiveView: View {
                     }
                     .padding(.horizontal, 12)
                     .frame(height: 40)
-                    .background(theme.well, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(
+                        theme.well, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .padding(.leading, -56)
                 .padding(.top, 4)
@@ -346,7 +372,11 @@ struct MeetingLiveView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if !meetings.modelReady || models.installedDirectory(for: .asr) == nil {
                         Text(
-                            tr(french, "Le fichier est conservé. Installe les moteurs de transcription et de reconnaissance des voix pour créer le compte rendu.", "The file is kept. Install the transcription and speaker recognition engines to create the report.")
+                            tr(
+                                french,
+                                "Le fichier est conservé. Installe les moteurs de transcription et de reconnaissance des voix pour créer le compte rendu.",
+                                "The file is kept. Install the transcription and speaker recognition engines to create the report."
+                            )
                         )
                         .font(VoxoLTypography.font(size: 13))
                         .foregroundStyle(theme.secondaryInk)
@@ -355,7 +385,9 @@ struct MeetingLiveView: View {
                     HStack(spacing: 6) {
                         Button(tr(french, "Transcrire", "Transcribe"), action: transcribe)
                             .buttonStyle(HubButtonStyle(kind: .primary))
-                            .disabled(meetings.busy || !meetings.modelReady || models.installedDirectory(for: .asr) == nil)
+                            .disabled(
+                                meetings.busy || !meetings.modelReady
+                                    || models.installedDirectory(for: .asr) == nil)
                         Button(tr(french, "Afficher le fichier", "Show file")) {
                             NSWorkspace.shared.activateFileViewerSelecting([url])
                         }

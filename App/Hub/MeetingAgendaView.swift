@@ -35,7 +35,8 @@ struct MeetingUpcomingList: View {
                 } label: {
                     Text(tr(french, "Calendriers", "Calendars"))
                 }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).tint(theme.secondaryInk).fixedSize()
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).tint(theme.secondaryInk)
+                .fixedSize()
             }
         }
 
@@ -43,15 +44,22 @@ struct MeetingUpcomingList: View {
             HStack(spacing: 10) {
                 Text(
                     meetings.calendar.denied
-                        ? (tr(french, "L’accès au calendrier est refusé.", "Calendar access is denied."))
-                        : (tr(french, "Tes réunions du calendrier apparaîtront ici.", "Your calendar meetings will appear here."))
+                        ? (tr(
+                            french, "L’accès au calendrier est refusé.",
+                            "Calendar access is denied."))
+                        : (tr(
+                            french, "Tes réunions du calendrier apparaîtront ici.",
+                            "Your calendar meetings will appear here."))
                 )
                 .font(VoxoLTypography.font(size: 13))
                 .foregroundStyle(theme.secondaryInk)
                 Spacer()
                 if meetings.calendar.denied {
-                    Button(tr(french, "Ouvrir les Réglages", "Open Settings"), action: meetings.calendar.openSettings)
-                        .buttonStyle(HubButtonStyle(kind: .secondary))
+                    Button(
+                        tr(french, "Ouvrir les Réglages", "Open Settings"),
+                        action: meetings.calendar.openSettings
+                    )
+                    .buttonStyle(HubButtonStyle(kind: .secondary))
                 } else {
                     Button(tr(french, "Connecter le calendrier", "Connect calendar")) {
                         Task { await meetings.calendar.connect() }
@@ -62,10 +70,14 @@ struct MeetingUpcomingList: View {
             .padding(.horizontal, 10)
             .frame(minHeight: 40)
         } else if events.isEmpty {
-            Text(tr(french, "Rien de prévu dans les trois prochains jours.", "Nothing planned in the next three days."))
-                .font(VoxoLTypography.font(size: 13))
-                .foregroundStyle(theme.secondaryInk)
-                .padding(.horizontal, 10)
+            Text(
+                tr(
+                    french, "Rien de prévu dans les trois prochains jours.",
+                    "Nothing planned in the next three days.")
+            )
+            .font(VoxoLTypography.font(size: 13))
+            .foregroundStyle(theme.secondaryInk)
+            .padding(.horizontal, 10)
         } else {
             VStack(spacing: 2) {
                 ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -104,7 +116,8 @@ struct MeetingUpcomingList: View {
         .padding(.horizontal, 10)
         .frame(height: 52)
         .background(
-            next ? theme.well : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            next ? theme.well : Color.clear,
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func time(_ date: Date) -> String {
@@ -112,7 +125,9 @@ struct MeetingUpcomingList: View {
         let hour = date.formatted(.dateTime.hour().minute().locale(locale))
         let calendar = Calendar.current
         if calendar.isDateInToday(date) { return hour }
-        if calendar.isDateInTomorrow(date) { return tr(french, "Demain \(hour)", "Tomorrow \(hour)") }
+        if calendar.isDateInTomorrow(date) {
+            return tr(french, "Demain \(hour)", "Tomorrow \(hour)")
+        }
         return "\(date.formatted(.dateTime.weekday(.abbreviated).locale(locale))) \(hour)"
     }
 

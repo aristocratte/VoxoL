@@ -895,10 +895,12 @@ final class ParakeetCoreTests: XCTestCase {
                 }
                 let row = try logits(values)
                 let bias = ParakeetDecodingBias(offsets: offsets)
-                guard let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
-                    row,
-                    bias: bias
-                ) else { continue }
+                guard
+                    let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
+                        row,
+                        bias: bias
+                    )
+                else { continue }
 
                 var adjusted = values
                 for (index, offset) in offsets where index >= 0 && index < count {
@@ -921,10 +923,12 @@ final class ParakeetCoreTests: XCTestCase {
         ] {
             let row = try logits(values)
             let bias = ParakeetDecodingBias(offsets: offsets)
-            guard let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
-                row,
-                bias: bias
-            ) else { continue }
+            guard
+                let fastWinner = GreedyTDTDecoder.unchangedWinnerForNonPositiveBias(
+                    row,
+                    bias: bias
+                )
+            else { continue }
             var adjusted = values
             for (index, offset) in offsets where index >= 0 && index < adjusted.count {
                 adjusted[index] += offset

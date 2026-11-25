@@ -271,28 +271,28 @@ enum Pipeline {
                         ?? decoded.tokenIds.endIndex
                     decodeTotal.add(decoded.elapsedSeconds)
                     let chunk = ChunkResult(
-                            tokenIds: Array(decoded.tokenIds[firstKeptToken...]),
-                            frameIndices: decoded.frameIndices[firstKeptToken...].map {
-                                $0 - discardFrames
-                            },
-                            durations: Array(decoded.durations[firstKeptToken...]),
-                            tokenLogitMargins: Array(
-                                decoded.tokenLogitMargins[firstKeptToken...]
-                            ),
-                            durationLogitMargins: decoded.durationLogitMargins,
-                            blankDecisionCount: decoded.blankDecisionCount,
-                            totalDecisionCount: decoded.totalDecisionCount,
-                            maximumFramesWithoutEmission:
-                                decoded.maximumFramesWithoutEmission,
-                            timelineFrames: decoded.validFrames - discardFrames,
-                            originalTokenIds: decoded.tokenIds,
-                            originalFrameIndices: decoded.frameIndices,
-                            originalDurations: decoded.durations,
-                            originalTokenLogitMargins: decoded.tokenLogitMargins,
-                            firstKeptTokenIndex: firstKeptToken,
-                            validFrames: decoded.validFrames,
-                            discardFrames: discardFrames
-                        )
+                        tokenIds: Array(decoded.tokenIds[firstKeptToken...]),
+                        frameIndices: decoded.frameIndices[firstKeptToken...].map {
+                            $0 - discardFrames
+                        },
+                        durations: Array(decoded.durations[firstKeptToken...]),
+                        tokenLogitMargins: Array(
+                            decoded.tokenLogitMargins[firstKeptToken...]
+                        ),
+                        durationLogitMargins: decoded.durationLogitMargins,
+                        blankDecisionCount: decoded.blankDecisionCount,
+                        totalDecisionCount: decoded.totalDecisionCount,
+                        maximumFramesWithoutEmission:
+                            decoded.maximumFramesWithoutEmission,
+                        timelineFrames: decoded.validFrames - discardFrames,
+                        originalTokenIds: decoded.tokenIds,
+                        originalFrameIndices: decoded.frameIndices,
+                        originalDurations: decoded.durations,
+                        originalTokenLogitMargins: decoded.tokenLogitMargins,
+                        firstKeptTokenIndex: firstKeptToken,
+                        validFrames: decoded.validFrames,
+                        discardFrames: discardFrames
+                    )
                     results.set(index: item.index, chunk: chunk)
                 } catch {
                     fail(error)

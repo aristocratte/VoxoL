@@ -123,11 +123,14 @@ private struct MeetingsListView: View {
 
     var body: some View {
         HubPage {
-            HubPageHeader(verbatim: tr(french, "Réunions", "Meetings"), meta: Text(verbatim: summary)) {
+            HubPageHeader(
+                verbatim: tr(french, "Réunions", "Meetings"), meta: Text(verbatim: summary)
+            ) {
                 HStack(spacing: 6) {
                     importButton
                     Button {
-                        recording = RecordingRequest(title: tr(french, "Nouvelle réunion", "New meeting"))
+                        recording = RecordingRequest(
+                            title: tr(french, "Nouvelle réunion", "New meeting"))
                     } label: {
                         HStack(spacing: 6) {
                             Circle().fill(theme.coral).frame(width: 7, height: 7)
@@ -186,7 +189,11 @@ private struct MeetingsListView: View {
                             .font(VoxoLTypography.font(size: 15, weight: .semibold))
                             .foregroundStyle(theme.ink)
                         Text(
-                            tr(french, "Enregistre une réunion en présentiel ou en appel, ou importe un audio ou une vidéo. Tout reste sur ce Mac.", "Record a meeting in person or on a call, or import audio or video. Everything stays on this Mac.")
+                            tr(
+                                french,
+                                "Enregistre une réunion en présentiel ou en appel, ou importe un audio ou une vidéo. Tout reste sur ce Mac.",
+                                "Record a meeting in person or on a call, or import audio or video. Everything stays on this Mac."
+                            )
                         )
                         .font(VoxoLTypography.font(size: 13))
                         .foregroundStyle(theme.secondaryInk)
@@ -216,17 +223,22 @@ private struct MeetingsListView: View {
             }
         }
         .sheet(item: $recording) { request in
-            MeetingRecordingSheet(title: request.title, french: french, calendarEvent: request.event)
-                .environment(theme)
-                .environment(meetings)
+            MeetingRecordingSheet(
+                title: request.title, french: french, calendarEvent: request.event
+            )
+            .environment(theme)
+            .environment(meetings)
         }
     }
 
     private var summary: String {
         let count = meetings.records.count
         let minutes = Int(meetings.records.reduce(0) { $0 + $1.duration } / 60)
-        let duration = minutes >= 60 ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
-        let noun = french ? (count > 1 ? "réunions" : "réunion") : (count == 1 ? "meeting" : "meetings")
+        let duration =
+            minutes >= 60
+            ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
+        let noun =
+            french ? (count > 1 ? "réunions" : "réunion") : (count == 1 ? "meeting" : "meetings")
         return "\(count) \(noun) · \(duration)"
     }
 
@@ -251,10 +263,14 @@ private struct MeetingsListView: View {
             .disabled(meetings.busy || models.installedDirectory(for: .asr) == nil)
             .help(
                 models.installedDirectory(for: .asr) == nil
-                    ? (tr(french, "Installe d’abord le moteur de transcription dans Réglages.", "Install the transcription engine in Settings first."))
+                    ? (tr(
+                        french, "Installe d’abord le moteur de transcription dans Réglages.",
+                        "Install the transcription engine in Settings first."))
                     : (tr(french, "Importer un audio ou une vidéo", "Import audio or video")))
         } else {
-            Button(tr(french, "Installer la reconnaissance des voix", "Install speaker recognition")) {
+            Button(
+                tr(french, "Installer la reconnaissance des voix", "Install speaker recognition")
+            ) {
                 meetings.installModel()
             }
             .buttonStyle(HubButtonStyle(kind: .secondary))
@@ -266,7 +282,8 @@ private struct MeetingsListView: View {
         let recorder = meetings.recorder
         return Button(action: showCapture) {
             HStack(spacing: 10) {
-                Circle().fill(recorder.active ? theme.coral : theme.secondaryInk).frame(width: 8, height: 8)
+                Circle().fill(recorder.active ? theme.coral : theme.secondaryInk).frame(
+                    width: 8, height: 8)
                 Text(verbatim: recorder.title)
                     .font(VoxoLTypography.font(size: 14, weight: .medium))
                     .foregroundStyle(theme.ink)
@@ -309,9 +326,11 @@ private struct MeetingRow: View {
             meetings.selection = record.id
         } label: {
             HStack(spacing: 14) {
-                ConversationPrint(envelope: envelope, duration: record.duration, tint: theme.secondaryInk)
-                    .frame(width: 76, height: 20)
-                    .accessibilityHidden(true)
+                ConversationPrint(
+                    envelope: envelope, duration: record.duration, tint: theme.secondaryInk
+                )
+                .frame(width: 76, height: 20)
+                .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(verbatim: record.title)
@@ -333,8 +352,11 @@ private struct MeetingRow: View {
                 HStack(spacing: -5) {
                     ForEach(record.speakerIDs.prefix(4), id: \.self) { id in
                         MeetingSpeakerBadge(
-                            speaker: id, name: record.name(for: id, prefix: tr(french, "Intervenant", "Speaker")))
-                            .overlay(Circle().stroke(hovering ? theme.well : theme.surface, lineWidth: 2))
+                            speaker: id,
+                            name: record.name(for: id, prefix: tr(french, "Intervenant", "Speaker"))
+                        )
+                        .overlay(
+                            Circle().stroke(hovering ? theme.well : theme.surface, lineWidth: 2))
                     }
                 }
                 Text(verbatim: state)
@@ -349,14 +371,17 @@ private struct MeetingRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .task(id: record.turns.count) { envelope = ConversationPrint.envelope(of: record, slices: 60) }
+        .task(id: record.turns.count) {
+            envelope = ConversationPrint.envelope(of: record, slices: 60)
+        }
         .accessibilityLabel(Text(verbatim: "\(record.title), \(detail), \(state)"))
     }
 
     private var detail: String {
         let locale = Locale(identifier: tr(french, "fr", "en"))
         let minutes = max(1, Int((record.duration / 60).rounded()))
-        return "\(record.occurredAt.formatted(.dateTime.hour().minute().locale(locale))) · \(minutes) min"
+        return
+            "\(record.occurredAt.formatted(.dateTime.hour().minute().locale(locale))) · \(minutes) min"
     }
 
     private var state: String {
@@ -365,7 +390,10 @@ private struct MeetingRow: View {
         }
         guard let report = meetings.reports[record.id] else { return "" }
         if report.proposal != nil { return tr(french, "Nouvelle version", "New version") }
-        if report.content.blocks.allSatisfy({ $0.text.isEmpty }) { return tr(french, "Sans compte rendu", "No report") }
-        return report.reviewedAt == nil ? (tr(french, "À relire", "To review")) : (tr(french, "Relue", "Reviewed"))
+        if report.content.blocks.allSatisfy({ $0.text.isEmpty }) {
+            return tr(french, "Sans compte rendu", "No report")
+        }
+        return report.reviewedAt == nil
+            ? (tr(french, "À relire", "To review")) : (tr(french, "Relue", "Reviewed"))
     }
 }

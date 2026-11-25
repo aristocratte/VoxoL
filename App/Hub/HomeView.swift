@@ -38,7 +38,8 @@ struct HomeHistoryDay: Identifiable {
             } else if calendar.isDateInYesterday(day) {
                 title = String("Yesterday", in: locale)
             } else {
-                title = day.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
+                title =
+                    day.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(locale))
                     .sentenceCased
             }
             return HomeHistoryDay(
@@ -165,7 +166,7 @@ struct HomeView: View {
                                 : "Press \(shortcut.label) and speak"
                         )
                         .font(VoxoLTypography.font(size: 15, weight: .semibold))
-                            .foregroundStyle(theme.ink)
+                        .foregroundStyle(theme.ink)
                         Text("Your dictations will appear here.")
                             .font(VoxoLTypography.font(size: 13))
                             .foregroundStyle(theme.secondaryInk)

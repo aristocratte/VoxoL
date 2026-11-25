@@ -137,7 +137,8 @@ final class DecoderWorker: @unchecked Sendable {
         let useSharedDecoderStateBacking =
             ProcessInfo.processInfo.environment["VOXOL_ASR_SHARED_DECODER_STATE_BACKING"] == "1"
         self.useSharedDecoderStateBacking = useSharedDecoderStateBacking
-        let sharedDecoderState = useSharedDecoderStateBacking
+        let sharedDecoderState =
+            useSharedDecoderStateBacking
             ? try Self.makeSharedDecoderState(
                 decoderHiddenBacking: decoderHiddenBacking,
                 joint: joint,
@@ -199,9 +200,9 @@ final class DecoderWorker: @unchecked Sendable {
             from: decoderInputs, options: options
         )
         if useOutputBackings, useDirectOutputBackings, !traceOutputBackings,
-           let dh = decoderHiddenBacking,
-           let nh = nextHiddenBacking,
-           let nc = nextCellBacking
+            let dh = decoderHiddenBacking,
+            let nh = nextHiddenBacking,
+            let nc = nextCellBacking
         {
             return (dh, nh, nc)
         }
@@ -261,15 +262,16 @@ final class DecoderWorker: @unchecked Sendable {
             return try runJointTraced(useOutputBackings: useOutputBackings)
         }
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
-        let inputs = useOutputBackings && usesSharedDecoderStateBacking
+        let inputs =
+            useOutputBackings && usesSharedDecoderStateBacking
             ? sharedJointInputs!
             : jointInputs
         let out = try joint.prediction(
             from: inputs, options: options
         )
         if useOutputBackings, useDirectOutputBackings, !traceOutputBackings,
-           let tl = tokenLogitsBacking,
-           let dl = durationLogitsBacking
+            let tl = tokenLogitsBacking,
+            let dl = durationLogitsBacking
         {
             return (tl, dl)
         }
@@ -290,7 +292,8 @@ final class DecoderWorker: @unchecked Sendable {
         let clock = ContinuousClock()
         let predictionStart = clock.now
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
-        let inputs = useOutputBackings && usesSharedDecoderStateBacking
+        let inputs =
+            useOutputBackings && usesSharedDecoderStateBacking
             ? sharedJointInputs!
             : jointInputs
         let out = try joint.prediction(
@@ -379,8 +382,8 @@ final class DecoderWorker: @unchecked Sendable {
         decoderHiddenSize: Int
     ) throws -> MLMultiArray {
         guard decoderHiddenBacking.dataType == .float32,
-              decoderHiddenBacking.count == decoderHiddenSize,
-              let description = joint.modelDescription.inputDescriptionsByName["decoder_state"]
+            decoderHiddenBacking.count == decoderHiddenSize,
+            let description = joint.modelDescription.inputDescriptionsByName["decoder_state"]
         else {
             throw ParakeetError.runtimeUnavailable
         }

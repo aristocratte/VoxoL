@@ -176,29 +176,36 @@ enum RollingPreviewBenchmark {
         private var normalized = [String]()
 
         mutating func observe(_ hypothesis: String) -> AssemblyResult {
-            let incomingWords = hypothesis.split(whereSeparator: \Character.isWhitespace).map(String.init)
+            let incomingWords = hypothesis.split(whereSeparator: \Character.isWhitespace).map(
+                String.init)
             let incomingNormalized = incomingWords.map {
                 $0.lowercased().trimmingCharacters(in: .punctuationCharacters.union(.symbols))
             }
             guard !incomingWords.isEmpty else {
-                return AssemblyResult(text: words.joined(separator: " "), matchedWords: 0,
+                return AssemblyResult(
+                    text: words.joined(separator: " "), matchedWords: 0,
                     mergeSucceeded: false)
             }
             guard !words.isEmpty else {
                 words = incomingWords
                 normalized = incomingNormalized
-                return AssemblyResult(text: words.joined(separator: " "), matchedWords: 0,
+                return AssemblyResult(
+                    text: words.joined(separator: " "), matchedWords: 0,
                     mergeSucceeded: true)
             }
 
             let match = longestContiguousMatch(
                 left: normalized, right: incomingNormalized, minimumWords: 4)
             guard let match else {
-                return AssemblyResult(text: words.joined(separator: " "), matchedWords: 0,
+                return AssemblyResult(
+                    text: words.joined(separator: " "), matchedWords: 0,
                     mergeSucceeded: false)
             }
-            words = Array(words.prefix(match.leftStart)) + Array(incomingWords.dropFirst(match.rightStart))
-            normalized = Array(normalized.prefix(match.leftStart))
+            words =
+                Array(words.prefix(match.leftStart))
+                + Array(incomingWords.dropFirst(match.rightStart))
+            normalized =
+                Array(normalized.prefix(match.leftStart))
                 + Array(incomingNormalized.dropFirst(match.rightStart))
             return AssemblyResult(
                 text: words.joined(separator: " "), matchedWords: match.length,

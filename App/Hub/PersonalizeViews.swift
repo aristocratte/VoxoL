@@ -113,7 +113,8 @@ struct DictionaryView: View {
                 .padding(.top, 20)
             } else {
                 HubSegmented(options: DictionaryFilter.allCases, selection: $filter) { option in
-                    Text(option.title) + Text(verbatim: "  \(entries.filter(option.includes).count)")
+                    Text(option.title)
+                        + Text(verbatim: "  \(entries.filter(option.includes).count)")
                 }
                 .padding(.top, 24)
                 .padding(.bottom, 8)

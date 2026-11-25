@@ -321,7 +321,8 @@ struct HubKeycap: View {
             .padding(.horizontal, 6)
             .frame(height: 20)
             .background(
-                fill ?? theme.selection, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                fill ?? theme.selection, in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+            )
             .fixedSize()
     }
 }

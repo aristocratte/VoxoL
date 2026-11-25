@@ -381,8 +381,9 @@ public actor TrainingReviewRepository {
         let faithful = decision.faithful.trimmingCharacters(in: .whitespacesAndNewlines)
         let rewrite = decision.rewrite.trimmingCharacters(in: .whitespacesAndNewlines)
         let code = decision.code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard decision.disposition == .quarantine
-            || (!verbatim.isEmpty && !faithful.isEmpty && !rewrite.isEmpty)
+        guard
+            decision.disposition == .quarantine
+                || (!verbatim.isEmpty && !faithful.isEmpty && !rewrite.isEmpty)
         else {
             throw TrainingReviewRepositoryError.emptyDecision
         }

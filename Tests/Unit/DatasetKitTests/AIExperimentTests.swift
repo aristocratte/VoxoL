@@ -23,7 +23,8 @@ final class AIExperimentTests: XCTestCase {
         let result = DatasetBuilder.buildAIExperiment([row()])
         XCTAssertEqual(result.train.count, 1)
         XCTAssertTrue(result.rejectedIDs.isEmpty)
-        XCTAssertTrue(result.train[0].messages[0].content.contains("You correct English dictation."))
+        XCTAssertTrue(
+            result.train[0].messages[0].content.contains("You correct English dictation."))
         XCTAssertTrue(result.train[0].messages[2].content.contains("VOXOLP0"))
     }
 

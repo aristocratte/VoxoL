@@ -30,7 +30,9 @@ final class MeetingPlayback {
         guard let reference else {
             if let time { position = max(0, time) }
             error =
-                tr(french, "Relie le fichier audio d’origine pour écouter ce passage.", "Link the original audio file to listen to this passage.")
+                tr(
+                    french, "Relie le fichier audio d’origine pour écouter ce passage.",
+                    "Link the original audio file to listen to this passage.")
             return
         }
         do {
@@ -46,7 +48,9 @@ final class MeetingPlayback {
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     stop()
                     error =
-                        tr(french, "Le fichier a été déplacé. Relie-le à nouveau.", "The file moved. Link it again.")
+                        tr(
+                            french, "Le fichier a été déplacé. Relie-le à nouveau.",
+                            "The file moved. Link it again.")
                     return
                 }
                 player = AVPlayer(url: url)
@@ -149,7 +153,12 @@ struct ConversationPrint: View {
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0).onChanged { value in
-                        seek?(max(0, min(duration, value.location.x / max(1, proxy.size.width) * duration)))
+                        seek?(
+                            max(
+                                0,
+                                min(
+                                    duration, value.location.x / max(1, proxy.size.width) * duration
+                                )))
                     },
                     including: seek == nil ? .none : .all
                 )
@@ -176,7 +185,8 @@ struct ConversationPrint: View {
                     let distance = abs(Double(row) - Double(rows - 1) / 2) / (Double(rows - 1) / 2)
                     let inside =
                         distance <= amplitude
-                        && Self.grain(Double(column) * 1.3, Double(row) * 0.7) < 0.9 - distance * 0.35
+                        && Self.grain(Double(column) * 1.3, Double(row) * 0.7) < 0.9 - distance
+                            * 0.35
                     let centre = CGPoint(
                         x: CGFloat(column) * cell + cell / 2, y: CGFloat(row) * cell + cell / 2)
                     if inside {
@@ -227,7 +237,8 @@ struct ConversationPrint: View {
             let last = min(slices - 1, Int(turn.end / duration * Double(slices)))
             guard first <= last else { continue }
             for slice in first...last {
-                values[slice] = max(values[slice], 0.3 + 0.55 * pace + 0.15 * grain(Double(slice), 3))
+                values[slice] = max(
+                    values[slice], 0.3 + 0.55 * pace + 0.15 * grain(Double(slice), 3))
             }
         }
         return values.map { min(1, $0) }
@@ -291,7 +302,9 @@ struct MeetingTranscriptPanel: View {
                     Button(tr(french, "Exporter en texte (.txt)", "Export as text (.txt)")) {
                         meetings.export(transcript, format: "txt", french: french)
                     }
-                    Button(tr(french, "Exporter en sous-titres (.srt)", "Export as subtitles (.srt)")) {
+                    Button(
+                        tr(french, "Exporter en sous-titres (.srt)", "Export as subtitles (.srt)")
+                    ) {
                         meetings.export(transcript, format: "srt", french: french)
                     }
                     Button(tr(french, "Exporter en données (.json)", "Export as data (.json)")) {
@@ -315,7 +328,9 @@ struct MeetingTranscriptPanel: View {
                     .font(VoxoLTypography.font(size: 13))
                     .padding(.horizontal, 10)
                     .frame(height: 28)
-                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .background(
+                        theme.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    )
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
             }
@@ -362,11 +377,17 @@ struct MeetingTranscriptPanel: View {
                 Menu {
                     ForEach(transcript.speakerIDs, id: \.self) { id in
                         Button(transcript.name(for: id, prefix: speakerPrefix)) {
-                            Task { await meetings.assign(speaker: id, turn: turn.id, document: transcript.id) }
+                            Task {
+                                await meetings.assign(
+                                    speaker: id, turn: turn.id, document: transcript.id)
+                            }
                         }
                     }
                     Button(unknown) {
-                        Task { await meetings.assign(speaker: nil, turn: turn.id, document: transcript.id) }
+                        Task {
+                            await meetings.assign(
+                                speaker: nil, turn: turn.id, document: transcript.id)
+                        }
                     }
                     Divider()
                     Button(tr(french, "Renommer les voix…", "Rename voices…"), action: renameVoices)
