@@ -29,7 +29,7 @@ Usage quotidien
     ├── Workspace
     │   ├── Home
     │   ├── Dictation
-    │   └── Meetings — Coming soon
+    │   └── Meetings
     ├── Personalize
     │   ├── Context
     │   ├── Dictionary
@@ -104,14 +104,14 @@ aperçu avant toute modification destructive.
 ### History
 
 Archive locale recherchable, politique de rétention et récupération de la révision précédente.
-L'activation de l'historique est explicite ; aucun fichier audio n'est créé par le parcours de
-capture actuel.
+L'historique est activé par défaut et le mode privé le suspend. L'audio n'est conservé que si
+« Personal benchmark capture » est activé.
 
 ### Meetings
 
-Page accessible `Coming soon`, sans contrôle mort. Elle présente le futur flux : sélection d'une
-source, capture locale, marqueurs, puis Summary, Decisions, Actions et Transcript. La première
-version ne promet aucune attribution nominative des intervenants.
+Enregistrement du micro ou d'un appel dans un fichier choisi par l'utilisateur, ou import d'un
+fichier audio ; transcription locale avec séparation des intervenants (modèle téléchargé à la
+demande), marqueurs, puis rapport. Les intervenants sont distingués, pas nommés.
 
 ### Privacy and performance
 
@@ -134,6 +134,6 @@ l'a pas modifié entre-temps.
 
 L'application valide la navigation, la localisation, l'identité, les demandes de permissions, le
 contrat d'installation et l'historique local. Elle capture maintenant le micro avec `⌥ Espace`,
-détecte la parole sans terminer elle-même le push-to-talk et insère un texte de test avec
-`⌥ ⇧ Espace`. Elle n'exécute pas encore les modèles : l'installateur reste bloqué par conception
-tant que les artefacts CoreML et MLX vérifiés ne sont pas publiés.
+détecte la parole sans terminer elle-même le push-to-talk, transcrit localement et insère le texte
+dans l'application active. Les deux modèles s'installent depuis Hugging Face
+après une action explicite, avec vérification de taille et de SHA-256.

@@ -35,17 +35,16 @@ LANGUAGE_TITLES = {
 }
 DOMAINS = {
     "commonvoice": "Consumer microphones",
-    "voxpopuli": "Spontaneous speech",
+    "voxpopuli": "Parliamentary speeches",
     "librispeech": "Audiobook",
     "mls": "Audiobook",
     "fleurs": "Studio-read prose",
 }
 DOMAIN_ORDER = [
-    "Consumer microphones", "Spontaneous speech", "Audiobook",
+    "Consumer microphones", "Parliamentary speeches", "Audiobook",
     "Studio-read prose",
 ]
 COMPETITOR = "Wispr Flow"
-COMPETITOR_LATENCY_MS = 3261
 
 
 def wer(report: Path) -> float | None:
@@ -140,9 +139,12 @@ def main() -> int:
         f"{summary['ties']} ties** across 31 benchmarks |",
     ]
     if latency:
+        # Recognition alone. The earlier line divided a hardcoded competitor figure by this
+        # one and called the result a speed-up; a dictation also waits for cleanup and
+        # insertion, which this number does not contain.
         lines.append(
-            f"| Median inference | **{latency:.0f} ms** on device — "
-            f"{COMPETITOR_LATENCY_MS / latency:.0f}× faster than {COMPETITOR} |"
+            f"| Median recognition time | **{latency:.0f} ms** on device — "
+            "speech recognition alone, not key press to text |"
         )
     lines += [
         "| Audio leaving the machine | **none** |",
@@ -171,18 +173,19 @@ def main() -> int:
 
     real = [
         r
-        for domain in ("Consumer microphones", "Spontaneous speech")
+        for domain in ("Consumer microphones", "Parliamentary speeches")
         for r in domains.get(domain, [])
     ]
     real_wins = sum(1 for r in real if r["verdict"] == "VoxoL")
     real_losses = sum(1 for r in real if r["verdict"] == "Wispr")
     lines += [
         "",
-        f"On speech recorded the way people actually speak — ordinary "
-        f"microphones, unscripted talking — VoxoL wins **{real_wins} of "
+        f"On recordings made outside a studio — volunteers' own microphones "
+        f"and parliamentary speeches — VoxoL wins **{real_wins} of "
         f"{len(real)} cells and loses {real_losses}**. The losses are "
-        "concentrated in prepared, read material: an audiobook narrator or "
-        "prose read aloud in a treated room.",
+        "concentrated in audiobooks and prose read aloud in a treated room. "
+        "All of these corpora are read or prepared speech: none of them is "
+        "dictation.",
         "",
         "## Every cell, wins and losses alike",
         "",

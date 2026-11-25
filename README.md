@@ -12,8 +12,9 @@ MLS, LibriSpeech, VoxPopuli), 8 langues, 9 258 clips :
 | | |
 | --- | --- |
 | Bilan | **14 victoires, 6 défaites, 11 égalités** |
-| Sur la parole réelle (micros grand public, parole spontanée) | **13 victoires sur 15, 0 défaite** |
-| Latence médiane | **115 ms** en local, 28× plus rapide |
+| Hors studio (micros grand public, discours parlementaires) | **13 victoires sur 15, 0 défaite** |
+| Reconnaissance seule, médiane | **115 ms** en local |
+| De la touche au texte, dictées réelles | **1,6 s** en médiane, 6,1 s au 95ᵉ centile (375 dictées du propriétaire, août à novembre 2026) |
 | Audio quittant la machine | **aucun** |
 
 Une victoire n'est comptée que si l'intervalle de confiance à 95 % exclut zéro,
@@ -42,9 +43,9 @@ techniques réels sans simuler le moteur :
 - une transcription Parakeet TDT entièrement locale via Core ML, préchargée hors du thread UI et
   accélérée par les unités de calcul Apple disponibles ;
 - une insertion macOS via Accessibility, avec fallback presse-papiers restauré uniquement si
-  l'utilisateur ne l'a pas modifié, testable avec `⌥ ⇧ Espace` ;
+  l'utilisateur ne l'a pas modifié, testable avec `⌥ ⇧ Espace` dans un build de développement ;
 - une identité VoxoL monochrome déclinée dans l'app, la barre des menus et l'icône macOS ;
-- un aperçu « Coming soon » du futur mode réunion, encore inaccessible ;
+- un mode réunion : enregistrement ou import, transcription, locuteurs et compte rendu modifiable ;
 - le contrat local des deux modèles autorisés, sans poids ;
 - les contrôles CI de politique du dépôt, formatage, build et tests ; la localisation, la
   signature et le lancement se vérifient localement avec `./Scripts/verify.sh`.

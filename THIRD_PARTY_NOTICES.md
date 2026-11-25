@@ -5,15 +5,30 @@ following weights only after an explicit user action. Inference remains local af
 
 - NVIDIA Parakeet TDT 0.6B v3 — `CC BY 4.0` —
   <https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3>
-  - Core ML conversion provider: `mweinbach1/parakeet-tdt-0.6b-v3-coreml` — `CC BY 4.0` —
-    <https://huggingface.co/mweinbach1/parakeet-tdt-0.6b-v3-coreml>
+  - Core ML conversion provider: `arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml` — license of the conversion
+    repository to be confirmed on its page —
+    <https://huggingface.co/arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml>
 - Qwen3.5-0.8B — `Apache-2.0` — <https://huggingface.co/Qwen/Qwen3.5-0.8B>
-  - Experimental MLX 4-bit conversion provider: `mlx-community/Qwen3.5-0.8B-4bit` —
-    `Apache-2.0` — <https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit>
+  - MLX 4-bit conversion provider: `mlx-community/Qwen3.5-0.8B-4bit` — `Apache-2.0` as declared in
+    `Models/manifests/runtime-models.json` — <https://huggingface.co/mlx-community/Qwen3.5-0.8B-4bit>
+- Meeting speaker model, downloaded when the user installs it from the Meetings screen:
+  `FluidInference/nemotron-3-diarization-coreml` — license to be confirmed on the repository
+  page — <https://huggingface.co/FluidInference/nemotron-3-diarization-coreml>
+
+Swift dependencies linked into the application (licenses read from the package checkouts; exact
+versions are pinned in `VoxoL.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`):
+
+- FluidAudio, revision `5c51c5c9` — `Apache-2.0` — <https://github.com/FluidInference/FluidAudio>
 - MLX Swift LM `2.31.3` — `MIT` — <https://github.com/ml-explore/mlx-swift-lm>
-- MLX Swift `0.31.6` (resolved transitively) — `MIT` —
-  <https://github.com/ml-explore/mlx-swift>
-- Core ML Tools, used only from `Tools/` when introduced —
+- MLX Swift `0.31.6` — `MIT` — <https://github.com/ml-explore/mlx-swift>
+- Resolved transitively:
+  - EventSource — `MIT` — <https://github.com/mattt/EventSource>
+  - yyjson — `MIT` — <https://github.com/ibireme/yyjson>
+  - swift-argument-parser, swift-asn1, swift-collections, swift-crypto, swift-numerics —
+    `Apache-2.0` — under <https://github.com/apple>
+  - swift-huggingface, swift-jinja, swift-transformers — `Apache-2.0` — under
+    <https://github.com/huggingface>
+- Core ML Tools, imported only by the development scripts in `Tools/training/` —
   <https://github.com/apple/coremltools>
 
 VoxoL's `ParakeetCore` source is adapted from `parakeet-coreml-swift`, copyright 2026 Max

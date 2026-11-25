@@ -16,18 +16,14 @@ deux révisions sont des commits immuables et chaque URL de téléchargement doi
 au dépôt fournisseur déclaré :
 
 - Parakeet utilise la conversion Core ML `arhesstide/voxol-parakeet-tdt-0.6b-v3-coreml`, épinglée
-  au commit `8ff3f781af07b2a186317babf73d13c171295c91`. Depuis le 2026-08-05, VoxoL publie sa
-  propre conversion au lieu de consommer celle d'un tiers : l'encodeur livré porte le fine-tune
-  français/anglais, et le paquet embarque `language-penalty.json`, que la conversion amont n'a
-  aucune raison de contenir ;
-- Qwen utilise la conversion affine 4-bit `bobkitchen/Qwen3.5-4B-Text-4bit`, épinglée au commit
-  `bbad837ea6c860d8258fdee0cf31ed48165d64fd`. Son index ne contient que des poids
-  `language_model.*` et aucun poids d'encodeur visuel.
+  au commit `8ff3f781af07b2a186317babf73d13c171295c91`, pour le modèle officiel
+  `nvidia/parakeet-tdt-0.6b-v3` ;
+- Qwen utilise la conversion 4-bit `mlx-community/Qwen3.5-0.8B-4bit`, épinglée au commit
+  `da28692b5f139cb0ec58a356b437486b7dac7462`, pour le modèle officiel `Qwen/Qwen3.5-0.8B`.
 
 Le téléchargement ne démarre qu'après une action explicite. La taille exacte et le SHA-256 de
 chaque fichier sont vérifiés dans un répertoire temporaire avant activation atomique. Parakeet est
-ensuite compilé et chargé par Core ML. Qwen passe une validation locale de format, de quantification
-et d'absence de poids vision ; le vrai chargement MLX reste une gate de l'intégration runtime.
+ensuite compilé et chargé par Core ML et Qwen par MLX.
 
 Les octets reçus sont écrits dans un fichier `.partial` rattaché aux deux révisions épinglées. Une
 pause conserve ce fichier et une reprise utilise une requête HTTP `Range` ; une fermeture inattendue
@@ -40,8 +36,9 @@ devront avoir leur propre signature détachée et une politique de rotation de c
 
 ## Conséquences
 
-Hugging Face héberge les fichiers mais n'exécute aucune inférence : après installation, la dictée
-reste locale et n'effectue aucun appel réseau. Les fournisseurs communautaires et leurs licences
-sont visibles dans l'interface et dans `THIRD_PARTY_NOTICES.md`. Une future conversion publiée par
-VoxoL pourra les remplacer seulement après une nouvelle ADR, des tests de parité et de performance,
-et la publication de nouveaux checksums.
+Hugging Face héberge les fichiers mais n'exécute aucune inférence : la dictée elle-même n'effectue
+aucun appel réseau. L'application en fait trois autres, documentés dans `PRIVACY.md` : la
+vérification des mises à jour, leur téléchargement accepté par l'utilisateur et le modèle de
+diarisation des réunions. Les fournisseurs des conversions et leurs licences figurent dans
+`THIRD_PARTY_NOTICES.md`. Remplacer une conversion exige une nouvelle ADR, des tests de parité et de
+performance, et la publication de nouveaux checksums.

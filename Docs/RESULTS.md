@@ -7,7 +7,7 @@ Fully local dictation for macOS. Every number below is generated from the measur
 | | |
 | --- | --- |
 | Head to head | **14 wins, 6 losses, 11 ties** across 31 benchmarks |
-| Median inference | **115 ms** on device — 28× faster than Wispr Flow |
+| Median recognition time | **115 ms** on device — speech recognition alone, not key press to text |
 | Audio leaving the machine | **none** |
 
 A cell counts as a win only where a 95% bootstrap interval on the difference excludes zero, resampling **speakers** rather than clips and corrected for testing 31 cells at once. Anything else is a tie, including gaps that look decisive.
@@ -17,11 +17,11 @@ A cell counts as a win only where a 95% bootstrap interval on the difference exc
 | Kind of speech | VoxoL | Wispr Flow | Ties |
 | --- | ---: | ---: | ---: |
 | Consumer microphones | **6** | 0 | 2 |
-| Spontaneous speech | **7** | 0 | 0 |
+| Parliamentary speeches | **7** | 0 | 0 |
 | Audiobook | 1 | 1 | 6 |
 | Studio-read prose | 0 | 5 | 3 |
 
-On speech recorded the way people actually speak — ordinary microphones, unscripted talking — VoxoL wins **13 of 15 cells and loses 0**. The losses are concentrated in prepared, read material: an audiobook narrator or prose read aloud in a treated room.
+On recordings made outside a studio — volunteers' own microphones and parliamentary speeches — VoxoL wins **13 of 15 cells and loses 0**. The losses are concentrated in audiobooks and prose read aloud in a treated room. All of these corpora are read or prepared speech: none of them is dictation.
 
 ## Every cell, wins and losses alike
 

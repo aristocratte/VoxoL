@@ -117,20 +117,28 @@ jobs:
           VOXOL_NOTARY_PROFILE=voxol-notary ./Scripts/notarize-release.sh \
             "$RUNNER_TEMP/DerivedData/Build/Products/Release/VoxoL.app"
 
-      # Zip rather than DMG: `ditto -c -k --keepParent` is what notarytool
-      # accepts, and it is also what Sparkle expects to download.
+      # A disk image, because that is the asset the in-app updater looks for. The zip this
+      # step used to produce could never have been installed by the app it shipped.
       - name: Package
         id: package
+        env:
+          SIGNED: ${{ steps.mode.outputs.signed }}
         run: |
           set -euo pipefail
           app="$RUNNER_TEMP/DerivedData/Build/Products/Release/VoxoL.app"
-          version="${GITHUB_REF_NAME#v}"
-          [ "$version" = "$GITHUB_REF_NAME" ] && version="$(date +%Y.%m.%d)"
-          archive="$RUNNER_TEMP/VoxoL-$version.zip"
-          ditto -c -k --keepParent "$app" "$archive"
-          shasum -a 256 "$archive" | tee "$archive.sha256"
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          output="$RUNNER_TEMP/release"
+          if [ "$SIGNED" = "true" ]; then
+            # A tag that disagrees with the bundle would publish one version under another's name.
+            VOXOL_EXPECTED_VERSION="${GITHUB_REF_NAME#v}" VOXOL_NOTARY_PROFILE=voxol-notary \
+              ./Scripts/package-release.sh "$app" "$output"
+          else
+            VOXOL_ALLOW_DEVELOPMENT_SIGNING=1 ./Scripts/package-release.sh "$app" "$output" || {
+              # An unsigned dry run has nothing to package; the build itself was the check.
+              mkdir -p "$output"
+              echo "Unsigned dry run: no disk image produced."
+            }
+          fi
+          echo "output=$output" >> "$GITHUB_OUTPUT"
 
       - name: Verify the packaged app
         if: steps.mode.outputs.signed == 'true'
@@ -141,14 +149,14 @@ jobs:
           # machine will run when they open the download.
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
+          xcrun stapler validate "${{ steps.package.outputs.output }}"/VoxoL-*.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: VoxoL-${{ steps.package.outputs.version }}
-          path: |
-            ${{ steps.package.outputs.archive }}
-            ${{ steps.package.outputs.archive }}.sha256
+          name: VoxoL-${{ github.ref_name }}
+          path: ${{ steps.package.outputs.output }}
+          if-no-files-found: ignore
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -156,7 +164,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "${{ steps.package.outputs.archive }}" \
-            "${{ steps.package.outputs.archive }}.sha256" \
+            "${{ steps.package.outputs.output }}"/VoxoL-*.dmg \
+            "${{ steps.package.outputs.output }}/SHA256SUMS" \
             --title "VoxoL $GITHUB_REF_NAME" \
             --generate-notes
