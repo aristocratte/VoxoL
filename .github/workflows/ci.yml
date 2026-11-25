@@ -14,10 +14,18 @@ on:
 
 jobs:
   tests:
-    runs-on: macos-15
+    # The same image as release.yml. macos-15 ships an older swift-format that ignores the
+    # rule-scoped `swift-format-ignore-file:` comments and an older Swift than the 6.2 tools
+    # version, so main had been red since August on findings no local run reported.
+    runs-on: macos-26
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+
+      - name: Report toolchain
+        run: |
+          swift --version
+          xcodebuild -version
 
       - name: Cache SwiftPM dependencies
         uses: actions/cache@v4
