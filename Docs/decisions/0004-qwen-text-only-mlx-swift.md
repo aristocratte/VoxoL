@@ -1,5 +1,7 @@
 # ADR-0004 — Qwen text-only via MLX Swift
 
+> Statut : remplacée par [0010](0010-qwen-0.8b-experimental-polisher.md). Le runtime livré charge `Qwen/Qwen3.5-0.8B` (MLX 4-bit, `Models/manifests/runtime-models.json`), pas le 4B décrit ci-dessous.
+
 - Statut : acceptée
 - Date : 2026-07-20
 

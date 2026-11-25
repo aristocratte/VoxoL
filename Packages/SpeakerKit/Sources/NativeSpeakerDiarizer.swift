@@ -91,6 +91,7 @@ public actor NativeSpeakerDiarizer {
 
 /// Bounded native file decoding shared by transcription and diarization.
 public enum SpeakerAudio {
+    /// The longest recording either network accepts.
     public static let maximumDurationSeconds: Double = 2 * 60 * 60
 
     /// Bounded, continuous sample-rate conversion. Both networks receive the same samples.

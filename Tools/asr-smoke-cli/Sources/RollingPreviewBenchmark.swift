@@ -228,12 +228,17 @@ enum RollingPreviewBenchmark {
                         length += 1
                     }
                     guard length >= minimumWords else { continue }
-                    if best == nil
-                        || length > best!.length
-                        || (length == best!.length && leftStart > best!.leftStart)
-                        || (length == best!.length && leftStart == best!.leftStart
-                            && rightStart < best!.rightStart)
-                    {
+                    let isBetter: Bool
+                    if let current = best {
+                        isBetter =
+                            length > current.length
+                            || (length == current.length && leftStart > current.leftStart)
+                            || (length == current.length && leftStart == current.leftStart
+                                && rightStart < current.rightStart)
+                    } else {
+                        isBetter = true
+                    }
+                    if isBetter {
                         best = (leftStart, rightStart, length)
                     }
                 }

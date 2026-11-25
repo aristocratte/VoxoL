@@ -4,10 +4,14 @@ import Foundation
 public struct MeetingReportNarrative: Equatable, Sendable {
     /// One immutable transcript fragment considered for the bounded global summary.
     public struct Source: Equatable, Sendable {
+        /// The transcript turn this passage comes from.
         public let turnID: Int
+        /// The passage, verbatim.
         public let text: String
+        /// Whether the passage must be kept when the set is trimmed to its bound.
         public let prioritized: Bool
 
+        /// Creates a source passage.
         public init(turnID: Int, text: String, prioritized: Bool = false) {
             self.turnID = turnID
             self.text = text
@@ -15,19 +19,26 @@ public struct MeetingReportNarrative: Equatable, Sendable {
         }
     }
 
+    /// One drafted paragraph and the turns it was written from.
     public struct Paragraph: Equatable, Sendable {
+        /// The drafted prose.
         public let text: String
+        /// The transcript turns the paragraph cites.
         public let sourceTurnIDs: [Int]
 
+        /// Creates a paragraph.
         public init(text: String, sourceTurnIDs: [Int]) {
             self.text = text
             self.sourceTurnIDs = sourceTurnIDs
         }
     }
 
+    /// The drafted paragraphs, in order.
     public let paragraphs: [Paragraph]
+    /// Whether the narrative fell back to quoting the transcript instead of drafting.
     public let usesVerbatimFallback: Bool
 
+    /// Creates a narrative.
     public init(paragraphs: [Paragraph], usesVerbatimFallback: Bool = false) {
         self.paragraphs = paragraphs
         self.usesVerbatimFallback = usesVerbatimFallback

@@ -9,7 +9,9 @@ public enum MeetingMedia {
     /// A locally readable audio source kept alive across ASR and diarization.
     /// Temporary extracted audio is deleted explicitly by ``cleanup()``.
     public struct PreparedAudio: Sendable {
+        /// The file to read.
         public let url: URL
+        /// Its duration.
         public let durationSeconds: Double
         private let temporary: Bool
 
@@ -19,6 +21,7 @@ public enum MeetingMedia {
             self.temporary = temporary
         }
 
+        /// Deletes the file when it was extracted for this session.
         public func cleanup() {
             guard temporary else { return }
             try? FileManager.default.removeItem(at: url)

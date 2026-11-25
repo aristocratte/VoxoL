@@ -264,7 +264,7 @@ final class DecoderWorker: @unchecked Sendable {
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
         let inputs =
             useOutputBackings && usesSharedDecoderStateBacking
-            ? sharedJointInputs!
+            ? (sharedJointInputs ?? jointInputs)
             : jointInputs
         let out = try joint.prediction(
             from: inputs, options: options
@@ -294,7 +294,7 @@ final class DecoderWorker: @unchecked Sendable {
         let options = useOutputBackings ? jointPredictionOptions : predictionOptions
         let inputs =
             useOutputBackings && usesSharedDecoderStateBacking
-            ? sharedJointInputs!
+            ? (sharedJointInputs ?? jointInputs)
             : jointInputs
         let out = try joint.prediction(
             from: inputs, options: options

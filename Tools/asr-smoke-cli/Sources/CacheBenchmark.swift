@@ -35,7 +35,7 @@ enum CacheBenchmark {
         let decoderWorkersEnvironmentKey = "VOXOL_ASR_CACHE_BENCHMARK_DECODER_WORKERS"
         let decoderWorkers = ProcessInfo.processInfo.environment[decoderWorkersEnvironmentKey]
             .flatMap(Int.init)
-        guard decoderWorkers == nil || (1...8).contains(decoderWorkers!) else {
+        guard decoderWorkers.map({ (1...8).contains($0) }) ?? true else {
             throw Failure.usage
         }
         let computeUnitsEnvironmentKey = "VOXOL_ASR_CACHE_BENCHMARK_COMPUTE_UNITS"
