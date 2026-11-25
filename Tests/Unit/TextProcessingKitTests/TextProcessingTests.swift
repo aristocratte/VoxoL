@@ -387,7 +387,8 @@ final class TextProcessingTests: XCTestCase {
         let filler = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: "euh envoie le rapport demain matin à VoxoL",
-                preferredLanguage: .french
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(cleanupMode: .rewrite)
             )
         )
         let list = DeterministicTextProcessor.prepare(
@@ -464,14 +465,16 @@ final class TextProcessingTests: XCTestCase {
         let grammaticalSentence = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript: "Les rapport sont prêt",
-                preferredLanguage: .french
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(cleanupMode: .rewrite)
             )
         )
         let naturalEnumeration = DeterministicTextProcessor.prepare(
             TextProcessingRequest(
                 rawTranscript:
                     "Les priorités sont envoyer le rapport appeler Maya et revoir les chiffres",
-                preferredLanguage: .french
+                preferredLanguage: .french,
+                preferences: TextProcessingPreferences(cleanupMode: .rewrite)
             )
         )
 

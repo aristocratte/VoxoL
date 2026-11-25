@@ -107,6 +107,21 @@ public enum UpdateCheck {
             .map { Int($0) ?? 0 } ?? []
     }
 
+    /// Whether a downloaded bundle may replace the running one.
+    ///
+    /// The tag is only what the feed claims. The bundle on the disk image is what would actually
+    /// run, so it has to be the release that was announced and strictly newer than this build:
+    /// otherwise an older build attached to a newer tag installs as an "update".
+    public static func canInstall(
+        bundleVersion: String,
+        over current: String,
+        announced: String
+    ) -> Bool {
+        isNewer(bundleVersion, than: current)
+            && !isNewer(bundleVersion, than: announced)
+            && !isNewer(announced, than: bundleVersion)
+    }
+
     /// The release worth offering, or nil when the running build is current.
     public static func availableUpdate(
         current: String,

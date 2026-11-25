@@ -223,9 +223,11 @@ public final class AudioCaptureSession {
         self.retainsNativeAudio = retainsNativeAudio
     }
 
-    /// Whether the underlying audio engine is currently running.
+    /// Whether a capture is open. It stays true until `stop()` collects it, even when the system
+    /// halts the engine underneath (a microphone unplugged mid-take): only `stop()` releases the
+    /// session, so reporting a halted engine as idle left every later `start()` refused.
     public var isRecording: Bool {
-        engine?.isRunning == true
+        engine != nil
     }
 
     /// Latest content-free capture counters, safe to poll from the UI.

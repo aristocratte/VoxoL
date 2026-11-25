@@ -188,6 +188,7 @@ private struct DictionaryRow: View {
     let edit: () -> Void
 
     @State private var hovering = false
+    @State private var confirmingDeletion = false
 
     var body: some View {
         HStack(spacing: 16) {
@@ -217,9 +218,23 @@ private struct DictionaryRow: View {
         .hubRowHover(hovering)
         .contentShape(Rectangle())
         .onTapGesture(perform: edit)
+        .focusable()
+        .onKeyPress(.return) {
+            edit()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            edit()
+            return .handled
+        }
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Edit", action: edit)
+            Button("Delete", role: .destructive) { confirmingDeletion = true }
+        }
+        .confirmationDialog(
+            "Delete this word?", isPresented: $confirmingDeletion, titleVisibility: .visible
+        ) {
             Button("Delete", role: .destructive) {
                 Task { await personalization.removeDictionaryEntry(id: entry.id) }
             }
@@ -322,6 +337,7 @@ private struct SnippetRow: View {
     let edit: () -> Void
 
     @State private var hovering = false
+    @State private var confirmingDeletion = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 20) {
@@ -365,9 +381,23 @@ private struct SnippetRow: View {
         .hubRowHover(hovering)
         .contentShape(Rectangle())
         .onTapGesture(perform: edit)
+        .focusable()
+        .onKeyPress(.return) {
+            edit()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            edit()
+            return .handled
+        }
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Edit", action: edit)
+            Button("Delete", role: .destructive) { confirmingDeletion = true }
+        }
+        .confirmationDialog(
+            "Delete this shortcut?", isPresented: $confirmingDeletion, titleVisibility: .visible
+        ) {
             Button("Delete", role: .destructive) {
                 Task { await personalization.removeSnippet(id: snippet.id) }
             }

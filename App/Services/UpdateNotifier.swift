@@ -41,7 +41,11 @@ final class UpdateNotifier {
         guard pollingTask == nil else { return }
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.check(announce: true)
+                // Read each cycle, so turning the setting off stops the next request without a
+                // relaunch. A check asked for from Settings is not affected.
+                if UserDefaults.standard.bool(forKey: "voxol.automaticUpdateCheck") {
+                    await self?.check(announce: true)
+                }
                 guard let interval = self?.interval else { return }
                 try? await Task.sleep(for: interval)
             }
@@ -90,13 +94,17 @@ final class UpdateNotifier {
 
     private func present(_ update: UpdateCheck.Release) {
         UserDefaults.standard.set(update.version, forKey: lastNotifiedKey)
+        let french = UpdateInstaller.french
         let alert = NSAlert()
-        alert.messageText = "VoxoL \(update.version) est disponible"
-        alert.informativeText =
-            "La mise à jour se télécharge et s'installe toute seule, "
-            + "puis VoxoL redémarre."
-        alert.addButton(withTitle: "Installer maintenant")
-        alert.addButton(withTitle: "Plus tard")
+        alert.messageText = tr(
+            french, "VoxoL \(update.version) est disponible",
+            "VoxoL \(update.version) is available")
+        alert.informativeText = tr(
+            french,
+            "La mise à jour se télécharge et s’installe toute seule, puis VoxoL redémarre.",
+            "The update downloads and installs itself, then VoxoL restarts.")
+        alert.addButton(withTitle: tr(french, "Installer maintenant", "Install now"))
+        alert.addButton(withTitle: tr(french, "Plus tard", "Later"))
         if alert.runModal() == .alertFirstButtonReturn {
             Task { await UpdateInstaller.shared.install(update) }
         }

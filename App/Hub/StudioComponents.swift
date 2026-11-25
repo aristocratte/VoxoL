@@ -804,6 +804,7 @@ struct EditorialDropdown: View {
         .buttonStyle(.plain)
         .fixedSize()
         .onHover { hovering = $0 }
+        .accessibilityValue(options.first(where: { $0.id == selectedID })?.title ?? Text(""))
         .anchorPreference(key: EditorialDropdownPreferenceKey.self, value: .bounds) { anchor in
             isOpen
                 ? [
@@ -829,6 +830,16 @@ private struct EditorialDropdownPanel: View {
     let request: EditorialDropdownRequest
     @Environment(VoxoLTheme.self) private var theme
     @State private var hoveredID: String?
+    @FocusState private var focused: Bool
+
+    /// Arrow keys move through the options, Return picks, Escape closes: a menu drawn by hand
+    /// has to do what the system one does from the keyboard.
+    private func move(_ step: Int) {
+        let ids = request.options.map(\.id)
+        guard !ids.isEmpty else { return }
+        let current = ids.firstIndex(of: hoveredID ?? request.selectedID) ?? 0
+        hoveredID = ids[(current + step + ids.count) % ids.count]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -866,6 +877,29 @@ private struct EditorialDropdownPanel: View {
         .background(theme.raisedSurface)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onAppear {
+            hoveredID = request.selectedID
+            focused = true
+        }
+        .onKeyPress(.downArrow) {
+            move(1)
+            return .handled
+        }
+        .onKeyPress(.upArrow) {
+            move(-1)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            request.select(hoveredID ?? request.selectedID)
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            request.dismiss()
+            return .handled
+        }
     }
 }
 

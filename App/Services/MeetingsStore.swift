@@ -102,6 +102,7 @@ final class MeetingsStore {
     }
     private(set) var phase: Phase = .idle
     private(set) var speakerProgress: Double = 0
+    private(set) var modelDownloadProgress: Double = 0
     private(set) var reportProgress: Double = 0
     private(set) var modelReady = false
     private(set) var records: [SpeakerTranscript] = []
@@ -423,11 +424,14 @@ final class MeetingsStore {
         guard !busy else { return }
         phase = .downloading
         failure = nil
+        modelDownloadProgress = 0
         let directory = modelDirectory
         job = Task {
             defer { phase = .idle; job = nil }
             let download = Task.detached {
-                try await SpeakerModelAssets.install(directory: directory)
+                try await SpeakerModelAssets.install(directory: directory) { fraction in
+                    Task { @MainActor [weak self] in self?.modelDownloadProgress = fraction }
+                }
             }
             do {
                 try await withTaskCancellationHandler {
@@ -438,7 +442,7 @@ final class MeetingsStore {
                 try Task.checkCancellation()
                 modelReady = true
             } catch {
-                if !Task.isCancelled { failure = error.localizedDescription }
+                if !Task.isCancelled { failure = meetingFailureMessage(error) }
             }
         }
     }
@@ -568,7 +572,7 @@ final class MeetingsStore {
                         prestartedRuntime: prestartedReportRuntime)
                 }
             } catch {
-                if !Task.isCancelled { failure = error.localizedDescription }
+                if !Task.isCancelled { failure = meetingFailureMessage(error) }
             }
         }
     }
@@ -612,7 +616,7 @@ final class MeetingsStore {
         let remaining = savedRecords.filter { $0.id != id }
         if remaining.count != savedRecords.count {
             do { try await archive.save(remaining) } catch {
-                failure = error.localizedDescription; return
+                failure = meetingFailureMessage(error); return
             }
         }
         savedRecords = remaining
@@ -624,7 +628,7 @@ final class MeetingsStore {
                 try await reportArchive.save(
                     reports.values.filter { savedIDs.contains($0.transcriptID) }
                         .sorted { $0.createdAt < $1.createdAt })
-            } catch { failure = error.localizedDescription }
+            } catch { failure = meetingFailureMessage(error) }
         }
         generationCache = generationCache.filter { !$0.key.hasPrefix(id.uuidString) }
         topicCache = topicCache.filter { !$0.key.hasPrefix(id.uuidString) }
@@ -638,7 +642,7 @@ final class MeetingsStore {
         do {
             reports[id] = try MeetingReportDraft.template(for: document, french: french)
             await persistReports()
-        } catch { failure = error.localizedDescription }
+        } catch { failure = meetingFailureMessage(error) }
     }
 
     func rewritePassage(_ blockID: UUID, in id: UUID, instruction: String, french: Bool) {
@@ -715,7 +719,7 @@ final class MeetingsStore {
                 reportProgress = 1
                 await persistReports()
             } catch {
-                if !Task.isCancelled { failure = error.localizedDescription }
+                if !Task.isCancelled { failure = meetingFailureMessage(error) }
             }
             await runtime?.unload()
         }
@@ -732,7 +736,7 @@ final class MeetingsStore {
         job = Task {
             defer { phase = .idle; job = nil }
             do { try await generateReportDraft(for: document, french: french) } catch {
-                if !Task.isCancelled { failure = error.localizedDescription }
+                if !Task.isCancelled { failure = meetingFailureMessage(error) }
             }
         }
     }
@@ -839,7 +843,7 @@ final class MeetingsStore {
             updateMeeting(id) {
                 $0.audioReference = .init(bookmark: bookmark, filename: url.lastPathComponent)
             }
-        } catch { failure = error.localizedDescription }
+        } catch { failure = meetingFailureMessage(error) }
     }
 
     func exportReport(_ report: MeetingReportDraft, title: String, includeSources: Bool = true) {
@@ -854,7 +858,7 @@ final class MeetingsStore {
                 ).utf8
             ).write(to: url, options: .atomic)
         } catch {
-            failure = error.localizedDescription
+            failure = meetingFailureMessage(error)
         }
     }
 
@@ -868,7 +872,7 @@ final class MeetingsStore {
                 document: report.content, transcript: records.first { $0.id == report.id },
                 includeSources: includeSources
             ).write(to: url, options: .atomic)
-        } catch { failure = error.localizedDescription }
+        } catch { failure = meetingFailureMessage(error) }
     }
 
     func copyReport(_ report: MeetingReportDraft) {
@@ -913,7 +917,7 @@ final class MeetingsStore {
                 data = Data(render(document, subtitles: format == "srt", french: french).utf8)
             }
             try data.write(to: url, options: .atomic)
-        } catch { failure = error.localizedDescription }
+        } catch { failure = meetingFailureMessage(error) }
     }
 
     func copy(_ document: SpeakerTranscript, french: Bool) {
@@ -1248,12 +1252,34 @@ final class MeetingsStore {
         return chunks
     }
 
-    nonisolated private static func reportModelDirectory() -> URL {
+    /// The model that writes reports, with the digests its files must match.
+    ///
+    /// Reports were written against a Qwen build that no installation downloads, so the
+    /// button stayed disabled on every Mac, the owner's included. The cleanup model in the
+    /// bundled manifest is on all of them: a developer who has the dedicated build keeps it,
+    /// everyone else gets the installed model.
+    nonisolated private static let reportModel: (directory: URL, digests: [(String, String)]) = {
         let support = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support.appendingPathComponent(
+        let dedicated = support.appendingPathComponent(
             "VoxoL/Models/polisher/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
             isDirectory: true)
+        let hasDedicated = FileManager.default.fileExists(
+            atPath: dedicated.appendingPathComponent("model.safetensors").path)
+        if !hasDedicated,
+            let manifestURL = Bundle.main.url(forResource: "runtime-models", withExtension: "json"),
+            let manifest = try? RuntimeModelManifest.loadAndValidate(from: manifestURL),
+            let polisher = manifest.models.first(where: { $0.role == .polisher })
+        {
+            let installed = support.appendingPathComponent(
+                "VoxoL/Models/polisher/\(polisher.revision)", isDirectory: true)
+            return (installed, polisher.artifact.files.map { ($0.path, $0.sha256) })
+        }
+        return (dedicated, dedicatedReportModelDigests())
+    }()
+
+    nonisolated private static func reportModelDirectory() -> URL {
+        reportModel.directory
     }
 
     private static func reportModelVerificationHandle() async throws
@@ -1342,6 +1368,10 @@ final class MeetingsStore {
     }
 
     nonisolated private static func reportModelExpectedDigests() -> [(String, String)] {
+        reportModel.digests
+    }
+
+    nonisolated private static func dedicatedReportModelDigests() -> [(String, String)] {
         [
             (
                 "chat_template.jinja",

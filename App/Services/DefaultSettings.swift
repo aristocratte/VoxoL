@@ -25,6 +25,10 @@ enum DefaultSettings {
             // particular speaker gets wrong. Discarding them by default threw
             // away the app's ability to improve on the person using it.
             "voxol.learningEnabled": true,
+            // The one request the app makes without being asked: reading the public release
+            // list. On by default so a fix reaches people, and switchable because a local app
+            // should say when it talks to the network and let the owner stop it.
+            "voxol.automaticUpdateCheck": true,
             // Session-only, byte-exact cleanup reuse while recording. This
             // does not change the model prompt, weights or fidelity validation.
             "voxol.prefetchEnabled": true,

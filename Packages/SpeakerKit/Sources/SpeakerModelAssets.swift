@@ -51,24 +51,41 @@ public enum SpeakerModelAssets {
     }
 
     /// Network access is limited to these immutable public model assets. Audio stays local.
-    public static func install(directory: URL) async throws {
+    ///
+    /// `progress` receives the fraction of `downloadBytes` on disk so far: a 200 MB wait with
+    /// nothing moving read as a hang.
+    public static func install(
+        directory: URL,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         let fm = FileManager.default
+        var completed: Int64 = 0
         for file in files {
             try Task.checkCancellation()
             let destination = directory.appendingPathComponent(file.path)
-            if (try? valid(file, at: destination)) == true { continue }
+            if (try? valid(file, at: destination)) == true {
+                completed += file.size
+                progress(Double(completed) / Double(downloadBytes))
+                continue
+            }
             guard
                 let url = URL(
                     string:
                         "https://huggingface.co/\(repository)/resolve/\(revision)/\(file.remotePath)"
                 )
             else { throw SpeakerError.modelIntegrity }
-            let (temporary, response) = try await URLSession.shared.download(from: url)
+            let base = completed
+            let (temporary, response) = try await ProgressDownload.fetch(url) { written in
+                progress(Double(base + written) / Double(downloadBytes))
+            }
             defer { try? fm.removeItem(at: temporary) }
             try Task.checkCancellation()
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                try valid(file, at: temporary)
-            else { throw SpeakerError.modelIntegrity }
+            // A refusal is the server's, not a damaged model: say which.
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw URLError(.badServerResponse)
+            }
+            guard try valid(file, at: temporary) else { throw SpeakerError.modelIntegrity }
+            completed += file.size
             try fm.createDirectory(
                 at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
@@ -91,5 +108,78 @@ public enum SpeakerModelAssets {
             hash.update(data: chunk)
         }
         return hash.finalize().map { String(format: "%02x", $0) }.joined() == artifact.sha256
+    }
+}
+
+/// A download that reports bytes as they arrive; `URLSession.download(from:)` says nothing
+/// until it is done.
+private final class ProgressDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let onBytes: @Sendable (Int64) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<(URL, URLResponse), any Error>?
+    private var result: (URL, URLResponse)?
+
+    private init(onBytes: @escaping @Sendable (Int64) -> Void) {
+        self.onBytes = onBytes
+    }
+
+    static func fetch(
+        _ url: URL, onBytes: @escaping @Sendable (Int64) -> Void
+    ) async throws -> (URL, URLResponse) {
+        let delegate = ProgressDownload(onBytes: onBytes)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let task = session.downloadTask(with: url)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                delegate.lock.withLock { delegate.continuation = continuation }
+                task.resume()
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData _: Int64,
+        totalBytesWritten: Int64, totalBytesExpectedToWrite _: Int64
+    ) {
+        onBytes(totalBytesWritten)
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        // The system deletes `location` when this returns, so it is moved now.
+        let kept = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voxol-speaker-\(UUID().uuidString)")
+        do {
+            try FileManager.default.moveItem(at: location, to: kept)
+            if let response = downloadTask.response {
+                lock.withLock { result = (kept, response) }
+            }
+        } catch {
+            lock.withLock {
+                continuation?.resume(throwing: error)
+                continuation = nil
+            }
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?
+    ) {
+        lock.withLock {
+            guard let continuation else { return }
+            if let error {
+                continuation.resume(throwing: error)
+            } else if let result {
+                continuation.resume(returning: result)
+            } else {
+                continuation.resume(throwing: URLError(.badServerResponse))
+            }
+            self.continuation = nil
+        }
     }
 }

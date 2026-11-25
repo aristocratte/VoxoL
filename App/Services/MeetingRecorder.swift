@@ -121,7 +121,7 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
                 }
             }
         } catch {
-            failure = error.localizedDescription
+            failure = meetingFailureMessage(error)
             if let stream { try? await stream.stopCapture() }
             if let output { try? await output.finish() }
             microphone?.stop()
@@ -159,10 +159,10 @@ final class MeetingRecorder: NSObject, AVAudioRecorderDelegate {
         microphone?.stop()
         microphone = nil
         if let stream {
-            do { try await stream.stopCapture() } catch { failure = error.localizedDescription }
+            do { try await stream.stopCapture() } catch { failure = meetingFailureMessage(error) }
         }
         if let output {
-            do { try await output.finish() } catch { failure = error.localizedDescription }
+            do { try await output.finish() } catch { failure = meetingFailureMessage(error) }
         }
         stream = nil
         output = nil
@@ -390,4 +390,50 @@ private final class MeetingCallOutput: NSObject, SCStreamOutput, SCStreamDelegat
             throw writer.error ?? MeetingRecorder.RecordingError.writing
         }
     }
+}
+
+/// A sentence the person can act on, in the interface language, for whatever stopped a meeting.
+///
+/// The screens used to print the system's own description of the error, in the system language:
+/// for a refused screen-recording permission that was a ScreenCaptureKit code, with no hint that
+/// the fix was one switch in System Settings.
+@MainActor
+func meetingFailureMessage(_ error: any Error) -> String {
+    let french = UserDefaults.standard.string(forKey: "voxol.interfaceLanguage") == "fr"
+    if error is MeetingRecorder.RecordingError || error is SpeakerError {
+        return error.localizedDescription
+    }
+    let nsError = error as NSError
+    if nsError.domain == SCStreamErrorDomain,
+        nsError.code == SCStreamError.Code.userDeclined.rawValue
+    {
+        return tr(
+            french,
+            "Autorise « Enregistrement de l’écran et audio système » pour VoxoL dans Réglages Système, puis réessaie.",
+            "Allow “Screen & System Audio Recording” for VoxoL in System Settings, then try again.")
+    }
+    if nsError.domain == NSCocoaErrorDomain,
+        [
+            NSFileReadNoSuchFileError, NSFileReadNoPermissionError, NSFileReadCorruptFileError,
+            NSFileReadUnknownError,
+        ].contains(nsError.code)
+    {
+        return tr(
+            french,
+            "Le fichier audio n’a pas pu être lu. Vérifie qu’il existe et qu’il n’est pas abîmé.",
+            "The audio file could not be read. Check that it exists and is not damaged.")
+    }
+    if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteOutOfSpaceError {
+        return tr(
+            french, "Espace disque insuffisant pour enregistrer la réunion.",
+            "Not enough disk space to save the meeting.")
+    }
+    if let error = error as? URLError {
+        return ModelInstallationFailure(networkError: error).message(french: french)
+    }
+    return tr(
+        french,
+        "La réunion n’a pas pu être traitée (\(nsError.domain) \(nsError.code)). Réessaie ; si cela se répète, signale-le depuis Réglages › À propos.",
+        "The meeting could not be processed (\(nsError.domain) \(nsError.code)). Try again; if it keeps happening, report it from Settings › About."
+    )
 }

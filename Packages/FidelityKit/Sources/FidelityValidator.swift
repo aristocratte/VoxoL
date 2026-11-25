@@ -19,6 +19,7 @@ public enum FidelityRejectionReason: String, Equatable, Sendable {
     case missingContent
     case editScopeTooLarge
     case functionWordChanged
+    case wordOrderChanged
 }
 
 /// Validated cleanup text and its selected route.
@@ -104,7 +105,10 @@ public enum FidelityValidator {
             "bien sûr", "voici", "texte final :", "texte final:", "texte corrigé :",
             "texte corrigé:", "résultat :", "résultat:", "réponse :", "réponse:",
         ]
-        if preambles.contains(where: lower.hasPrefix) {
+        // A dictation that itself opens this way is not the model talking: only an opening the
+        // source does not have is a preamble.
+        let sourceLower = preparation.promptText.lowercased()
+        if preambles.contains(where: { lower.hasPrefix($0) && !sourceLower.hasPrefix($0) }) {
             return reject(.modelPreamble, preparation)
         }
         if lower.contains("<think>") || lower.contains("</think>")
@@ -136,10 +140,16 @@ public enum FidelityValidator {
                 return reject(.languageChanged, preparation)
             }
         }
-        guard
-            questionMarkCount(in: candidate)
-                >= questionMarkCount(in: preparation.promptText)
-        else {
+        let sourceQuestions = questionMarkCount(in: preparation.promptText)
+        let candidateQuestions = questionMarkCount(in: candidate)
+        guard candidateQuestions >= sourceQuestions else {
+            return reject(.questionIntentChanged, preparation)
+        }
+        // Punctuating a question the words already ask is cleanup. Turning "tu viens demain."
+        // into "tu viens demain ?" decides what the speaker meant.
+        if candidateQuestions > sourceQuestions,
+            !hasInterrogativeMarker(preparation.promptText, language: preparation.language)
+        {
             return reject(.questionIntentChanged, preparation)
         }
 
@@ -171,6 +181,15 @@ public enum FidelityValidator {
             allowListFraming: preparation.automaticLists && containsStructuredList(candidate)
         ) {
             return reject(.missingContent, preparation)
+        }
+        // Every word can survive while the sentence says something else: "Paul appelle Marie"
+        // and "Marie appelle Paul" are the same bag of words. Rewrite may restructure; faithful
+        // cleanup may not move a word.
+        if preparation.cleanupMode != .rewrite,
+            !(preparation.automaticLists && containsStructuredList(candidate)),
+            containsMovedWord(source: sourceWords, candidate: candidateWords)
+        {
+            return reject(.wordOrderChanged, preparation)
         }
         // The edit budget is the mode's promise in numbers. Faithful allows
         // touch-ups; rewrite allows restructuring a spoken sentence into a
@@ -246,7 +265,7 @@ private extension FidelityValidator {
     static func isRepairable(_ reason: FidelityRejectionReason) -> Bool {
         switch reason {
         case .missingContent, .unexpectedContent, .editScopeTooLarge, .functionWordChanged,
-            .missingProtectedToken, .duplicatedProtectedToken,
+            .wordOrderChanged, .missingProtectedToken, .duplicatedProtectedToken,
             .reorderedProtectedToken, .numberAttachmentChanged, .questionIntentChanged:
             true
         case .emptyOutput, .outputTooLong, .modelPreamble, .thinkingLeak,
@@ -588,6 +607,18 @@ private extension FidelityValidator {
                 continue
             }
             if removableWords.contains(source) || removableListWords.contains(source) {
+                // An auxiliary or "à" carries the tense or the relation. It may go as a
+                // stuttered duplicate, never as the only one: "il a fini" is not "il fini".
+                // Trading one for another ("est" → "sont") is agreement, and a list drops its
+                // framing verb; neither leaves the sentence with fewer of them.
+                let tenseBearing = tenseBearingWords(for: language)
+                if !allowListFraming, tenseBearing.contains(source),
+                    !candidateWords.contains(source),
+                    candidateWords.count(where: tenseBearing.contains)
+                        < sourceWords.count(where: tenseBearing.contains)
+                {
+                    return true
+                }
                 continue
             }
             if subjectPronouns(for: language).contains(source),
@@ -657,6 +688,15 @@ private extension FidelityValidator {
 
         let distance = editDistance(source, candidate)
         let maximumLength = max(source.count, candidate.count)
+        // One letter in a short word is usually another word ("hier"/"hiver", "peu"/"peur"),
+        // not a spelling fix. Short words may change only the way inflection changes them.
+        // Function words are left to the function-word guard, which knows their agreements.
+        let functionWords = swapProtectedWords(for: language)
+        if maximumLength <= 5, !functionWords.contains(source), !functionWords.contains(candidate),
+            !isShortWordInflection(source, candidate)
+        {
+            return nil
+        }
         let allowedDistance = maximumLength <= 5 ? 1 : 2
         guard distance <= allowedDistance,
             Double(distance) / Double(maximumLength) <= 0.34
@@ -778,6 +818,78 @@ private extension FidelityValidator {
             previous = current
         }
         return previous[rhs.count]
+    }
+
+    /// The final letter changing, or a trailing mark of number, gender or person: "fais"/"fait",
+    /// "test"/"tests". A lexicon would be needed to tell "mois"/"moi" apart from those; this
+    /// only closes the cases where a letter is inserted or appended that no inflection adds.
+    static func isShortWordInflection(_ source: String, _ candidate: String) -> Bool {
+        let (shorter, longer) =
+            source.count <= candidate.count ? (source, candidate) : (candidate, source)
+        if shorter.count == longer.count {
+            return shorter.dropLast() == longer.dropLast()
+        }
+        guard longer.hasPrefix(shorter), let ending = longer.last else { return false }
+        return "sextz".contains(ending)
+    }
+
+    /// Whether the source's own words ask a question, so that adding its question mark is
+    /// punctuation and not interpretation.
+    static func hasInterrogativeMarker(_ text: String, language: TextLanguage) -> Bool {
+        let lower = text.lowercased()
+        let pattern =
+            switch language {
+            case .french:
+                #"\b(est[- ]ce|pourquoi|comment|combien|quand|où|qui|quoi|quel(?:le)?s?|lequel|laquelle|lesquel(?:le)?s)\b|-(?:t-)?(?:tu|vous|il|elle|on|ils|elles|je|nous)\b"#
+            case .english:
+                #"\b(what|why|how|when|where|who|whom|whose|which)\b|(?:^|[.!?]\s+)(?:do|does|did|is|are|was|were|am|can|could|will|would|should|shall|may|might|have|has|had)\b"#
+            }
+        return !matches(pattern, in: lower).isEmpty
+    }
+
+    /// Whether a word left one place and reappeared in another. The longest common
+    /// subsequence keeps every word that stayed put; a word left over on both sides moved.
+    static func containsMovedWord(source: [String], candidate: [String]) -> Bool {
+        guard !source.isEmpty, !candidate.isEmpty else { return false }
+        var lengths = Array(
+            repeating: Array(repeating: 0, count: candidate.count + 1), count: source.count + 1)
+        for row in stride(from: source.count - 1, through: 0, by: -1) {
+            for column in stride(from: candidate.count - 1, through: 0, by: -1) {
+                lengths[row][column] =
+                    source[row] == candidate[column]
+                    ? lengths[row + 1][column + 1] + 1
+                    : max(lengths[row + 1][column], lengths[row][column + 1])
+            }
+        }
+        var displacedSource: [String: Int] = [:]
+        var displacedCandidate: Set<String> = []
+        var row = 0
+        var column = 0
+        while row < source.count, column < candidate.count {
+            if source[row] == candidate[column] {
+                row += 1
+                column += 1
+            } else if lengths[row + 1][column] >= lengths[row][column + 1] {
+                displacedSource[source[row], default: 0] += 1
+                row += 1
+            } else {
+                displacedCandidate.insert(candidate[column])
+                column += 1
+            }
+        }
+        for word in source[row...] { displacedSource[word, default: 0] += 1 }
+        displacedCandidate.formUnion(candidate[column...])
+        return displacedSource.keys.contains(where: displacedCandidate.contains)
+    }
+
+    /// Auxiliaries, and French "à" (which accent-folding writes as "a").
+    static func tenseBearingWords(for language: TextLanguage) -> Set<String> {
+        switch language {
+        case .english:
+            ["is", "are", "was", "were", "be", "been", "have", "has", "had", "do", "does", "did"]
+        case .french:
+            ["a", "est", "sont", "etre", "ete"]
+        }
     }
 
     static func grammarInsertionWords(for language: TextLanguage) -> Set<String> {

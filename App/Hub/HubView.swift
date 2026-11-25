@@ -73,6 +73,7 @@ struct HubView: View {
     @AppStorage("voxol.dictationShortcut") private var shortcut = DictationShortcut.optionSpace
     @AppStorage("voxol.learningEnabled") private var learningEnabled = true
     @AppStorage("voxol.privateMode") private var privateMode = false
+    @AppStorage("voxol.correctionCapture") private var correctionCapture = false
 
     @State private var selection = HubView.initialDestination
     @State private var settingsSection = HubView.initialSettingsSection
@@ -154,7 +155,10 @@ struct HubView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 4)
 
-            navigationGroup(HubDestination.personalize)
+            // Reviewing recordings only has something to show once the owner has chosen to
+            // keep them; until then it was an empty developer screen in the main navigation.
+            navigationGroup(
+                HubDestination.personalize.filter { $0 != .review || correctionCapture })
 
             Spacer(minLength: 12)
 
@@ -391,6 +395,8 @@ struct HubView: View {
         case .historyLoadFailed: "History could not be loaded"
         case .historySaveFailed: "History could not be saved"
         case .editSaved: "Edit saved"
+        case .dictationDeleted: "Dictation deleted"
+        case .historyErased: "History erased"
         }
     }
 }

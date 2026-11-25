@@ -355,6 +355,16 @@ private struct HomeRow: View {
         .hubRowHover(hovering)
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
+        // A tap alone left the row unreachable from the keyboard.
+        .focusable()
+        .onKeyPress(.return) {
+            open()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            open()
+            return .handled
+        }
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Copy transcription") { transcripts.copy(record) }
@@ -379,6 +389,7 @@ private struct ResultCard: View {
     let inspect: () -> Void
 
     @State private var tokens: [TranscriptDiff.Token]?
+    @State private var confirmingDeletion = false
 
     var body: some View {
         Group {
@@ -456,6 +467,8 @@ private struct ResultCard: View {
                             Task { await transcripts.exportAudio(for: record) }
                         }
                     }
+                    Divider()
+                    Button("Delete", role: .destructive) { confirmingDeletion = true }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 13, weight: .medium))
@@ -470,6 +483,15 @@ private struct ResultCard: View {
                 .help("More actions")
             }
             .padding(.top, 14)
+        }
+        .confirmationDialog(
+            "Delete this dictation?", isPresented: $confirmingDeletion, titleVisibility: .visible
+        ) {
+            Button("Delete dictation", role: .destructive) {
+                Task { await transcripts.delete(record.id) }
+            }
+        } message: {
+            Text("Its text and any audio kept with it are removed from this Mac.")
         }
     }
 
@@ -489,7 +511,7 @@ private struct ResultCard: View {
             case .unchanged:
                 piece.foregroundColor = theme.secondaryInk
             case .removed:
-                piece.foregroundColor = theme.secondaryInk.opacity(0.6)
+                piece.foregroundColor = theme.secondaryInk
                 piece.strikethroughStyle = .single
             case .added:
                 piece.foregroundColor = theme.cobalt

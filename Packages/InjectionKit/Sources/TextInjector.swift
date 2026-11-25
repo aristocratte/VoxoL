@@ -246,6 +246,12 @@ public final class TextInjector {
         self.pasteConfirmationWindow = pasteConfirmationWindow
     }
 
+    /// Gives the owner's clipboard back now instead of at the end of the hold. Quitting during
+    /// the hold cancelled the scheduled return and left the dictation on the clipboard.
+    public func returnClipboardNow() {
+        clipboardLease.returnNow()
+    }
+
     /// Reads everything the destination control currently holds, when the
     /// application exposes it over Accessibility.
     ///

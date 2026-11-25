@@ -627,7 +627,7 @@ struct PreflightView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Verifying SHA-256…")
+                        Text("Checking the download…")
                             .font(VoxoLTypography.font(size: 12, relativeTo: .caption))
                             .foregroundStyle(theme.secondaryInk)
                     }
@@ -638,7 +638,7 @@ struct PreflightView: View {
                     Button("Download") { installMissingModelParts() }
                         .buttonStyle(GrainRowButtonStyle(prominent: true))
                 } else if anyAwaiting {
-                    Text("Artifact pending")
+                    Text("Not available yet")
                         .font(VoxoLTypography.font(size: 12, relativeTo: .caption))
                         .foregroundStyle(theme.secondaryInk)
                 } else {
@@ -655,6 +655,16 @@ struct PreflightView: View {
                         totalBytes: totalBytes,
                         paused: !anyDownloading
                     )
+                } else if anyFailed,
+                    let reason = items.first(where: { $0.phase == .failed })?.failureReason
+                {
+                    // A retry button alone left the user repeating a failure they could not
+                    // see the cause of.
+                    Text(verbatim: reason)
+                        .font(VoxoLTypography.font(size: 12, relativeTo: .caption))
+                        .foregroundStyle(theme.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         )

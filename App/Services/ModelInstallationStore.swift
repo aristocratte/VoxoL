@@ -263,8 +263,26 @@ final class ModelInstallationStore {
             update(model.role) { item in
                 item.phase = .failed
                 item.downloadedBytes = Self.resumableBytes(for: model)
-                item.failureReason = error.localizedDescription
+                item.failureReason = Self.failure(for: error).message(
+                    french: UserDefaults.standard.string(forKey: "voxol.interfaceLanguage") == "fr")
             }
+        }
+    }
+
+    /// Translates whatever stopped the installation into a cause the user can act on.
+    private nonisolated static func failure(for error: any Error) -> ModelInstallationFailure {
+        switch error {
+        case let error as URLError:
+            ModelInstallationFailure(networkError: error)
+        case ModelInstallationError.insufficientDiskSpace(let requiredBytes):
+            .insufficientDiskSpace(requiredBytes: requiredBytes)
+        case ModelInstallationError.checksumMismatch, ModelInstallationError.downloadSizeMismatch,
+            ResumableDownloadError.downloadSizeMismatch, ResumableDownloadError.invalidContentRange:
+            .damagedDownload
+        case ResumableDownloadError.invalidResponse(let statusCode):
+            .serverRefused(statusCode: statusCode)
+        default:
+            .unavailable
         }
     }
 
@@ -282,7 +300,7 @@ final class ModelInstallationStore {
 private enum ModelInstallationError: Error {
     case manifestMissing
     case missingDownloadURL
-    case insufficientDiskSpace
+    case insufficientDiskSpace(requiredBytes: Int64)
     case downloadSizeMismatch
     case checksumMismatch
     case artifactSmokeTestFailed
@@ -372,7 +390,8 @@ private extension ModelInstallationStore {
         let remainingBytes = max(0, artifactBytes - downloadedBytes)
         let temporaryOverhead = model.role == .asr ? artifactBytes : 268_435_456
         guard available >= remainingBytes + temporaryOverhead else {
-            throw ModelInstallationError.insufficientDiskSpace
+            throw ModelInstallationError.insufficientDiskSpace(
+                requiredBytes: remainingBytes + temporaryOverhead)
         }
     }
 
@@ -497,6 +516,16 @@ private extension ModelInstallationStore {
             return false
         }
         return await Task.detached {
+            let paths = model.artifact.files.map(\.path)
+            let digest = model.artifact.files.map(\.sha256).joined(separator: ",")
+            let stampURL = try? verificationStampURL(for: model)
+            // Hashing 1.3 GB on every launch held the first dictation back. Files untouched
+            // since they last passed are trusted; anything changed is hashed again.
+            if let stampURL, let stamp = VerifiedArtifactStamp.read(from: stampURL),
+                stamp.matches(files: paths, in: directory, digest: digest)
+            {
+                return true
+            }
             for file in model.artifact.files {
                 let url = directory.appendingPathComponent(file.path)
                 guard FileManager.default.fileExists(atPath: url.path),
@@ -505,8 +534,23 @@ private extension ModelInstallationStore {
                     return false
                 }
             }
-            return !model.artifact.files.isEmpty
+            guard !model.artifact.files.isEmpty else { return false }
+            if let stampURL {
+                try? FileManager.default.createDirectory(
+                    at: stampURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? VerifiedArtifactStamp(files: paths, in: directory, digest: digest)
+                    .write(to: stampURL)
+            }
+            return true
         }.value
+    }
+
+    /// Kept beside the models rather than inside them, so a runtime that reads its whole
+    /// directory never meets a file it does not know.
+    nonisolated static func verificationStampURL(for model: RuntimeModel) throws -> URL {
+        try modelRoot()
+            .appendingPathComponent(".verified", isDirectory: true)
+            .appendingPathComponent("\(model.role.rawValue)-\(model.revision).json")
     }
 
     nonisolated static func sha256(of url: URL) throws -> String {

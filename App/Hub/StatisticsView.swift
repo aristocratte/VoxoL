@@ -304,7 +304,8 @@ struct StatisticsView: View {
 
     private func figures(_ model: StatisticsModel) -> some View {
         HStack(alignment: .top, spacing: 16) {
-            figure("Time saved", value: recovered(model.recoveredMinutes))
+            figure("Time saved (estimate)", value: recovered(model.recoveredMinutes))
+                .help("Compared with typing the same words at 40 words per minute")
             figure("Words dictated", value: Text(model.words.formatted()))
             figure(
                 "Speed",

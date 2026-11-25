@@ -20,8 +20,9 @@ struct MeetingProgressLine: View {
                 "Checking speaker recognition…")
         case .downloading:
             tr(
-                french, "Installation de la reconnaissance des voix…",
-                "Installing speaker recognition…")
+                french,
+                "Téléchargement de la reconnaissance des voix (\(modelSize))…",
+                "Downloading speaker recognition (\(modelSize))…")
         case .reading: tr(french, "Préparation de l’audio…", "Preparing the audio…")
         case .transcribing:
             tr(french, "Transcription de la conversation…", "Transcribing the conversation…")
@@ -34,8 +35,14 @@ struct MeetingProgressLine: View {
         }
     }
 
+    private var modelSize: String {
+        ByteCountFormatter.string(
+            fromByteCount: SpeakerModelAssets.downloadBytes, countStyle: .file)
+    }
+
     private var measured: Double? {
         switch meetings.phase {
+        case .downloading: meetings.modelDownloadProgress
         case .speakers: meetings.speakerProgress
         case .reporting: meetings.reportProgress
         default: nil

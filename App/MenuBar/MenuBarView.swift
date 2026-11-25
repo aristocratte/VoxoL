@@ -57,16 +57,18 @@ private struct MenuBarContent: View {
                     .font(.caption)
                     .foregroundStyle(theme.secondaryInk)
                 Spacer()
-                KeyboardShortcutBadge(keys: "⌥ Space")
+                KeyboardShortcutBadge(keys: DictationShortcut.current.label)
             }
 
-            HStack {
-                Text("Insertion test")
-                    .font(.caption)
-                    .foregroundStyle(theme.secondaryInk)
-                Spacer()
-                KeyboardShortcutBadge(keys: "⌥ ⇧ Space")
-            }
+            #if DEBUG
+                HStack {
+                    Text("Insertion test")
+                        .font(.caption)
+                        .foregroundStyle(theme.secondaryInk)
+                    Spacer()
+                    KeyboardShortcutBadge(keys: "⌥ ⇧ Space")
+                }
+            #endif
 
             Button(action: previewCapsule) {
                 Label("Preview capsule", systemImage: "waveform")

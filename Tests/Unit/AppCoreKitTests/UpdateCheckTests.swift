@@ -133,4 +133,21 @@ final class UpdateCheckTests: XCTestCase {
         XCTAssertEqual(state.phase, .failed)
         XCTAssertEqual(state.available, release("1.1.0"))
     }
+
+    func testADiskImageHoldingTheAnnouncedNewerVersionCanBeInstalled() {
+        XCTAssertTrue(
+            UpdateCheck.canInstall(bundleVersion: "0.1.11", over: "0.1.10", announced: "v0.1.11"))
+    }
+
+    func testAnOlderBuildPublishedUnderANewerTagIsRefused() {
+        XCTAssertFalse(
+            UpdateCheck.canInstall(bundleVersion: "0.1.9", over: "0.1.10", announced: "v0.1.11"))
+        XCTAssertFalse(
+            UpdateCheck.canInstall(bundleVersion: "0.1.10", over: "0.1.10", announced: "v0.1.11"))
+    }
+
+    func testADiskImageThatIsNotTheAnnouncedReleaseIsRefused() {
+        XCTAssertFalse(
+            UpdateCheck.canInstall(bundleVersion: "0.1.12", over: "0.1.10", announced: "v0.1.11"))
+    }
 }

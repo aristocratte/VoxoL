@@ -22,13 +22,15 @@ final class TranscriptStore {
     @ObservationIgnored private let fileStore: TranscriptFileStore
     @ObservationIgnored private var pendingChanges: [UUID: UUID] = [:]
     @ObservationIgnored private var exportedChanges: [UUID: UUID] = [:]
+    /// Deletions the archive on disk does not reflect yet, so a reload cannot bring them back.
+    @ObservationIgnored private var pendingDeletions: Set<UUID> = []
 
     init(directoryURL: URL? = nil) {
         fileStore = TranscriptFileStore(directoryURL: directoryURL)
         if directoryURL == nil { Self.activeStore = self }
     }
 
-    var hasUnsavedChanges: Bool { !pendingChanges.isEmpty }
+    var hasUnsavedChanges: Bool { !pendingChanges.isEmpty || !pendingDeletions.isEmpty }
     var hasUnprotectedChanges: Bool {
         pendingChanges.contains { exportedChanges[$0.key] != $0.value }
     }
@@ -74,21 +76,28 @@ final class TranscriptStore {
         do {
             let archive = try await fileStore.load()
             let pending = records.filter { pendingChanges[$0.id] != nil }
-            records = (archive.records.filter { pendingChanges[$0.id] == nil } + pending)
-                .sorted { $0.createdAt > $1.createdAt }
+            let saved = archive.records.filter {
+                pendingChanges[$0.id] == nil && !pendingDeletions.contains($0.id)
+            }
+            records = (saved + pending).sorted { $0.createdAt > $1.createdAt }
             usesExampleData = false
-            historyIssue = pendingChanges.isEmpty ? nil : .saveFailed
+            historyIssue = hasUnsavedChanges ? .saveFailed : nil
         } catch TranscriptFileStoreError.fileMissing {
             records = records.filter { pendingChanges[$0.id] != nil }
             usesExampleData = false
-            historyIssue = pendingChanges.isEmpty ? nil : .saveFailed
+            historyIssue = hasUnsavedChanges ? .saveFailed : nil
         } catch {
-            // Keep in-memory results and leave the unreadable file untouched.
+            // The unreadable file is kept, byte for byte, under another name, and history
+            // starts again: leaving it in place meant nothing after it could be saved and the
+            // app refused to quit. If even the rename fails, fall back to protecting it.
             historyIssue = .loadFailed
             toast = .historyLoadFailed
+            if (try? await fileStore.setAsideUnreadableArchive()) != nil {
+                historyIssue = hasUnsavedChanges ? .saveFailed : nil
+            }
         }
         isLoading = false
-        if historyIssue != .loadFailed, !pendingChanges.isEmpty {
+        if historyIssue != .loadFailed, hasUnsavedChanges {
             await persist()
         }
     }
@@ -110,6 +119,35 @@ final class TranscriptStore {
         records.insert(record, at: 0)
         pendingChanges[record.id] = UUID()
         usesExampleData = false
+        await persist()
+    }
+
+    /// Removes one dictation, and the audio kept with it, for good.
+    func delete(_ id: UUID) async {
+        guard let index = records.firstIndex(where: { $0.id == id }) else { return }
+        await forget([records.remove(at: index)])
+        if historyIssue == nil { toast = .dictationDeleted }
+    }
+
+    /// Erases every dictation and every retained recording.
+    func deleteAll() async {
+        let erased = records
+        records = []
+        // This log quotes the words the recogniser doubted, so it goes with the history.
+        await fileStore.remove(relativePath: "Diagnostics/repair-shadow.jsonl")
+        await forget(erased)
+        if historyIssue == nil { toast = .historyErased }
+    }
+
+    private func forget(_ erased: [TranscriptRecord]) async {
+        for record in erased {
+            pendingChanges.removeValue(forKey: record.id)
+            exportedChanges.removeValue(forKey: record.id)
+            pendingDeletions.insert(record.id)
+            if let path = record.audioRelativePath {
+                await fileStore.remove(relativePath: path)
+            }
+        }
         await persist()
     }
 
@@ -212,13 +250,15 @@ final class TranscriptStore {
         // before allowing a dictation that arrived during launch to write the archive.
         guard !isLoading else { return }
         let changesBeingSaved = pendingChanges
+        let deletionsBeingSaved = pendingDeletions
         do {
             try await fileStore.save(TranscriptArchive(records: records))
             for (id, revision) in changesBeingSaved where pendingChanges[id] == revision {
                 pendingChanges.removeValue(forKey: id)
                 exportedChanges.removeValue(forKey: id)
             }
-            if pendingChanges.isEmpty { historyIssue = nil }
+            pendingDeletions.subtract(deletionsBeingSaved)
+            if !hasUnsavedChanges { historyIssue = nil }
         } catch {
             if historyIssue != .loadFailed { historyIssue = .saveFailed }
             toast = .historySaveFailed
@@ -271,6 +311,8 @@ enum TranscriptToast: Equatable {
     case historyLoadFailed
     case historySaveFailed
     case editSaved
+    case dictationDeleted
+    case historyErased
 }
 
 struct TranscriptEdit: Equatable, Sendable {

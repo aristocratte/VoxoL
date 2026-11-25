@@ -29,19 +29,19 @@
 		00000000000000000000001A /* HubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000025 /* HubView.swift */; };
 		000000000000000000000FA5 /* ReleaseNotesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000FA6 /* ReleaseNotesCard.swift */; };
 		00000000000000000000001B /* StudioComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000026 /* StudioComponents.swift */; };
-		00000000000000000000001C /* WorkspaceStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000027 /* WorkspaceStudios.swift */; };
-		00000000000000000000001D /* PersonalizationStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000028 /* PersonalizationStudios.swift */; };
-		00000000000000000000001E /* SystemStudios.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000029 /* SystemStudios.swift */; };
+		00000000000000000000001C /* DictationModes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000027 /* DictationModes.swift */; };
+		00000000000000000000001D /* PersonalizationEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000028 /* PersonalizationEditors.swift */; };
 		00000000000000000000001F /* PreflightView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000002A /* PreflightView.swift */; };
 		000000000000000000000020 /* VoiceCapsule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000002B /* VoiceCapsule.swift */; };
 		000000000000000000000021 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* Localizable.strings */; };
 		000000000000000000000033 /* TranscriptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000040 /* TranscriptStore.swift */; };
 		000000000000000000000034 /* PermissionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000041 /* PermissionCoordinator.swift */; };
 		000000000000000000000035 /* ModelInstallationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000042 /* ModelInstallationStore.swift */; };
-		000000000000000000000036 /* SetupRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000043 /* SetupRows.swift */; };
-		000000000000000000000037 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000044 /* HomeDashboardView.swift */; };
+		000000000000000000000037 /* TranscriptSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000044 /* TranscriptSheets.swift */; };
 		000000000000000000000038 /* TranscriptHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000045 /* TranscriptHistory.swift */; };
 		000000000000000000000039 /* RuntimeModelManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000046 /* RuntimeModelManifest.swift */; };
+		A0D1700000000000000000F1 /* ModelInstallationFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D1700000000000000000F2 /* ModelInstallationFailure.swift */; };
+		A0D1700000000000000000F3 /* VerifiedArtifactStamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D1700000000000000000F4 /* VerifiedArtifactStamp.swift */; };
 		00000000000000000000003A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000047 /* Assets.xcassets */; };
 		00000000000000000000003B /* runtime-models.json in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000048 /* runtime-models.json */; };
 		00000000000000000000003C /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000004E /* InfoPlist.strings */; };
@@ -130,19 +130,19 @@
 		000000000000000000000025 /* HubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HubView.swift; sourceTree = "<group>"; };
 		000000000000000000000FA6 /* ReleaseNotesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesCard.swift; sourceTree = "<group>"; };
 		000000000000000000000026 /* StudioComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioComponents.swift; sourceTree = "<group>"; };
-		000000000000000000000027 /* WorkspaceStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceStudios.swift; sourceTree = "<group>"; };
-		000000000000000000000028 /* PersonalizationStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationStudios.swift; sourceTree = "<group>"; };
-		000000000000000000000029 /* SystemStudios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStudios.swift; sourceTree = "<group>"; };
+		000000000000000000000027 /* DictationModes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationModes.swift; sourceTree = "<group>"; };
+		000000000000000000000028 /* PersonalizationEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalizationEditors.swift; sourceTree = "<group>"; };
 		00000000000000000000002A /* PreflightView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreflightView.swift; sourceTree = "<group>"; };
 		00000000000000000000002B /* VoiceCapsule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCapsule.swift; sourceTree = "<group>"; };
 		00000000000000000000002C /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		000000000000000000000040 /* TranscriptStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptStore.swift; sourceTree = "<group>"; };
 		000000000000000000000041 /* PermissionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionCoordinator.swift; sourceTree = "<group>"; };
 		000000000000000000000042 /* ModelInstallationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelInstallationStore.swift; sourceTree = "<group>"; };
-		000000000000000000000043 /* SetupRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupRows.swift; sourceTree = "<group>"; };
-		000000000000000000000044 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
+		000000000000000000000044 /* TranscriptSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptSheets.swift; sourceTree = "<group>"; };
 		000000000000000000000045 /* TranscriptHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/AppCoreKit/Sources/TranscriptHistory.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000046 /* RuntimeModelManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/ModelManagerKit/Sources/RuntimeModelManifest.swift; sourceTree = SOURCE_ROOT; };
+		A0D1700000000000000000F2 /* ModelInstallationFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/ModelManagerKit/Sources/ModelInstallationFailure.swift; sourceTree = SOURCE_ROOT; };
+		A0D1700000000000000000F4 /* VerifiedArtifactStamp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packages/ModelManagerKit/Sources/VerifiedArtifactStamp.swift; sourceTree = SOURCE_ROOT; };
 		000000000000000000000047 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		000000000000000000000048 /* runtime-models.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Models/manifests/runtime-models.json; sourceTree = SOURCE_ROOT; };
 		000000000000000000000049 /* VoxoL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VoxoL.entitlements; sourceTree = "<group>"; };
@@ -287,11 +287,10 @@
 				C3A000000000000000000006 /* StatisticsView.swift */,
 				C3A000000000000000000004 /* HomeView.swift */,
 				000000000000000000001013 /* TrainingStudioView.swift */,
-				000000000000000000000044 /* HomeDashboardView.swift */,
+				000000000000000000000044 /* TranscriptSheets.swift */,
 				000000000000000000000026 /* StudioComponents.swift */,
-				000000000000000000000027 /* WorkspaceStudios.swift */,
-				000000000000000000000028 /* PersonalizationStudios.swift */,
-				000000000000000000000029 /* SystemStudios.swift */,
+				000000000000000000000027 /* DictationModes.swift */,
+				000000000000000000000028 /* PersonalizationEditors.swift */,
 			);
 			path = Hub;
 			sourceTree = "<group>";
@@ -300,7 +299,6 @@
 			isa = PBXGroup;
 			children = (
 				00000000000000000000002A /* PreflightView.swift */,
-				000000000000000000000043 /* SetupRows.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -362,6 +360,8 @@
 				000000000000000000000045 /* TranscriptHistory.swift */,
 				000000000000000000001011 /* TrainingReview.swift */,
 				000000000000000000000046 /* RuntimeModelManifest.swift */,
+				A0D1700000000000000000F2 /* ModelInstallationFailure.swift */,
+				A0D1700000000000000000F4 /* VerifiedArtifactStamp.swift */,
 				000000000000000000000055 /* DeterministicEndpointDetector.swift */,
 				000000000000000000000056 /* AudioRingBuffer.swift */,
 				000000000000000000000057 /* AudioCaptureSession.swift */,
@@ -513,9 +513,8 @@
 				C3A000000000000000000001 /* HubKit.swift in Sources */,
 				000000000000000000001003 /* TrainingStudioView.swift in Sources */,
 				00000000000000000000001B /* StudioComponents.swift in Sources */,
-				00000000000000000000001C /* WorkspaceStudios.swift in Sources */,
-				00000000000000000000001D /* PersonalizationStudios.swift in Sources */,
-				00000000000000000000001E /* SystemStudios.swift in Sources */,
+				00000000000000000000001C /* DictationModes.swift in Sources */,
+				00000000000000000000001D /* PersonalizationEditors.swift in Sources */,
 				00000000000000000000001F /* PreflightView.swift in Sources */,
 				000000000000000000000020 /* VoiceCapsule.swift in Sources */,
 				000000000000000000000033 /* TranscriptStore.swift in Sources */,
@@ -523,11 +522,12 @@
 				000000000000000000000034 /* PermissionCoordinator.swift in Sources */,
 				000000000000000000000035 /* ModelInstallationStore.swift in Sources */,
 				00000000000000000000005B /* ResumableFileDownload.swift in Sources */,
-				000000000000000000000036 /* SetupRows.swift in Sources */,
-				000000000000000000000037 /* HomeDashboardView.swift in Sources */,
+				000000000000000000000037 /* TranscriptSheets.swift in Sources */,
 				000000000000000000000038 /* TranscriptHistory.swift in Sources */,
 				000000000000000000001001 /* TrainingReview.swift in Sources */,
 				000000000000000000000039 /* RuntimeModelManifest.swift in Sources */,
+				A0D1700000000000000000F1 /* ModelInstallationFailure.swift in Sources */,
+				A0D1700000000000000000F3 /* VerifiedArtifactStamp.swift in Sources */,
 				00000000000000000000004F /* DeterministicEndpointDetector.swift in Sources */,
 				000000000000000000000050 /* AudioRingBuffer.swift in Sources */,
 				000000000000000000000051 /* AudioCaptureSession.swift in Sources */,
@@ -664,6 +664,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/VoxoL.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 15;

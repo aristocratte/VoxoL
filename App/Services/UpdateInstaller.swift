@@ -34,6 +34,24 @@ final class UpdateInstaller {
 
     private init() {}
 
+    /// The update flow lives outside SwiftUI's string catalog (an alert and a floating panel),
+    /// so it reads the interface language itself instead of always speaking French.
+    /// Where this copy lives, so an app kept in ~/Applications is updated where it is rather
+    /// than duplicated into /Applications. A copy running from a mounted disk image or from a
+    /// translocated path cannot be replaced in place, so it installs into /Applications.
+    nonisolated static var installedBundleURL: URL {
+        let running = Bundle.main.bundleURL
+        let path = running.path
+        if path.hasPrefix("/Volumes/") || path.contains("/AppTranslocation/") {
+            return URL(fileURLWithPath: "/Applications/VoxoL.app")
+        }
+        return running
+    }
+
+    nonisolated static var french: Bool {
+        UserDefaults.standard.string(forKey: "voxol.interfaceLanguage") == "fr"
+    }
+
     var isBusy: Bool {
         switch phase {
         case .downloading, .installing, .relaunching: true
@@ -61,8 +79,10 @@ final class UpdateInstaller {
             defer { try? FileManager.default.removeItem(at: staged) }
 
             phase = .installing
+            let announced = update.version
+            let current = BugReportComposer.Environment.current().applicationVersion
             try await Task.detached(priority: .userInitiated) {
-                try Self.installDiskImage(at: staged)
+                try Self.installDiskImage(at: staged, announced: announced, current: current)
             }.value
 
             phase = .relaunching
@@ -144,6 +164,13 @@ final class UpdateInstaller {
             // The file at `location` is deleted the moment this returns, so
             // the move happens here or not at all.
             do {
+                // A refusal arrives as a small error page, which would otherwise be saved as
+                // the disk image and reported later as an image that cannot be opened.
+                if let http = downloadTask.response as? HTTPURLResponse,
+                    !(200..<300).contains(http.statusCode)
+                {
+                    throw InstallError.downloadRefused(http.statusCode)
+                }
                 try? FileManager.default.removeItem(at: destination)
                 try FileManager.default.moveItem(at: location, to: destination)
             } catch {
@@ -168,7 +195,11 @@ final class UpdateInstaller {
 
     // MARK: - The install itself, off the main thread
 
-    private nonisolated static func installDiskImage(at imageURL: URL) throws {
+    private nonisolated static func installDiskImage(
+        at imageURL: URL,
+        announced: String,
+        current: String
+    ) throws {
         let mountPoint = try attach(imageURL)
         defer { detach(mountPoint) }
 
@@ -198,7 +229,18 @@ final class UpdateInstaller {
             }
         }
 
-        let destination = URL(fileURLWithPath: "/Applications/VoxoL.app")
+        // Same team is not enough: an older build signed by that team, attached to a newer
+        // tag, would install as an update and bring its defects back.
+        let bundleVersion =
+            Bundle(url: mounted)?.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        guard
+            UpdateCheck.canInstall(
+                bundleVersion: bundleVersion, over: current, announced: announced)
+        else {
+            throw InstallError.unexpectedVersion(bundleVersion)
+        }
+
+        let destination = installedBundleURL
         let staging = URL(
             fileURLWithPath: NSTemporaryDirectory()
         ).appendingPathComponent("VoxoL-staged-\(UUID().uuidString).app")
@@ -311,7 +353,7 @@ final class UpdateInstaller {
         // fresh bundle is read from disk rather than the unlinked old inode.
         let script = Process()
         script.executableURL = URL(fileURLWithPath: "/bin/sh")
-        script.arguments = ["-c", "sleep 0.8; /usr/bin/open /Applications/VoxoL.app"]
+        script.arguments = ["-c", "sleep 0.8; /usr/bin/open \"$0\"", Self.installedBundleURL.path]
         try? script.run()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApplication.shared.terminate(nil)
@@ -331,7 +373,7 @@ final class UpdateInstaller {
             backing: .buffered,
             defer: false
         )
-        panel.title = "Mise à jour"
+        panel.title = tr(Self.french, "Mise à jour", "Update")
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.isReleasedWhenClosed = false
@@ -350,21 +392,47 @@ final class UpdateInstaller {
         case mountFailed
         case unreadableSignature
         case toolFailed(String, Int32)
+        case downloadRefused(Int)
+        case unexpectedVersion(String)
 
         var errorDescription: String? {
-            switch self {
+            let french = UpdateInstaller.french
+            return switch self {
             case .noApplicationInImage:
-                "Le téléchargement ne contient pas d'application."
+                tr(
+                    french, "Le téléchargement ne contient pas d’application.",
+                    "The download does not contain an application.")
             case .wrongApplication(let identifier):
-                "L'image contient « \(identifier) », pas VoxoL."
+                tr(
+                    french, "L’image contient « \(identifier) », pas VoxoL.",
+                    "The image contains “\(identifier)”, not VoxoL.")
             case .wrongTeam(let team):
-                "Le téléchargement est signé par une autre équipe (\(team))."
+                tr(
+                    french, "Le téléchargement est signé par une autre équipe (\(team)).",
+                    "The download is signed by a different team (\(team)).")
             case .mountFailed:
-                "L'image disque n'a pas pu être ouverte."
+                tr(
+                    french, "L’image disque n’a pas pu être ouverte.",
+                    "The disk image could not be opened.")
             case .unreadableSignature:
-                "La signature du téléchargement est illisible."
+                tr(
+                    french, "La signature du téléchargement est illisible.",
+                    "The download’s signature could not be read.")
             case .toolFailed(let tool, let status):
-                "\(URL(fileURLWithPath: tool).lastPathComponent) a échoué (\(status))."
+                tr(
+                    french,
+                    "\(URL(fileURLWithPath: tool).lastPathComponent) a échoué (\(status)).",
+                    "\(URL(fileURLWithPath: tool).lastPathComponent) failed (\(status)).")
+            case .downloadRefused(let status):
+                tr(
+                    french, "Le serveur a refusé le téléchargement (erreur \(status)).",
+                    "The server refused the download (error \(status)).")
+            case .unexpectedVersion(let version):
+                tr(
+                    french,
+                    "Le téléchargement contient la version \(version.isEmpty ? "inconnue" : version), pas celle annoncée.",
+                    "The download contains version \(version.isEmpty ? "unknown" : version), not the one announced."
+                )
             }
         }
     }
@@ -387,32 +455,46 @@ private struct UpdateInstallerPanelView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     if let progress = installer.downloadProgress {
                         ProgressView(value: progress)
-                        Text(verbatim: "Téléchargement… \(Int(progress * 100)) %")
-                            .font(.system(size: 12))
+                        Text(
+                            verbatim: tr(
+                                UpdateInstaller.french, "Téléchargement… \(Int(progress * 100)) %",
+                                "Downloading… \(Int(progress * 100))%")
+                        )
+                        .font(.system(size: 12))
                     } else {
-                        progressRow("Téléchargement…")
+                        progressRow(tr(UpdateInstaller.french, "Téléchargement…", "Downloading…"))
                     }
                 }
             case .installing:
-                progressRow("Installation dans Applications…")
+                progressRow(
+                    tr(
+                        UpdateInstaller.french, "Installation dans Applications…",
+                        "Installing into Applications…"))
             case .relaunching:
-                progressRow("Redémarrage…")
+                progressRow(tr(UpdateInstaller.french, "Redémarrage…", "Restarting…"))
             case .failed(let reason):
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(verbatim: "La mise à jour intégrée a échoué : \(reason)")
-                        .font(.system(size: 12))
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        verbatim: tr(
+                            UpdateInstaller.french, "La mise à jour intégrée a échoué : \(reason)",
+                            "The built-in update failed: \(reason)")
+                    )
+                    .font(.system(size: 12))
+                    .fixedSize(horizontal: false, vertical: true)
                     HStack {
                         Spacer()
                         Button {
                             installer.dismissPanel()
                         } label: {
-                            Text(verbatim: "Fermer")
+                            Text(verbatim: tr(UpdateInstaller.french, "Fermer", "Close"))
                         }
                         Button {
                             installer.openReleasePage(UpdateNotifier.shared.available)
                         } label: {
-                            Text(verbatim: "Ouvrir la page de téléchargement")
+                            Text(
+                                verbatim: tr(
+                                    UpdateInstaller.french, "Ouvrir la page de téléchargement",
+                                    "Open the download page"))
                         }
                         .keyboardShortcut(.defaultAction)
                     }
@@ -423,9 +505,8 @@ private struct UpdateInstallerPanelView: View {
         .frame(width: 340, alignment: .leading)
     }
 
-    // Verbatim on purpose: the alert this panel accompanies is written in
-    // French directly (NSAlert has no LocalizedStringKey path), and half-
-    // localizing one flow is worse than none. Localize both together.
+    // Verbatim on purpose: the alert this panel accompanies has no LocalizedStringKey path, so
+    // both pick their words from the interface language at the call site.
     private func progressRow(_ label: String) -> some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)

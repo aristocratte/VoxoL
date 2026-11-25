@@ -176,6 +176,15 @@ final class DictationSessionCoordinator {
     @ObservationIgnored private var destinationApplicationName = "Unknown"
     @ObservationIgnored private var destinationBundleIdentifier: String?
     @ObservationIgnored private var destinationInsertionTarget: TextInsertionTarget?
+    /// The dictation started in a password field. The insertion is refused there, and what was
+    /// said must not end up readable in the history either.
+    @ObservationIgnored private var destinationIsSecureField = false
+    /// A press arrived while the previous dictation was still being processed.
+    @ObservationIgnored private var startWhenIdle = false
+    /// Ends a capture that was never closed: a toggle left on, a key that never came back up.
+    @ObservationIgnored private var captureDeadlineTask: Task<Void, Never>?
+    /// Long enough for any dictation; meetings are the tool for anything longer.
+    static let maximumCaptureDuration: Duration = .seconds(300)
     @ObservationIgnored private var destinationContext: ContextSnapshot?
     @ObservationIgnored private var dictationPressedAt: ContinuousClock.Instant?
     @ObservationIgnored private var pressToCapsuleMilliseconds: Int?
@@ -500,10 +509,15 @@ final class DictationSessionCoordinator {
         livePartialTranscript = ""
         capsuleDismissalTask?.cancel()
         capsuleDismissalTask = nil
+        captureDeadlineTask?.cancel()
+        captureDeadlineTask = nil
+        startWhenIdle = false
+        hotkeyMonitor.captureIsOpen = false
         hotkeyMonitor.stop()
         if audioCapture.isRecording {
             _ = audioCapture.stop()
         }
+        injector.returnClipboardNow()
         state = .waitingForInputMonitoring
     }
 
@@ -576,9 +590,6 @@ private extension DictationSessionCoordinator {
                     holdToTalk.handle(.shortcutReleased)
                     finishDictation(releasedAt: ContinuousClock().now)
                 } else {
-                    guard transcriptionTask == nil else {
-                        return
-                    }
                     toggleSessionIsActive = true
                     shortcutHeld = true
                     holdToTalk.handle(.shortcutPressed)
@@ -610,7 +621,14 @@ private extension DictationSessionCoordinator {
     }
 
     func beginDictation() async {
-        guard !audioCapture.isRecording, transcriptionTask == nil else {
+        guard !audioCapture.isRecording else {
+            return
+        }
+        // A press while the previous dictation is still being written used to vanish, along
+        // with whatever was said. It now waits: the microphone opens the moment the previous
+        // one is done, and the capsule says so by turning to "Listening".
+        guard transcriptionTask == nil else {
+            startWhenIdle = true
             return
         }
 
@@ -653,11 +671,34 @@ private extension DictationSessionCoordinator {
             holdToTalk.handle(.captureStarted)
             state = .listening
             startStatusPolling()
+            hotkeyMonitor.captureIsOpen = true
+            captureDeadlineTask?.cancel()
+            captureDeadlineTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: Self.maximumCaptureDuration)
+                guard !Task.isCancelled, let self, self.audioCapture.isRecording else { return }
+                self.logger.notice("Capture reached its maximum length; finishing")
+                self.toggleSessionIsActive = false
+                self.shortcutHeld = false
+                self.holdToTalk.handle(.shortcutReleased)
+                self.finishDictation(releasedAt: ContinuousClock().now)
+            }
 
             let destination = NSWorkspace.shared.frontmostApplication
             destinationApplicationName = destination?.localizedName ?? "Unknown"
             destinationBundleIdentifier = destination?.bundleIdentifier
-            destinationInsertionTarget = rehearsalIsActive ? nil : (try? injector.captureTarget())
+            destinationIsSecureField = false
+            if rehearsalIsActive {
+                destinationInsertionTarget = nil
+            } else {
+                do {
+                    destinationInsertionTarget = try injector.captureTarget()
+                } catch TextInjectionError.secureField {
+                    destinationInsertionTarget = nil
+                    destinationIsSecureField = true
+                } catch {
+                    destinationInsertionTarget = nil
+                }
+            }
             if setting("voxol.contextEnabled", default: true) {
                 destinationContext = contextProvider.capture()
                 // The words on screen are the best available predictor of the
@@ -847,6 +888,9 @@ private extension DictationSessionCoordinator {
         guard audioCapture.isRecording else {
             return
         }
+        captureDeadlineTask?.cancel()
+        captureDeadlineTask = nil
+        hotkeyMonitor.captureIsOpen = false
         let clock = ContinuousClock()
         performanceSignposter.emitEvent("ShortcutReleased")
         shortcutHeld = false
@@ -917,6 +961,8 @@ private extension DictationSessionCoordinator {
 
         let insertionTarget = destinationInsertionTarget
         destinationInsertionTarget = nil
+        let startedInSecureField = destinationIsSecureField
+        destinationIsSecureField = false
         let capturedContext = destinationContext
         destinationContext = nil
         // Endpointing drives live feedback only. The push-to-talk capture and
@@ -978,6 +1024,12 @@ private extension DictationSessionCoordinator {
             }
             defer {
                 transcriptionTask = nil
+                if startWhenIdle {
+                    startWhenIdle = false
+                    if shortcutHeld {
+                        Task { @MainActor [weak self] in await self?.beginDictation() }
+                    }
+                }
                 if let sessionID {
                     Task {
                         await sessionProcessor?.endPrefetchSession(sessionID)
@@ -997,6 +1049,12 @@ private extension DictationSessionCoordinator {
             // replaces the decoder's bias wholesale, so without them here the
             // screen vocabulary only ever shaped the live preview, never the
             // transcript that got inserted.
+            // The first dictation after launch waits for the recogniser to finish loading, which
+            // takes up to a minute on a cold start. "Transcribing…" for that long reads as a
+            // hang; this says what is actually happening.
+            if let speechRuntime, !(await speechRuntime.isReady) {
+                VoiceCapsuleController.shared.show(.preparingModel)
+            }
             var parakeetContextBiasActive = false
             if let speechRuntime {
                 var decodingVocabulary = speechContextualStrings
@@ -1187,7 +1245,7 @@ private extension DictationSessionCoordinator {
                     return
                 }
 
-                if let transcriptStore {
+                if let transcriptStore, !startedInSecureField {
                     let revisions =
                         rawText == text
                         ? []
@@ -1284,6 +1342,12 @@ private extension DictationSessionCoordinator {
                 VoiceCapsuleController.shared.dismiss()
             } catch let error as TextInjectionError {
                 lastError = error.localizedDescription
+                let copied =
+                    textForRecovery != nil
+                    && InsertionRecoveryPolicy.allowsManualClipboardRecovery(for: error)
+                MetricsRecorder.recordDeliveryFailure(
+                    bundleIdentifier: bundleIdentifier, reason: "\(error)",
+                    copiedForManualPaste: copied)
                 logger.error(
                     "Text delivery failed error=\(error.localizedDescription, privacy: .public)"
                 )
@@ -1318,6 +1382,9 @@ private extension DictationSessionCoordinator {
                     report.failureReason = error.localizedDescription
                 }
                 logger.error("Speech transcription failed: \(error.localizedDescription)")
+                MetricsRecorder.recordDeliveryFailure(
+                    bundleIdentifier: bundleIdentifier, reason: "transcriptionFailed",
+                    copiedForManualPaste: false)
                 VoiceCapsuleController.shared.showError(.transcriptionFailed)
                 dismissCapsule(after: .seconds(2))
             }
@@ -1325,6 +1392,10 @@ private extension DictationSessionCoordinator {
     }
 
     func cancelDictation() {
+        startWhenIdle = false
+        captureDeadlineTask?.cancel()
+        captureDeadlineTask = nil
+        hotkeyMonitor.captureIsOpen = false
         cancelTextPrefetch()
         abandonRehearsal()
         shortcutHeld = false
@@ -2016,8 +2087,15 @@ private enum PersonalBenchmarkRecorder {
                 at: sessions,
                 withIntermediateDirectories: true
             )
-            let usedBytes = directorySize(root)
-            guard usedBytes < maximumBytes else { return }
+            // The cap is for recordings. Measured on the whole folder it also counted the
+            // head-to-head and audit material kept beside them (280 MB on the owner's Mac),
+            // and capture stopped without a word on 22 September.
+            let usedBytes = directorySize(sessions)
+            guard usedBytes < maximumBytes else {
+                os.Logger(subsystem: "com.voxol.VoxoL", category: "benchmark")
+                    .notice("Personal benchmark capture is full; recording skipped")
+                return
+            }
             let availableBytes = maximumBytes - usedBytes
             let asrWAV = wavData(from: samples)
             let files: [String: Data] = [

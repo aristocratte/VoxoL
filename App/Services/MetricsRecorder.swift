@@ -88,6 +88,23 @@ enum MetricsRecorder {
         ])
     }
 
+    /// A dictation that was transcribed but never reached its destination. Only successful
+    /// insertions were logged, so the failure rate could not be read from the metrics at all.
+    /// `reason` is an error kind, never text.
+    static func recordDeliveryFailure(
+        bundleIdentifier: String?, reason: String, copiedForManualPaste: Bool
+    ) {
+        guard !UserDefaults.standard.bool(forKey: "voxol.privateMode") else { return }
+        append([
+            "type": "deliveryFailed",
+            "id": UUID().uuidString,
+            "ts": Int(Date().timeIntervalSince1970),
+            "app": bundleIdentifier ?? "unknown",
+            "reason": reason,
+            "copied": copiedForManualPaste,
+        ])
+    }
+
     /// What the destination field said became of it.
     static func recordOutcome(
         id: UUID,

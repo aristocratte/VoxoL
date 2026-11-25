@@ -158,4 +158,62 @@ final class TranscriptFileStoreTests: XCTestCase {
         let symlink = await store.audioURL(relativePath: "link.m4a")
         XCTAssertNil(symlink)
     }
+
+    func testDeletingARecordsAudioRemovesTheRetainedFile() async throws {
+        let directory = try directory()
+        let audio = directory.appendingPathComponent("Audio/take.wav")
+        try FileManager.default.createDirectory(
+            at: audio.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("samples".utf8).write(to: audio)
+        let store = TranscriptFileStore(directoryURL: directory)
+
+        await store.remove(relativePath: "Audio/take.wav")
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: audio.path))
+    }
+
+    func testDeletingAudioNeverReachesOutsideTheHistoryDirectory() async throws {
+        let directory = try directory()
+        let outside = directory.deletingLastPathComponent()
+            .appendingPathComponent("voxol-outside-\(UUID().uuidString).wav")
+        try Data("someone else's file".utf8).write(to: outside)
+        addTeardownBlock { try? FileManager.default.removeItem(at: outside) }
+        let store = TranscriptFileStore(directoryURL: directory)
+
+        await store.remove(relativePath: "../\(outside.lastPathComponent)")
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
+    }
+
+    func testUnreadableHistoryIsSetAsideSoNewDictationsCanBeSaved() async throws {
+        let directory = try directory()
+        let url = directory.appendingPathComponent("transcripts.json")
+        let damaged = Data("{\"records\": [interrupted write".utf8)
+        try damaged.write(to: url)
+        let store = TranscriptFileStore(directoryURL: directory)
+        _ = try? await store.load()
+
+        let kept = try await store.setAsideUnreadableArchive()
+
+        XCTAssertEqual(try Data(contentsOf: kept), damaged)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        let archive = TranscriptArchive(records: [record])
+        try await store.save(archive)
+        let reloaded = try await store.load()
+        XCTAssertEqual(reloaded, archive)
+    }
+
+    func testAReadableHistoryIsNeverSetAside() async throws {
+        let store = TranscriptFileStore(directoryURL: try directory())
+        _ = try? await store.load()
+        try await store.save(TranscriptArchive(records: [record]))
+        _ = try await store.load()
+
+        do {
+            _ = try await store.setAsideUnreadableArchive()
+            XCTFail("A history that loads must stay where it is")
+        } catch {
+            XCTAssertEqual(error as? TranscriptFileStoreError, .archiveIsReadable)
+        }
+    }
 }

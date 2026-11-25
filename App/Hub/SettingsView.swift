@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Hashable {
@@ -27,6 +28,7 @@ struct SettingsView: View {
     @Environment(PermissionCoordinator.self) private var permissions
     @Environment(PersonalizationStore.self) private var personalization
     @Environment(DictationSessionCoordinator.self) private var dictationSession
+    @Environment(TranscriptStore.self) private var transcripts
     @Environment(\.locale) private var locale
 
     @Binding var languageCode: String
@@ -44,6 +46,11 @@ struct SettingsView: View {
     @AppStorage("voxol.contextEnabled") private var contextEnabled = true
     @AppStorage("voxol.learningEnabled") private var learningEnabled = true
     @AppStorage("voxol.correctionCapture") private var correctionCapture = false
+    @AppStorage("voxol.automaticUpdateCheck") private var automaticUpdateCheck = true
+
+    @State private var confirmingHistoryErasure = false
+    @State private var exportFailed = false
+    @State private var callAudioAllowed = CGPreflightScreenCaptureAccess()
 
     var body: some View {
         HubPage {
@@ -67,11 +74,17 @@ struct SettingsView: View {
             .transition(.opacity)
         }
         .editorialDropdownHost()
-        .onChange(of: privateMode) { _, enabled in
-            if enabled {
-                historyEnabled = false
-                learningEnabled = false
-            }
+        .alert("The export failed", isPresented: $exportFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(
+                "Nothing was saved. Check the destination folder and the free disk space, then try again."
+            )
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        ) { _ in
+            callAudioAllowed = CGPreflightScreenCaptureAccess()
         }
     }
 
@@ -203,15 +216,15 @@ struct SettingsView: View {
                     HubField(
                         title: "Local engines",
                         detail: models.manifestLoadFailed
-                            ? Text("The verified manifest could not be loaded")
-                            : Text("Checking verified artifacts…")
+                            ? Text("The model list could not be read. Reinstall VoxoL.")
+                            : Text("Checking the models…")
                     ) {
                         ProgressView().controlSize(.small)
                     }
                 } else {
                     ForEach(models.items) { item in
                         HubField(
-                            title: item.model.role == .asr ? "Parakeet" : "Qwen",
+                            title: item.model.role == .asr ? "Speech recognition" : "Text cleanup",
                             detail: Text(modelDetail(item))
                         ) {
                             modelAction(item)
@@ -258,14 +271,14 @@ struct SettingsView: View {
 
     private func modelDetail(_ item: ModelInstallationItem) -> LocalizedStringKey {
         switch item.phase {
-        case .loading: "Checking the local artifact"
-        case .awaitingVerifiedArtifact: "No release artifact has passed verification"
-        case .readyToDownload: "Verified artifact ready to install"
+        case .loading: "Checking the installed model"
+        case .awaitingVerifiedArtifact: "Not available for download yet"
+        case .readyToDownload: "Ready to download"
         case .downloading:
             LocalizedStringKey("Downloading · \(Int((item.progress * 100).rounded())) %")
         case .paused:
             LocalizedStringKey("Paused · \(Int((item.progress * 100).rounded())) %")
-        case .verifying: "Verifying checksum and runtime"
+        case .verifying: "Checking the download"
         case .installed: "Installed and verified on this Mac"
         case .failed:
             LocalizedStringKey(item.failureReason ?? String("Installation failed", in: locale))
@@ -287,6 +300,28 @@ struct SettingsView: View {
                 permissionField(
                     .inputMonitoring, title: "Input Monitoring",
                     detail: "Detect your shortcut in other apps")
+                // Optional, and only for meetings: without it a call recording failed with a
+                // ScreenCaptureKit error and nothing here said why.
+                HubField(
+                    title: "Screen & System Audio Recording",
+                    detail: Text("Record the other side of a call, for meetings only")
+                ) {
+                    if callAudioAllowed {
+                        Label("Allowed", systemImage: "checkmark")
+                            .font(VoxoLTypography.font(size: 13, weight: .medium))
+                            .foregroundStyle(theme.success)
+                    } else {
+                        Button("Open Settings") {
+                            if let url = URL(
+                                string:
+                                    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+                            ) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(HubButtonStyle(kind: .onWell))
+                    }
+                }
                 HubField(
                     title: "Local engines",
                     detail: Text("\(models.installedCount) of \(models.items.count) installed")
@@ -366,6 +401,14 @@ struct SettingsView: View {
                         .disabled(privateMode)
                 }
                 HubField(
+                    title: "Saved dictations",
+                    detail: Text("\(transcripts.records.count) kept on this Mac")
+                ) {
+                    Button("Erase history") { confirmingHistoryErasure = true }
+                        .buttonStyle(HubButtonStyle(kind: .onWell))
+                        .disabled(transcripts.records.isEmpty)
+                }
+                HubField(
                     title: "Bounded context",
                     detail: Text("Use nearby text only for the current dictation")
                 ) {
@@ -414,6 +457,18 @@ struct SettingsView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Erase all saved dictations?", isPresented: $confirmingHistoryErasure,
+            titleVisibility: .visible
+        ) {
+            Button("Erase history", role: .destructive) {
+                Task { await transcripts.deleteAll() }
+            }
+        } message: {
+            Text(
+                "Every dictation and every recording kept with it is removed from this Mac. This cannot be undone."
+            )
+        }
     }
 
     // MARK: About
@@ -438,6 +493,14 @@ struct SettingsView: View {
                     }
                     .buttonStyle(HubButtonStyle(kind: .onWell))
                     .disabled(UpdateNotifier.shared.isChecking)
+                }
+                HubField(
+                    title: "Automatic update check",
+                    detail: Text(
+                        "Reads the public release list on GitHub at launch, then every six hours")
+                ) {
+                    Toggle("Automatic update check", isOn: $automaticUpdateCheck)
+                        .toggleStyle(HubSwitchStyle())
                 }
                 HubField(
                     title: "Report a problem",
@@ -482,20 +545,24 @@ struct SettingsView: View {
     }
 
     private func exportCorrections() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "voxol-reviewed-corrections.jsonl"
-        guard panel.runModal() == .OK, let url = panel.url,
-            let data = try? personalization.correctionExportData()
-        else { return }
-        try? data.write(to: url, options: .atomic)
+        save(named: "voxol-reviewed-corrections.jsonl") {
+            try personalization.correctionExportData()
+        }
     }
 
     private func exportDiagnostics() {
+        save(named: "voxol-diagnostics.json") { try dictationSession.diagnosticsExportData() }
+    }
+
+    /// A failed export used to end in silence, which reads exactly like a successful one.
+    private func save(named name: String, data: () throws -> Data) {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "voxol-diagnostics.json"
-        guard panel.runModal() == .OK, let url = panel.url,
-            let data = try? dictationSession.diagnosticsExportData()
-        else { return }
-        try? data.write(to: url, options: .atomic)
+        panel.nameFieldStringValue = name
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try data().write(to: url, options: .atomic)
+        } catch {
+            exportFailed = true
+        }
     }
 }

@@ -329,6 +329,11 @@ public enum DeterministicTextProcessor {
             )
         }
 
+        // Before anything protects or reads the words: an echo looks like a file name
+        // ("direction.ction") and would otherwise be carried through untouched.
+        let withoutEchoes = removeSeamEchoes(in: text)
+        didDeterministicRewrite = didDeterministicRewrite || withoutEchoes != text
+        text = withoutEchoes
         let correctedText = resolveExplicitCorrections(in: text, language: language)
         didDeterministicRewrite = didDeterministicRewrite || correctedText != text
         text = correctedText
@@ -414,10 +419,29 @@ public enum DeterministicTextProcessor {
         // for prose to matter, where the model would only add latency. Lists
         // stay out because their shape is already the meaning, and reflowing
         // them is damage rather than polish.
+        //
+        // Faithful cleanup narrows that further. It promises the words that were said, so
+        // there is no spoken syntax for the model to rewrite; measured on the owner's own
+        // dictations it returned its input unchanged six times in ten, added more errors
+        // than it removed in the rest, and took two thirds of the wait. In faithful mode the
+        // model is asked only where the deterministic pass left something unresolved.
+        // Rewrite keeps the rule above, and switching the fast path off still asks every time.
         let isTrivialFragment = promptWordCount < 3
-        let needsPolisher =
-            hasUnresolvedSpeechArtifacts
-            || (!isTrivialFragment && !isStructuredList(promptText))
+        let needsPolisher: Bool
+        if request.preferences.cleanupMode == .rewrite {
+            needsPolisher =
+                hasUnresolvedSpeechArtifacts
+                || (!isTrivialFragment && !isStructuredList(promptText))
+        } else {
+            // What the deterministic pass cannot settle on its own: which of two things the
+            // speaker meant after "non" or "plutôt" (read on the transcript as heard, because
+            // removing the marker hides the contradiction it announced), and the debris the
+            // recogniser leaves when it stitches two windows.
+            needsPolisher =
+                containsSelfCorrectionMarker(
+                    normalizeWhitespace(request.rawTranscript), language: language)
+                || containsRecognizerDebris(promptText, language: language)
+        }
         let fastPath =
             request.preferences.fastPathEnabled
             && !needsPolisher
@@ -1385,6 +1409,59 @@ private extension DeterministicTextProcessor {
         }
         return patterns.contains { matches($0, in: input) }
             || matches(#"(?iu)\b([\p{L}]{2,})\b[ ,]+\1\b"#, in: input)
+            // A word whose ending is written twice ("regarderarder") is the recogniser
+            // stitching two windows badly. Real words do this too ("rechercher"), so it is
+            // only a reason to ask the model, never a reason to edit.
+            || matches(#"(?iu)\b[\p{L}]+?([\p{L}]{3,})\1\b"#, in: input)
+    }
+
+    /// A word that takes back what was just said. The crutches of speech ("du coup", "en
+    /// fait") are not here: faithful cleanup keeps them, so they give the model nothing to do.
+    static func containsSelfCorrectionMarker(_ input: String, language: TextLanguage) -> Bool {
+        let pattern =
+            switch language {
+            case .english: #"(?i)\b(?:actually|rather|sorry|I mean)\b"#
+            case .french: #"(?i)\b(?:enfin|plutôt|pardon|non|je veux dire)\b"#
+            }
+        return matches(pattern, in: input)
+    }
+
+    /// A hesitation the filler pass left behind, a word said twice in a row, or a word whose
+    /// ending is written twice.
+    static func containsRecognizerDebris(_ input: String, language: TextLanguage) -> Bool {
+        let hesitation =
+            switch language {
+            case .english: #"(?i)\b(?:um+|uh+|erm+)\b"#
+            case .french: #"(?i)\b(?:euh+|heu+|hum+)\b"#
+            }
+        return matches(hesitation, in: input)
+            || matches(#"(?iu)\b([\p{L}]{2,})\b[ ,]+\1\b"#, in: input)
+            || matches(#"(?iu)\b[\p{L}]+?([\p{L}]{3,})\1\b"#, in: input)
+    }
+
+    /// Drops the fragment left when two audio windows overlap: "direction.ction" repeats the
+    /// end of the word before it. Only a lowercase fragment that is exactly that word's ending
+    /// goes, so "Next.js" and "agent.md" stay as they are.
+    static func removeSeamEchoes(in input: String) -> String {
+        let pattern = #"([\p{L}]{3,})\. ?([\p{Ll}]{2,})(?![\p{L}\p{N}_])"#
+        guard let regex = try? RegularExpressionCache.shared.expression(pattern: pattern) else {
+            return input
+        }
+        var result = input
+        let matches = regex.matches(
+            in: result, range: NSRange(result.startIndex..<result.endIndex, in: result))
+        for match in matches.reversed() {
+            guard
+                let whole = Range(match.range, in: result),
+                let wordRange = Range(match.range(at: 1), in: result),
+                let echoRange = Range(match.range(at: 2), in: result)
+            else { continue }
+            let word = String(result[wordRange])
+            let echo = String(result[echoRange])
+            guard word.count > echo.count, word.lowercased().hasSuffix(echo) else { continue }
+            result.replaceSubrange(whole, with: word)
+        }
+        return result
     }
 
     static func isStructuredList(_ input: String) -> Bool {

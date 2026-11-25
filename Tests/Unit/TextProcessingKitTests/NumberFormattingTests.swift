@@ -188,7 +188,10 @@ final class PolisherGatingTests: XCTestCase {
             TextProcessingRequest(
                 rawTranscript: text,
                 preferredLanguage: .french,
-                preferences: TextProcessingPreferences(fastPathEnabled: true)
+                // These gates describe the rewrite promise: turning speech into writing is
+                // the model's work. Faithful cleanup has its own, narrower rule
+                // (`SeamAndRoutingTests`).
+                preferences: TextProcessingPreferences(cleanupMode: .rewrite, fastPathEnabled: true)
             )
         )
     }
@@ -273,7 +276,10 @@ final class SpokenFrenchGatingTests: XCTestCase {
             TextProcessingRequest(
                 rawTranscript: text,
                 preferredLanguage: .french,
-                preferences: TextProcessingPreferences(fastPathEnabled: true)
+                // These gates describe the rewrite promise: turning speech into writing is
+                // the model's work. Faithful cleanup has its own, narrower rule
+                // (`SeamAndRoutingTests`).
+                preferences: TextProcessingPreferences(cleanupMode: .rewrite, fastPathEnabled: true)
             )
         )
     }

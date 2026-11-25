@@ -48,7 +48,10 @@ final class ResumableFileDownload: NSObject, URLSessionDataDelegate, @unchecked 
                 let configuration = URLSessionConfiguration.ephemeral
                 configuration.timeoutIntervalForRequest = 60
                 configuration.timeoutIntervalForResource = 86_400
-                configuration.waitsForConnectivity = true
+                // Waiting for connectivity left an offline first launch at 0 % for up to a day
+                // with no message. Failing at once names the cause; the partial file is kept, so
+                // a retry resumes rather than restarts.
+                configuration.waitsForConnectivity = false
 
                 let delegateQueue = OperationQueue()
                 delegateQueue.name = "com.voxol.model-download"
@@ -115,7 +118,7 @@ final class ResumableFileDownload: NSObject, URLSessionDataDelegate, @unchecked 
     ) {
         do {
             guard let http = response as? HTTPURLResponse else {
-                throw ResumableDownloadError.invalidResponse
+                throw ResumableDownloadError.invalidResponse(statusCode: 0)
             }
 
             let shouldAppend: Bool
@@ -136,7 +139,7 @@ final class ResumableFileDownload: NSObject, URLSessionDataDelegate, @unchecked 
                 shouldAppend = requestedOffset > 0
                 receivedBytes = requestedOffset
             default:
-                throw ResumableDownloadError.invalidResponse
+                throw ResumableDownloadError.invalidResponse(statusCode: http.statusCode)
             }
 
             if !FileManager.default.fileExists(atPath: partialURL.path) {
@@ -250,8 +253,8 @@ private extension ResumableFileDownload {
     }
 }
 
-private enum ResumableDownloadError: Error {
-    case invalidResponse
+enum ResumableDownloadError: Error {
+    case invalidResponse(statusCode: Int)
     case invalidContentRange
     case cannotCreatePartialFile
     case downloadSizeMismatch

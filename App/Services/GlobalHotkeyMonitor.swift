@@ -35,12 +35,13 @@ enum DictationShortcut: String, CaseIterable, Identifiable {
     }
 
     var label: String {
-        switch self {
-        case .optionSpace: "⌥ Space"
-        case .controlSpace: "⌃ Space"
-        case .rightCommand: "⌘ droite"
-        case .rightOption: "⌥ droite"
-        case .rightControl: "⌃ droite"
+        let french = UserDefaults.standard.string(forKey: "voxol.interfaceLanguage") == "fr"
+        return switch self {
+        case .optionSpace: french ? "⌥ Espace" : "⌥ Space"
+        case .controlSpace: french ? "⌃ Espace" : "⌃ Space"
+        case .rightCommand: french ? "⌘ droite" : "Right ⌘"
+        case .rightOption: french ? "⌥ droite" : "Right ⌥"
+        case .rightControl: french ? "⌃ droite" : "Right ⌃"
         case .fnKey: "fn"
         }
     }
@@ -108,6 +109,9 @@ final class GlobalHotkeyMonitor {
     /// Set when another key is pressed during a solo hold: the user was typing a combination,
     /// not dictating, so the capture is cancelled and not restarted until the key comes back up.
     private var soloModifierAborted = false
+    /// Set by the session while a capture is open after the shortcut was let go (toggle mode),
+    /// so Escape can still cancel it.
+    var captureIsOpen = false
 
     init(action: @escaping (GlobalHotkeyAction) -> Void) {
         self.action = action
@@ -173,6 +177,7 @@ final class GlobalHotkeyMonitor {
             if let eventTap {
                 CGEvent.tapEnable(tap: eventTap, enable: true)
             }
+            releaseIfLetGoWhileDisabled()
             return true
         }
 
@@ -215,7 +220,7 @@ final class GlobalHotkeyMonitor {
             return true
         }
 
-        if keyCode == 53, dictationSpaceIsDown {
+        if keyCode == 53, dictationSpaceIsDown || soloModifierIsDown || captureIsOpen {
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             if !cancelKeyIsDown && !isRepeat {
                 cancelKeyIsDown = true
@@ -234,13 +239,17 @@ final class GlobalHotkeyMonitor {
         let hasControl = flags.contains(.maskControl)
 
         let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-        if hasOption, hasShift, !hasCommand, !hasControl {
-            if !testSpaceIsDown && !isRepeat {
-                testSpaceIsDown = true
-                action(.insertionTestRequested)
+        // A developer aid only: in a shipped build this combination typed a test sentence into
+        // whatever the user had in front of them, and swallowed a key they may have bound elsewhere.
+        #if DEBUG
+            if hasOption, hasShift, !hasCommand, !hasControl {
+                if !testSpaceIsDown && !isRepeat {
+                    testSpaceIsDown = true
+                    action(.insertionTestRequested)
+                }
+                return false
             }
-            return false
-        }
+        #endif
 
         guard DictationShortcut.current.matches(flags) else {
             return true
@@ -255,6 +264,23 @@ final class GlobalHotkeyMonitor {
 }
 
 extension GlobalHotkeyMonitor {
+    /// The system disables a tap that answered too slowly, and whatever happened meanwhile is
+    /// never delivered. A release lost that way left the microphone open until the next press,
+    /// so on re-enabling the keys are read directly and a hold that has ended is ended.
+    fileprivate func releaseIfLetGoWhileDisabled() {
+        if dictationSpaceIsDown, !CGEventSource.keyState(.combinedSessionState, key: 49) {
+            dictationSpaceIsDown = false
+            action(.dictationReleased)
+        }
+        if soloModifierIsDown, let soloFlag = DictationShortcut.current.soloFlag,
+            !CGEventSource.flagsState(.combinedSessionState).contains(soloFlag)
+        {
+            soloModifierIsDown = false
+            soloModifierAborted = false
+            action(.dictationReleased)
+        }
+    }
+
     /// Turns a modifier press and release into the same hold-to-talk gesture as a key combination.
     fileprivate func handleFlagsChanged(keyCode: Int64, flags: CGEventFlags) {
         let shortcut = DictationShortcut.current

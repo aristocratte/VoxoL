@@ -122,7 +122,6 @@
 "Local" = "Local";
 "Local by design" = "Local par conception";
 "Local dictionary and deterministic replacements" = "Dictionnaire local et remplacements déterministes";
-"Local engines" = "Les moteurs";
 "Local engines · settings" = "Moteurs locaux";
 "Local history" = "Historique local";
 "Local history is on" = "L’historique local est activé";
@@ -152,7 +151,6 @@
 "Parakeet TDT 0.6B v3" = "Parakeet TDT 0.6B v3";
 "Parakeet · local engine" = "Parakeet · moteur local";
 "Performance budgets" = "Budgets de performance";
-"Permissions" = "Les accès";
 "Personal dictionary" = "Dictionnaire personnel";
 "Personalize" = "Personnaliser";
 "Pinned manifests exist; runtime artifacts are not installed" = "Les manifests sont épinglés ; les artefacts runtime ne sont pas installés";
@@ -190,7 +188,6 @@
 "Recovery without surveillance." = "Récupérer sans surveiller.";
 "Remove clear hesitation sounds without changing intent." = "Supprimer les hésitations évidentes sans modifier l’intention.";
 "Remove fillers" = "Supprimer les hésitations";
-"Replay" = "Revoir";
 "Replay Preflight" = "Revoir le Preflight";
 "Replay the guided setup and interactive product tour." = "Relancer la configuration guidée et la visite interactive.";
 "Required to hear your dictation" = "Requis pour entendre votre dictée";
@@ -218,7 +215,7 @@
 "Snippet library" = "Bibliothèque de snippets";
 "Snippets" = "Snippets";
 "Soon" = "Bientôt";
-"Speak naturally" = "Parlez naturellement";
+"Speak naturally" = "Parle naturellement";
 "Speak naturally. VoxoL prepares faithful text for any app, locally on your Mac." = "Parlez naturellement. VoxoL prépare localement un texte fidèle pour chaque app sur votre Mac.";
 "Speech recognition" = "Reconnaissance vocale";
 "Speech recognition · immutable source revision pinned" = "Reconnaissance vocale · révision source immuable épinglée";
@@ -268,14 +265,14 @@
 "Voice workspace" = "Espace vocal";
 "VoxoL" = "VoxoL";
 "VoxoL explains every permission before macOS asks. This prototype requests nothing." = "VoxoL explique chaque autorisation avant la demande de macOS. Ce prototype ne demande rien.";
-"VoxoL preserves your meaning and prepares the text locally." = "VoxoL préserve votre sens et prépare le texte localement.";
+"VoxoL preserves your meaning and prepares the text locally." = "VoxoL préserve ton sens et prépare le texte localement.";
 "Warm total memory" = "Mémoire totale à chaud";
 "Website domain" = "Domaine du site";
 "Welcome to VoxoL" = "Bienvenue dans VoxoL";
 "What VoxoL is built to do" = "Ce que VoxoL est conçu pour faire";
 "When available" = "Lorsque disponible";
 "Workspace" = "Espace de travail";
-"Your voice, ready to use." = "Votre voix, prête à l’emploi.";
+"Your voice, ready to use." = "Ta voix, prête à l’emploi.";
 "Your words stay with you." = "Vos mots restent avec vous.";
 "Your words, pronounced your way." = "Vos mots, prononcés à votre façon.";
 "p95 release to paste" = "p95 du relâchement à l’insertion";
@@ -283,7 +280,6 @@
 "• Timeline: needs another pass" = "• Calendrier : à revoir";
 
 /* Functional setup, activity dashboard and compact capsule. */
-"%lld WPM" = "%lld mots/min";
 "%lld words" = "%lld mots";
 "%lld%%" = "%lld %%";
 "Across speaking time" = "Sur l’ensemble du temps de parole";
@@ -298,7 +294,7 @@
 "Checking runtime artifacts…" = "Vérification des artefacts runtime…";
 "Checksum and local artifact validation passed" = "Somme de contrôle et validation locale de l’artefact réussies";
 "Copied" = "Copié";
-"Copied · press ⌘V" = "Copié · appuyez sur ⌘V";
+"Copied · press ⌘V" = "Copié · appuie sur ⌘V";
 "Copy text" = "Copier le texte";
 "Couldn’t insert text" = "Impossible d’insérer le texte";
 "Couldn’t transcribe" = "Impossible de transcrire";
@@ -307,7 +303,7 @@
 "Download" = "Télécharger";
 "Download or verification failed" = "Échec du téléchargement ou de la vérification";
 "Download progress is measured by bytes, then every file is verified before use." = "La progression est mesurée en octets, puis chaque fichier est vérifié avant utilisation.";
-"Enable text history to keep future dictations locally." = "Activez l’historique texte pour conserver les prochaines dictées localement.";
+"Enable text history to keep future dictations locally." = "Active l’historique texte pour conserver les prochaines dictées localement.";
 "Every retained result, in one place." = "Tous les résultats conservés, au même endroit.";
 "Example" = "Exemple";
 "Example activity" = "Activité d’exemple";
@@ -317,10 +313,10 @@
 "Got it" = "Compris";
 "Grant each permission yourself. VoxoL checks the real macOS status live." = "Accordez chaque autorisation vous-même. VoxoL vérifie en direct leur état réel dans macOS.";
 "Grant the required permissions to continue" = "Accordez les autorisations requises pour continuer";
-"Hear the words you choose to dictate" = "Entendre les mots que vous choisissez de dicter";
+"Hear the words you choose to dictate" = "Entendre les mots que tu choisis de dicter";
 "History could not be loaded" = "Impossible de charger l’historique";
 "History could not be saved" = "Impossible d’enregistrer l’historique";
-"Hover a result to copy it, restore its previous edit or export retained audio." = "Survolez un résultat pour le copier, restaurer sa version précédente ou exporter l’audio conservé.";
+"Hover a result to copy it, restore its previous edit or export retained audio." = "Survole un résultat pour le copier, restaurer sa version précédente ou exporter l’audio conservé.";
 "In retained dictations" = "Dans les dictées conservées";
 "Input Monitoring" = "Entrée clavier";
 "Insert prepared text into the active app" = "Insérer le texte préparé dans l’app active";
@@ -355,24 +351,24 @@
 "Review, copy and recover transcript revisions without sending your words anywhere." = "Consultez, copiez et restaurez les versions de vos transcriptions sans envoyer vos mots ailleurs.";
 "Runtime manifest could not be loaded" = "Impossible de charger le manifeste runtime";
 "Search transcriptions" = "Rechercher dans les transcriptions";
-"See how much you dictate, how quickly you speak and every locally retained result." = "Consultez votre volume de dictée, votre débit de parole et tous les résultats conservés localement.";
+"See how much you dictate, how quickly you speak and every locally retained result." = "Consulte ton volume de dictée, ton débit de parole et tous les résultats conservés localement.";
 "Setup" = "Configuration";
 "Something went wrong" = "Un problème est survenu";
 "Speaking time" = "Temps de parole";
 "Text history is local and opt-in. Audio is not retained by the current capture path." = "L’historique texte est local et facultatif. Le parcours de capture actuel ne conserve aucun audio.";
-"Text history is local and opt-in. Audio remains off unless you explicitly enable retention later." = "L’historique texte est local et facultatif. L’audio reste désactivé tant que vous ne choisissez pas de le conserver.";
+"Text history is local and opt-in. Audio remains off unless you explicitly enable retention later." = "L’historique texte est local et facultatif. L’audio reste désactivé tant que tu ne choisis pas de le conserver.";
 "Text is written only to this Mac after a successful dictation." = "Le texte n’est écrit que sur ce Mac après une dictée réussie.";
 "The bundled model contract is missing or invalid." = "Le contrat de modèles inclus est absent ou invalide.";
 "Transcriptions" = "Transcriptions";
 "Try a different word or application name." = "Essayez un autre mot ou nom d’application.";
 "Verified runtime build not published yet" = "Build runtime vérifié pas encore publié";
 "Verifying SHA-256…" = "Vérification SHA-256…";
-"Visible for UI review only · never written to your history" = "Visible uniquement pour vérifier l’interface · jamais enregistré dans votre historique";
+"Visible for UI review only · never written to your history" = "Visible uniquement pour vérifier l’interface · jamais enregistré dans ton historique";
 "Word activity over the last 7 days" = "Activité en mots sur les 7 derniers jours";
 "Word volume by day" = "Volume de mots par jour";
 "Words" = "Mots";
-"Your next successful dictation will appear here." = "Votre prochaine dictée réussie apparaîtra ici.";
-"Your voice, at a glance." = "Votre voix, en un coup d’œil.";
+"Your next successful dictation will appear here." = "Ta prochaine dictée réussie apparaîtra ici.";
+"Your voice, at a glance." = "Ta voix, en un coup d’œil.";
 "·" = "·";
 
 /* Live capture, shortcut and insertion states. */
@@ -1006,7 +1002,7 @@
 /* Signalement */
 "Report" = "Signaler";
 "Report a problem" = "Signaler un problème";
-"Opens a prefilled issue · timings only, never your text" = "Ouvre un ticket prérempli · uniquement des mesures, jamais votre texte";
+"Opens a prefilled issue · timings only, never your text" = "Ouvre un ticket prérempli · uniquement des mesures, jamais ton texte";
 "Personal benchmark capture" = "Capture de référence personnelle";
 
 /* Historique : rétablir */
@@ -1019,11 +1015,11 @@
 "Cleanup runs on long dictations" = "La correction s'applique aux dictées longues";
 "It was skipped past twenty-four words — exactly the dictations that needed it most, which is why they read like a raw transcript." = "Elle était ignorée au-delà de vingt-quatre mots — précisément les dictées qui en avaient le plus besoin, d'où ce texte qui ressemblait à une transcription brute.";
 "History and statistics are on by default" = "L'historique et les statistiques sont activés par défaut";
-"They stayed off until you found the switch, so a fresh install showed zeroes forever. Private mode still turns everything off in one click." = "Ils restaient désactivés jusqu'à ce que vous trouviez le réglage, et une nouvelle installation affichait donc des zéros indéfiniment. Le mode privé désactive toujours tout en un clic.";
+"They stayed off until you found the switch, so a fresh install showed zeroes forever. Private mode still turns everything off in one click." = "Ils restaient désactivés jusqu'à ce que tu trouves le réglage, et une nouvelle installation affichait donc des zéros indéfiniment. Le mode privé désactive toujours tout en un clic.";
 "Undo now has a redo" = "L'annulation a désormais un rétablissement";
-"Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them." = "Restaurer le texte brut détruisait définitivement la version corrigée. Vous pouvez maintenant naviguer dans les deux sens et les comparer.";
-"Updates find you" = "Les mises à jour viennent à vous";
-"VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings." = "VoxoL vérifie seul les nouvelles versions et les signale dans la barre latérale, au lieu d'attendre que vous ouvriez les réglages.";
+"Restoring the raw text used to destroy the cleaned-up version for good. You can step both ways and compare them." = "Restaurer le texte brut détruisait définitivement la version corrigée. Tu peux maintenant naviguer dans les deux sens et les comparer.";
+"Updates find you" = "Les mises à jour viennent à toi";
+"VoxoL checks for new versions on its own and shows them in the sidebar, instead of waiting for you to open Settings." = "VoxoL vérifie seul les nouvelles versions et les signale dans la barre latérale, au lieu d'attendre que tu ouvres les réglages.";
 
 /* Traitement micro + qualité de prise */
 "Microphone cleanup" = "Nettoyage du micro";
@@ -1032,8 +1028,8 @@
 "Automatic" = "Automatique";
 "Always on" = "Toujours actif";
 "Off" = "Désactivé";
-"Weak signal — closer to the mic?" = "Signal faible — rapprochez-vous du micro ?";
-"Input too loud — lower the gain" = "Entrée saturée — baissez le niveau d'entrée";
+"Weak signal — closer to the mic?" = "Signal faible — rapproche-toi du micro ?";
+"Input too loud — lower the gain" = "Entrée saturée — baisse le niveau d'entrée";
 
 /* Apprentissage du dictionnaire */
 "New word learned" = "Nouveau mot appris";
@@ -1065,11 +1061,11 @@
 /* Notes de version 0.1.4 */
 "One bad sentence no longer costs the good ones." = "Une phrase ratée ne coûte plus les bonnes.";
 "Sentence-level repair" = "Réparation phrase par phrase";
-"When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded." = "Quand le modèle de correction abîme une phrase, seule cette phrase revient à ce que vous avez dit — le reste de ses améliorations est conservé au lieu d'être jeté.";
+"When the cleanup model damages one sentence, only that sentence reverts to what you said — the rest of its improvements are kept instead of discarded." = "Quand le modèle de correction abîme une phrase, seule cette phrase revient à ce que tu as dit — le reste de ses améliorations est conservé au lieu d'être jeté.";
 "Meaning is guarded harder" = "Le sens est mieux gardé";
 "Quantifiers, obligations, conditions and exceptions — “aucun”, “doit”, “sauf” — now survive every cleanup verbatim, in both modes, verified by hundreds of generated attack cases." = "Quantificateurs, obligations, conditions et exceptions — « aucun », « doit », « sauf » — survivent désormais mot pour mot à chaque correction, dans les deux modes, vérifié par des centaines de cas d'attaque générés.";
 "Learning that can back down" = "Un apprentissage qui sait reculer";
-"A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself." = "Un mot appris que vous corrigez est mis en pause immédiatement : une mauvaise déduction ne peut jamais s'auto-renforcer.";
+"A learned word you correct away is paused immediately, so a wrong guess can never reinforce itself." = "Un mot appris que tu corriges est mis en pause immédiatement : une mauvaise déduction ne peut jamais s'auto-renforcer.";
 
 /* Studio d’entraînement */
 "Training" = "Entraînement";
@@ -1274,7 +1270,7 @@
 
 "No speech was transcribed in this recording." = "Aucune parole n’a été transcrite dans cet enregistrement.";
 
-"The transcript is available, but saving failed. Export it to keep a copy." = "La transcription est disponible, mais son enregistrement a échoué. Exportez-la pour en garder une copie.";
+"The transcript is available, but saving failed. Export it to keep a copy." = "La transcription est disponible, mais son enregistrement a échoué. Exporte-la pour en garder une copie.";
 
 "Correct speaker" = "Corriger l’intervenant";
 
@@ -1320,13 +1316,13 @@
 
 "This media format could not be read." = "Ce format de fichier ne peut pas être lu.";
 
-"Allow microphone access in System Settings to record a meeting." = "Autorisez le microphone dans Réglages Système pour enregistrer une réunion.";
+"Allow microphone access in System Settings to record a meeting." = "Autorise le microphone dans Réglages Système pour enregistrer une réunion.";
 
 "The microphone recording could not start." = "L’enregistrement du microphone n’a pas pu démarrer.";
 
 "No display is available for capturing call audio." = "Aucun écran n’est disponible pour capturer le son de l’appel.";
 
-"Audio could not be saved. Check the available disk space." = "L’audio n’a pas pu être enregistré. Vérifiez l’espace disque disponible.";
+"Audio could not be saved. Check the available disk space." = "L’audio n’a pas pu être enregistré. Vérifie l’espace disque disponible.";
 
 "No audio was received from the call." = "Aucun son n’a été reçu de l’appel.";
 
@@ -1481,9 +1477,9 @@
 "Temps écoulé" = "Temps écoulé";
 "Terminer" = "Terminer";
 "Texte modifié · à revérifier" = "Texte modifié · à revérifier";
-"The PDF could not be exported. Try again." = "Le PDF n’a pas pu être exporté. Réessayez.";
+"The PDF could not be exported. Try again." = "Le PDF n’a pas pu être exporté. Réessaie.";
 "The document follows the topics of your meeting." = "Le document s’adapte aux sujets de votre réunion.";
-"The report is available, but saving failed. Export it to keep a copy." = "Le compte rendu est disponible, mais son enregistrement a échoué. Exportez-le pour en conserver une copie.";
+"The report is available, but saving failed. Export it to keep a copy." = "Le compte rendu est disponible, mais son enregistrement a échoué. Exporte-le pour en conserver une copie.";
 "The sources changed. Review this report again." = "Les sources ont changé. Ce compte rendu est à revérifier.";
 "The transcript changed after this draft. Generate a new one." = "La transcription a changé depuis ce brouillon. Relancez la rédaction.";
 "These notes are separate from the recorded conversation." = "Ces notes restent distinctes des propos transcrits.";
@@ -1500,7 +1496,7 @@
 "Vos notes personnelles" = "Vos notes personnelles";
 "Vos titres apparaîtront ici." = "Vos titres apparaîtront ici.";
 "Votre compte rendu prend forme…" = "Votre compte rendu prend forme…";
-"Votre document" = "Votre document";
+"Votre document" = "Ton document";
 "Votre document actuel sera conservé dans les versions." = "Votre document actuel sera conservé dans les versions.";
 "Votre fichier est conservé. Installez les modèles de transcription et de reconnaissance des voix pour créer le compte rendu." = "Votre fichier est conservé. Installez les modèles de transcription et de reconnaissance des voix pour créer le compte rendu.";
 "Votre semaine de conversations" = "Votre semaine de conversations";
@@ -1510,7 +1506,7 @@
 "Write report" = "Rédiger";
 "Writing…" = "Rédaction…";
 "Your current document will remain in version history." = "Votre document actuel sera conservé dans les versions.";
-"Your document" = "Votre document";
+"Your document" = "Ton document";
 "Your file is saved. Install transcription and speaker recognition models to create the report." = "Votre fichier est conservé. Installez les modèles de transcription et de reconnaissance des voix pour créer le compte rendu.";
 "Your headings will appear here." = "Vos titres apparaîtront ici.";
 "Your personal notes" = "Vos notes personnelles";
@@ -1567,6 +1563,8 @@
 "Statistics" = "Statistiques";
 "Text preparation" = "Préparation du texte";
 "Time saved" = "Temps gagné";
+"Time saved (estimate)" = "Temps gagné (estimation)";
+"Compared with typing the same words at 40 words per minute" = "Par rapport à la saisie des mêmes mots au clavier, à 40 mots par minute";
 "To confirm" = "À confirmer";
 "VoxoL needs its permissions and local engines before the shortcut works." = "VoxoL a besoin de ses autorisations et de ses moteurs locaux avant que le raccourci fonctionne.";
 "We meet Wednesday around 10 for the budget." = "On se voit mercredi vers 10 h pour le budget.";
@@ -1586,7 +1584,7 @@
 "Keeps each dictation’s audio on this Mac to measure accuracy on your own voice. 500 MB at most, off in private mode." = "Garde l’audio de chaque dictée sur ce Mac pour mesurer la précision sur ta voix. 500 Mo au plus, désactivé en mode privé.";
 
 /* Notes de version 0.1.7 */
-"A meeting becomes a document you can edit." = "Une réunion devient un document que vous modifiez.";
+"A meeting becomes a document you can edit." = "Une réunion devient un document que tu modifies.";
 "Meeting notes you can edit" = "Un compte rendu modifiable";
 "Headings, lists, checkable tasks and links. A new draft appears beside the current one before it replaces anything, and earlier versions can be restored." = "Titres, listes, tâches à cocher et liens. Un nouveau brouillon s’affiche à côté de la version actuelle avant de remplacer quoi que ce soit, et les versions précédentes se restaurent.";
 "Every passage shows its sources" = "Chaque passage montre ses sources";
@@ -1599,16 +1597,46 @@
 /* Notes de version 0.1.8 */
 "Dictation cleanup is about twice as fast." = "La correction des dictées est environ deux fois plus rapide.";
 "Faster cleanup" = "Une correction plus rapide";
-"Cleanup now checks drafts taken from what you said instead of writing every word, which halves its usual time." = "La correction vérifie maintenant des brouillons tirés de ce que vous avez dit au lieu d’écrire chaque mot, ce qui divise par deux son temps habituel.";
+"Cleanup now checks drafts taken from what you said instead of writing every word, which halves its usual time." = "La correction vérifie maintenant des brouillons tirés de ce que tu as dit au lieu d’écrire chaque mot, ce qui divise par deux son temps habituel.";
 
 /* Notes de version 0.1.9 */
 "Dictation starts sooner and lands more reliably." = "La dictée démarre plus tôt et arrive plus sûrement.";
 "The bubble appears as soon as you press" = "La bulle apparaît dès le raccourci";
 "It no longer waits for the destination app, and the microphone starts with it." = "Elle n’attend plus l’application de destination, et le micro démarre avec elle.";
 "Pasting is more reliable" = "Le collage est plus fiable";
-"Your clipboard comes back two seconds after the paste. If the text doesn’t land, it stays on the clipboard and VoxoL tells you." = "Votre presse-papiers revient deux secondes après le collage. Si le texte n’arrive pas, il y reste et VoxoL vous le signale.";
+"Your clipboard comes back two seconds after the paste. If the text doesn’t land, it stays on the clipboard and VoxoL tells you." = "Ton presse-papiers revient deux secondes après le collage. Si le texte n’arrive pas, il y reste et VoxoL te le signale.";
 "Long dictations join cleanly" = "Les raccords des longues dictées sont corrigés";
 "Words are no longer doubled or cut where two stretches of speech meet." = "Les mots ne sont plus doublés ni coupés là où deux passages se rejoignent.";
 
 /* Notes de version 0.1.10 */
 "A new Hub interface." = "Nouvelle interface du Hub.";
+"Dictation deleted" = "Dictée supprimée";
+"History erased" = "Historique effacé";
+"Delete this dictation?" = "Supprimer cette dictée ?";
+"Delete dictation" = "Supprimer la dictée";
+"Its text and any audio kept with it are removed from this Mac." = "Son texte et l’audio conservé avec elle sont supprimés de ce Mac.";
+"Saved dictations" = "Dictées enregistrées";
+"%lld kept on this Mac" = "%lld conservées sur ce Mac";
+"Erase history" = "Effacer l’historique";
+"Erase all saved dictations?" = "Effacer toutes les dictées enregistrées ?";
+"Every dictation and every recording kept with it is removed from this Mac. This cannot be undone." = "Chaque dictée et chaque enregistrement conservé avec elle sont supprimés de ce Mac. Cette action est irréversible.";
+"Automatic update check" = "Vérification automatique des mises à jour";
+"Reads the public release list on GitHub at launch, then every six hours" = "Lit la liste publique des versions sur GitHub au lancement, puis toutes les six heures";
+"Loading the model…" = "Chargement du modèle…";
+"Screen & System Audio Recording" = "Enregistrement de l’écran et audio système";
+"Record the other side of a call, for meetings only" = "Enregistrer l’autre côté d’un appel, pour les réunions uniquement";
+"Speech recognition" = "Reconnaissance vocale";
+"Text cleanup" = "Mise en forme du texte";
+"The model list could not be read. Reinstall VoxoL." = "La liste des modèles est illisible. Réinstalle VoxoL.";
+"Checking the models…" = "Vérification des modèles…";
+"Checking the installed model" = "Vérification du modèle installé";
+"Not available for download yet" = "Pas encore disponible au téléchargement";
+"Ready to download" = "Prêt à télécharger";
+"Checking the download" = "Vérification du téléchargement";
+"Checking the download…" = "Vérification du téléchargement…";
+"Not available yet" = "Pas encore disponible";
+"Delete this word?" = "Supprimer ce mot ?";
+"Delete this shortcut?" = "Supprimer ce raccourci ?";
+"The export failed" = "L’export a échoué";
+"Nothing was saved. Check the destination folder and the free disk space, then try again." = "Rien n’a été enregistré. Vérifie le dossier choisi et l’espace disque, puis réessaie.";
+"OK" = "OK";

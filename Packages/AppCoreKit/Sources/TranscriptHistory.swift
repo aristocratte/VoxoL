@@ -226,6 +226,7 @@ public enum TranscriptFileStoreError: Error, Equatable, Sendable {
     case unsupportedSchema(Int)
     case recoveryRequired
     case recoveryDestinationIsArchive
+    case archiveIsReadable
 }
 
 /// Serializes history access and protects an archive whose contents could not be read.
@@ -274,6 +275,32 @@ public actor TranscriptFileStore {
             to: archiveURL, options: [.atomic, .completeFileProtection])
     }
 
+    /// Moves an archive that cannot be read out of the way, intact, so history can start again.
+    ///
+    /// Refusing to write was the right protection for the file and the wrong outcome for the
+    /// person: every later dictation stayed in memory and the app would not quit. Renaming keeps
+    /// every byte of the old history and gives new dictations somewhere to go.
+    public func setAsideUnreadableArchive() throws -> URL {
+        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
+            throw TranscriptFileStoreError.fileMissing
+        }
+        guard !canSave else { throw TranscriptFileStoreError.archiveIsReadable }
+        let stamp = Date().formatted(
+            .iso8601.year().month().day().time(includingFractionalSeconds: false)
+                .dateSeparator(.omitted).timeSeparator(.omitted))
+        var destination = directoryURL.appendingPathComponent(
+            "transcripts.unreadable-\(stamp).json")
+        var attempt = 1
+        while FileManager.default.fileExists(atPath: destination.path) {
+            attempt += 1
+            destination = directoryURL.appendingPathComponent(
+                "transcripts.unreadable-\(stamp)-\(attempt).json")
+        }
+        try FileManager.default.moveItem(at: archiveURL, to: destination)
+        canSave = true
+        return destination
+    }
+
     /// Saves a separate recovery copy without granting permission to overwrite an unreadable archive.
     public func exportRecoveryCopy(_ archive: TranscriptArchive, to destination: URL) throws {
         let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path
@@ -295,6 +322,13 @@ public actor TranscriptFileStore {
             .resolvingSymlinksInPath().standardizedFileURL
         guard candidate.path.hasPrefix(root.path + "/") else { return nil }
         return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+    }
+
+    /// Deletes a file kept beside the history (a record's audio, a diagnostics log), under the
+    /// same containment rule as reading one.
+    public func remove(relativePath: String) {
+        guard let url = audioURL(relativePath: relativePath) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 }
 

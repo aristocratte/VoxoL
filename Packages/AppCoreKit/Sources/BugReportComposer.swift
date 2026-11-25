@@ -13,7 +13,7 @@ import Foundation
 /// automatically; opening the issue is their action.
 public enum BugReportComposer {
     /// Where the prefilled issue is opened.
-    public static let issueBaseURL = "https://github.com/arhesstide/voxol/issues/new"
+    public static let issueBaseURL = "https://github.com/aristocratte/VoxoL/issues/new"
 
     /// GitHub rejects a URL far past this, and browsers truncate earlier.
     private static let maximumBodyCharacters = 6_000

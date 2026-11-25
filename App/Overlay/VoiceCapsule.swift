@@ -7,6 +7,7 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
     case listening
     case speechDetected
     case transcribing
+    case preparingModel
     case polishing
     case inserting
     case success
@@ -19,7 +20,7 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var label: LocalizedStringKey {
+    var label: LocalizedStringResource {
         switch self {
         case .listening:
             "Listening…"
@@ -27,6 +28,8 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             "Got it"
         case .transcribing:
             "Transcribing…"
+        case .preparingModel:
+            "Loading the model…"
         case .polishing:
             "Refining…"
         case .inserting:
@@ -59,6 +62,8 @@ enum VoiceCapsulePhase: String, CaseIterable, Identifiable {
             NSSize(width: 126, height: 48)
         case .transcribing:
             NSSize(width: 186, height: 48)
+        case .preparingModel:
+            NSSize(width: 226, height: 48)
         case .polishing:
             NSSize(width: 190, height: 48)
         case .inserting:
@@ -87,7 +92,7 @@ enum VoiceCapsuleFailure: CaseIterable {
     case transcriptionFailed
     case insertionFailed
 
-    var label: LocalizedStringKey {
+    var label: LocalizedStringResource {
         switch self {
         case .microphoneUnavailable:
             "Microphone unavailable"
@@ -282,6 +287,7 @@ private struct VoiceCapsulePanelView: View {
     @Environment(VoxoLTheme.self) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.locale) private var locale
 
     let model: VoiceCapsuleModel
 
@@ -297,7 +303,7 @@ private struct VoiceCapsulePanelView: View {
                     leadingState
                         .frame(width: 24, height: 24)
 
-                    Text(currentLabel)
+                    Text(verbatim: String(currentLabel, in: locale))
                         .font(
                             VoxoLTypography.font(
                                 size: 12.5, weight: .semibold, relativeTo: .caption)
@@ -329,10 +335,23 @@ private struct VoiceCapsulePanelView: View {
         .shadow(color: theme.ink.opacity(0.16), radius: 12, y: 5)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: model.phase)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(currentLabel))
+        .accessibilityLabel(Text(verbatim: String(currentLabel, in: locale)))
+        // The capsule never takes focus, so VoiceOver would otherwise say nothing while it
+        // changes: the states a person acts on are spoken, the passing ones are not.
+        .onChange(of: labelIdentity) { _, _ in
+            guard announcedPhases.contains(model.phase) else { return }
+            AccessibilityNotification.Announcement(String(currentLabel, in: locale)).post()
+        }
     }
 
-    private var currentLabel: LocalizedStringKey {
+    private var announcedPhases: Set<VoiceCapsulePhase> {
+        [
+            .listening, .preparingModel, .success, .copiedFallback, .noSpeech, .tooQuiet,
+            .tooLoud, .learned, .error,
+        ]
+    }
+
+    private var currentLabel: LocalizedStringResource {
         switch model.phase {
         case .error:
             model.failure.label
@@ -352,7 +371,8 @@ private struct VoiceCapsulePanelView: View {
         case .error:
             theme.recording
         case .noSpeech:
-            theme.coral
+            // Coral on the capsule's paper is under 3:1; the grain already carries the state.
+            theme.ink
         case .copiedFallback:
             theme.warning
         default:
@@ -366,7 +386,8 @@ private struct VoiceCapsulePanelView: View {
     @ViewBuilder
     private var leadingState: some View {
         switch model.phase {
-        case .listening, .speechDetected, .transcribing, .polishing, .inserting, .noSpeech:
+        case .listening, .speechDetected, .transcribing, .preparingModel, .polishing, .inserting,
+            .noSpeech:
             VoxoLGrainSphere(
                 resolution: sphereResolution,
                 energy: sphereEnergy,
@@ -404,7 +425,7 @@ private struct VoiceCapsulePanelView: View {
         case .noSpeech: 0.05
         case .listening: 0.3
         case .speechDetected: 0.55
-        case .transcribing: 0.6
+        case .transcribing, .preparingModel: 0.6
         case .polishing: 0.8
         case .inserting: 0.95
         default: 1
@@ -422,7 +443,7 @@ private struct VoiceCapsulePanelView: View {
     /// Work in progress: the light sweeps round the form while the model runs.
     private var sphereChurn: Double {
         switch model.phase {
-        case .transcribing, .polishing: 1
+        case .transcribing, .preparingModel, .polishing: 1
         case .inserting: 0.4
         default: 0
         }
