@@ -116,6 +116,8 @@ class CaseTests(unittest.TestCase):
         links = [self.link("Je vais livré le module demain.", "Je vais livrer le module demain.")]
         cases, exclusions = MODULE.build_cases(links, owner_confirmed=False)
         repository = Path(__file__).resolve().parents[1]
+        # Ignored by git and absent from a fresh clone, where this test used to error out.
+        (repository / "outputs").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=repository / "outputs") as directory:
             MODULE.write_suite(Path(directory), cases, exclusions, inputs={"history": "abc"},
                                owner_confirmed=False)

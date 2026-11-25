@@ -7,6 +7,7 @@ from http.server import ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,6 +25,12 @@ sys.path.insert(0, str(SCRIPTS))
 import wispr_youtube_batch as batch  # noqa: E402
 import wispr_youtube_eta as eta  # noqa: E402
 import wispr_youtube_ui as ui  # noqa: E402
+
+# The collection tools are not part of a fresh machine. These tests exercise them for real, so
+# without them they are skipped rather than reported as failures of the code under test.
+needs_ffmpeg = unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is not installed")
+needs_collection_tools = unittest.skipUnless(
+    shutil.which("ffmpeg") and shutil.which("yt-dlp"), "ffmpeg and yt-dlp are not installed")
 
 
 class URLBatchTests(unittest.TestCase):
@@ -84,6 +91,7 @@ class URLBatchTests(unittest.TestCase):
             args.urls_file = pasted
             self.assertEqual(batch.source_lines(args), ["https://youtu.be/abc123def45"])
 
+    @needs_ffmpeg
     def test_download_retries_after_failure_and_reuses_verified_audio(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -114,6 +122,7 @@ class URLBatchTests(unittest.TestCase):
                 self.assertEqual(batch.download_video(item, root / "cache", str(fake), "ffprobe"), path)
             self.assertEqual(calls.read_text(), "2")
 
+    @needs_collection_tools
     def test_batch_job_persists_and_resumes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -145,6 +154,7 @@ class URLBatchTests(unittest.TestCase):
                 )), 0)
                 self.assertTrue(batch.read_json(job_path)["complete"])
 
+    @needs_collection_tools
     def test_batch_processes_three_videos_concurrently(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -196,6 +206,7 @@ class URLBatchTests(unittest.TestCase):
 
 
 class CollectorRecoveryTests(unittest.TestCase):
+    @needs_ffmpeg
     def test_parallel_collectors_share_request_throttle(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -247,6 +258,7 @@ class CollectorRecoveryTests(unittest.TestCase):
             # the whole span to avoid fake curl process-startup jitter.
             self.assertGreaterEqual(times[-1] - times[0], 1.4)
 
+    @needs_ffmpeg
     def test_failed_edited_request_resumes_without_repeating_raw(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

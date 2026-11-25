@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 import youtube_mp3_ui as ui
 
 
+@unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg is not installed")
 class YouTubeMP3Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

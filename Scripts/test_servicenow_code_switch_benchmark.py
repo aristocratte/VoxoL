@@ -6,6 +6,10 @@ import importlib.util
 from pathlib import Path
 import unittest
 
+# The preparation script reads parquet. Without pyarrow there is nothing to test here, and an
+# import error would fail the whole run instead of reporting one skipped module.
+if importlib.util.find_spec("pyarrow") is None:
+    raise unittest.SkipTest("pyarrow is not installed")
 
 ROOT = Path(__file__).resolve().parents[1]
 
