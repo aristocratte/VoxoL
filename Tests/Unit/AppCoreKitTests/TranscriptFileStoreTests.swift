@@ -216,4 +216,51 @@ final class TranscriptFileStoreTests: XCTestCase {
             XCTAssertEqual(error as? TranscriptFileStoreError, .archiveIsReadable)
         }
     }
+
+    private func benchmarkSession(
+        in directory: URL, named name: String, finalText: String, date: Date
+    ) throws -> URL {
+        let session = directory.appendingPathComponent("PersonalBenchmark/sessions/\(name)")
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let meta: [String: Any] = [
+            "finalText": finalText, "rawText": finalText,
+            "date": ISO8601DateFormatter().string(from: date),
+        ]
+        try JSONSerialization.data(withJSONObject: meta)
+            .write(to: session.appendingPathComponent("meta.json"))
+        try Data("audio".utf8).write(to: session.appendingPathComponent("audio.wav"))
+        return session
+    }
+
+    func testDeletingADictationAlsoDeletesItsBenchmarkRecording() async throws {
+        let directory = try directory()
+        let now = Date()
+        let mine = try benchmarkSession(
+            in: directory, named: "a", finalText: "Envoie le rapport.", date: now)
+        let other = try benchmarkSession(
+            in: directory, named: "b", finalText: "Autre chose.", date: now)
+        let sameTextLater = try benchmarkSession(
+            in: directory, named: "c", finalText: "Envoie le rapport.",
+            date: now.addingTimeInterval(3_600))
+        let store = TranscriptFileStore(directoryURL: directory)
+
+        await store.removeBenchmarkRecording(text: "Envoie le rapport.", createdAt: now)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: mine.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: other.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sameTextLater.path))
+    }
+
+    func testErasingEverythingDeletesEveryBenchmarkRecording() async throws {
+        let directory = try directory()
+        _ = try benchmarkSession(in: directory, named: "a", finalText: "Un.", date: Date())
+        _ = try benchmarkSession(in: directory, named: "b", finalText: "Deux.", date: Date())
+        let store = TranscriptFileStore(directoryURL: directory)
+
+        await store.removeAllBenchmarkRecordings()
+
+        let sessions = directory.appendingPathComponent("PersonalBenchmark/sessions")
+        XCTAssertEqual(
+            (try? FileManager.default.contentsOfDirectory(atPath: sessions.path)) ?? [], [])
+    }
 }

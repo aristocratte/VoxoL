@@ -324,6 +324,40 @@ public actor TranscriptFileStore {
         return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
     }
 
+    private var benchmarkSessionsURL: URL {
+        directoryURL.appendingPathComponent("PersonalBenchmark/sessions", isDirectory: true)
+    }
+
+    /// Deletes the benchmark recording made of one dictation, matched by its inserted text
+    /// and a write time within two minutes of the record's. The recording holds the audio and
+    /// both texts, so deleting only the history entry left the dictation on disk.
+    public func removeBenchmarkRecording(text: String, createdAt: Date) {
+        let sessions =
+            (try? FileManager.default.contentsOfDirectory(
+                at: benchmarkSessionsURL, includingPropertiesForKeys: nil)) ?? []
+        let formatter = ISO8601DateFormatter()
+        for session in sessions {
+            guard
+                let data = try? Data(contentsOf: session.appendingPathComponent("meta.json")),
+                let meta = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                meta["finalText"] as? String == text,
+                let written = (meta["date"] as? String).flatMap(formatter.date(from:)),
+                abs(written.timeIntervalSince(createdAt)) <= 120
+            else { continue }
+            try? FileManager.default.removeItem(at: session)
+        }
+    }
+
+    /// Deletes every benchmark recording; the folder itself stays so capture can resume.
+    public func removeAllBenchmarkRecordings() {
+        let sessions =
+            (try? FileManager.default.contentsOfDirectory(
+                at: benchmarkSessionsURL, includingPropertiesForKeys: nil)) ?? []
+        for session in sessions {
+            try? FileManager.default.removeItem(at: session)
+        }
+    }
+
     /// Deletes a file kept beside the history (a record's audio, a diagnostics log), under the
     /// same containment rule as reading one.
     public func remove(relativePath: String) {

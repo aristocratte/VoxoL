@@ -717,7 +717,8 @@ private extension DictationSessionCoordinator {
                     applicationName: destinationApplicationName
                 )
             }
-            if setting("voxol.prefetchEnabled", default: true),
+            if !destinationIsSecureField,
+                setting("voxol.prefetchEnabled", default: true),
                 setting("voxol.streamingEnabled", default: true),
                 dictationLanguagePreference == .automatic,
                 !ProcessInfo.processInfo.isLowPowerModeEnabled,
@@ -736,7 +737,9 @@ private extension DictationSessionCoordinator {
                     return
                 }
             }
-            startPartialTranscription()
+            if !destinationIsSecureField {
+                startPartialTranscription()
+            }
         } catch {
             toggleSessionIsActive = false
             cancelTextPrefetch()
@@ -920,6 +923,22 @@ private extension DictationSessionCoordinator {
         guard let capturedAudio = audioCapture.stop() else {
             return
         }
+        // A password is not dictated. The insertion would be refused anyway, and transcribing
+        // first left the words in the benchmark capture, the diagnostics log and the pipeline
+        // trace, which only the history was kept out of.
+        if destinationIsSecureField {
+            destinationIsSecureField = false
+            destinationInsertionTarget = nil
+            destinationContext = nil
+            liveInputLevel = 0
+            livePartialTranscript = ""
+            VoiceCapsuleController.shared.updateInputLevel(0)
+            state = .failed
+            lastError = TextInjectionError.secureField.localizedDescription
+            VoiceCapsuleController.shared.showError(.secureField)
+            dismissCapsule(after: .seconds(2))
+            return
+        }
         let captureTrace: [String: String] = [
             "inputDeviceUID": audioCapture.activeInputUID ?? "unknown",
             "inputSampleRateHz": String(audioCapture.inputSampleRate),
@@ -961,8 +980,6 @@ private extension DictationSessionCoordinator {
 
         let insertionTarget = destinationInsertionTarget
         destinationInsertionTarget = nil
-        let startedInSecureField = destinationIsSecureField
-        destinationIsSecureField = false
         let capturedContext = destinationContext
         destinationContext = nil
         // Endpointing drives live feedback only. The push-to-talk capture and
@@ -1245,7 +1262,7 @@ private extension DictationSessionCoordinator {
                     return
                 }
 
-                if let transcriptStore, !startedInSecureField {
+                if let transcriptStore {
                     let revisions =
                         rawText == text
                         ? []

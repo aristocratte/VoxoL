@@ -133,8 +133,10 @@ final class TranscriptStore {
     func deleteAll() async {
         let erased = records
         records = []
-        // This log quotes the words the recogniser doubted, so it goes with the history.
+        // These quote what was said (the recogniser's doubtful words, the benchmark audio and
+        // texts), so they go with the history.
         await fileStore.remove(relativePath: "Diagnostics/repair-shadow.jsonl")
+        await fileStore.removeAllBenchmarkRecordings()
         await forget(erased)
         if historyIssue == nil { toast = .historyErased }
     }
@@ -147,6 +149,7 @@ final class TranscriptStore {
             if let path = record.audioRelativePath {
                 await fileStore.remove(relativePath: path)
             }
+            await fileStore.removeBenchmarkRecording(text: record.text, createdAt: record.createdAt)
         }
         await persist()
     }

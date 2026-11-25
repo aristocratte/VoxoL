@@ -1640,3 +1640,4 @@
 "The export failed" = "L’export a échoué";
 "Nothing was saved. Check the destination folder and the free disk space, then try again." = "Rien n’a été enregistré. Vérifie le dossier choisi et l’espace disque, puis réessaie.";
 "OK" = "OK";
+"Not in a password field" = "Pas dans un champ mot de passe";

@@ -91,6 +91,7 @@ enum VoiceCapsuleFailure: CaseIterable {
     case modelsUnavailable
     case transcriptionFailed
     case insertionFailed
+    case secureField
 
     var label: LocalizedStringResource {
         switch self {
@@ -102,6 +103,8 @@ enum VoiceCapsuleFailure: CaseIterable {
             "Couldn’t transcribe"
         case .insertionFailed:
             "Couldn’t insert text"
+        case .secureField:
+            "Not in a password field"
         }
     }
 }

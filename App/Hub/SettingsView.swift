@@ -462,6 +462,8 @@ struct SettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Erase history", role: .destructive) {
+                // The in-memory pipeline traces quote the last dictations too.
+                dictationSession.clearPipelineTraces()
                 Task { await transcripts.deleteAll() }
             }
         } message: {
